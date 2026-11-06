@@ -1474,14 +1474,7 @@ async function renderRouteWorth(container) {
           <button class="btn btn-sm btn-primary" onclick="markRWReceived('${pkg.id}', this)">✓ Mark Received</button>
         </div>
       </div>
-      ${pkg.summary ? `<div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:8px;font-size:12px">
-        <div style="display:flex;gap:24px;flex-wrap:wrap">
-          <div><div style="font-weight:600;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.05em">Gross Income</div><div style="font-variant-numeric:tabular-nums;font-weight:600;margin-top:2px">${fmt(pkg.summary?.gross_income || 0)}</div></div>
-          <div><div style="font-weight:600;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.05em">Total Expenses</div><div style="font-variant-numeric:tabular-nums;font-weight:600;margin-top:2px">${fmt(pkg.summary?.total_expenses || 0)}</div></div>
-          <div><div style="font-weight:600;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.05em">Miles</div><div style="font-variant-numeric:tabular-nums;font-weight:600;margin-top:2px">${(pkg.summary?.total_miles || 0).toLocaleString()}</div></div>
-          <div><div style="font-weight:600;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.05em">Net Income</div><div style="font-variant-numeric:tabular-nums;font-weight:600;margin-top:2px">${fmt(pkg.summary?.net_income || 0)}</div></div>
-        </div>
-      </div>` : ''}
+      ${pkg.summary ? '<div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:8px;font-size:12px"><div style="display:flex;gap:24px;flex-wrap:wrap"><div><div style="font-weight:600;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.05em">Gross Income</div><div style="font-variant-numeric:tabular-nums;font-weight:600;margin-top:2px">' + fmt(pkg.summary.gross_income || 0) + '</div></div><div><div style="font-weight:600;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.05em">Total Expenses</div><div style="font-variant-numeric:tabular-nums;font-weight:600;margin-top:2px">' + fmt(pkg.summary.total_expenses || 0) + '</div></div><div><div style="font-weight:600;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.05em">Miles</div><div style="font-variant-numeric:tabular-nums;font-weight:600;margin-top:2px">' + (pkg.summary.total_miles || 0).toLocaleString() + '</div></div><div><div style="font-weight:600;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.05em">Net Income</div><div style="font-variant-numeric:tabular-nums;font-weight:600;margin-top:2px">' + fmt(pkg.summary.net_income || 0) + '</div></div></div></div>' : ''}
     </div>
   `).join('');
 }
