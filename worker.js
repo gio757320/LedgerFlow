@@ -1022,7 +1022,6 @@ function openClientDetail(c) {
       inviteBtn.textContent = 'Done ✓';
     });
   }
-}
 
   const resendBtn = document.getElementById('cdet-resend-btn');
   if (resendBtn) {
