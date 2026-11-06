@@ -1,0 +1,2213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>LedgerFlow — Manrique & Associates</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Serif+Display&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.0/dist/umd/supabase.js"></script>
+<style>
+/* ── Design tokens ───────────────────────────────────────────── */
+:root {
+  --navy:   #0f1f3d;
+  --navy2:  #1a3260;
+  --green:  #2e9e6b;
+  --green2: #24885a;
+  --gold:   #c9963a;
+  --red:    #d94f4f;
+  --bg:     #f4f6f9;
+  --surface:#ffffff;
+  --border: #dde2ea;
+  --text:   #1a2535;
+  --muted:  #6b7a8f;
+  --sidebar-w: 220px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:     #0d1117;
+    --surface:#161c27;
+    --border: #2a3344;
+    --text:   #e2e8f0;
+    --muted:  #8899aa;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg:     #0d1117;
+  --surface:#161c27;
+  --border: #2a3344;
+  --text:   #e2e8f0;
+  --muted:  #8899aa;
+  color-scheme: dark;
+}
+
+/* ── Reset / base ────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: 'Inter', system-ui, sans-serif; font-size: 14px; }
+body { background: var(--bg); color: var(--text); display: flex; flex-direction: column; }
+a { color: var(--green); text-decoration: none; }
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+input, select, textarea { font-family: inherit; font-size: 14px; }
+[hidden] { display: none !important; }
+
+/* ── Login screen ────────────────────────────────────────────── */
+#login-screen {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy2) 100%);
+  padding: 24px;
+}
+.login-card {
+  background: var(--surface); border-radius: 16px; padding: 48px 40px;
+  width: 100%; max-width: 420px; box-shadow: 0 20px 60px rgba(0,0,0,.35);
+}
+.login-logo {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 32px;
+}
+.login-logo-mark {
+  width: 42px; height: 42px; border-radius: 10px;
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy2) 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Serif Display', serif; color: #fff; font-size: 22px;
+}
+.login-logo-name { font-weight: 700; font-size: 20px; color: #fff; }
+.login-logo-name span { color: var(--green); }
+.login-h { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+.login-sub { color: var(--muted); margin-bottom: 28px; font-size: 13px; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.form-group input {
+  width: 100%; padding: 10px 14px; border-radius: 8px;
+  border: 1.5px solid var(--border); background: var(--bg);
+  color: var(--text); outline: none; transition: border-color .15s;
+}
+.form-group input:focus { border-color: var(--green); }
+#login-btn {
+  width: 100%; padding: 12px; border-radius: 8px;
+  background: var(--green); color: #fff; font-weight: 600; font-size: 15px;
+  margin-top: 8px; transition: background .15s;
+}
+#login-btn:hover { background: var(--green2); }
+#login-btn:disabled { opacity: .6; cursor: not-allowed; }
+#login-error { color: var(--red); font-size: 13px; margin-top: 10px; min-height: 18px; }
+.login-firm { text-align: center; margin-top: 24px; color: var(--muted); font-size: 12px; }
+
+/* ── App shell (after login) ─────────────────────────────────── */
+#app-shell { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Top bar */
+#topbar {
+  height: 56px; background: var(--navy); color: #fff;
+  display: flex; align-items: center; padding: 0 20px;
+  gap: 12px; flex-shrink: 0; z-index: 100;
+}
+#topbar-logo { font-family: 'DM Serif Display', serif; font-size: 20px; letter-spacing: -.3px; }
+#topbar-logo span { color: var(--gold); }
+#topbar-client-badge {
+  background: rgba(255,255,255,.12); border-radius: 20px;
+  padding: 3px 12px; font-size: 12px; font-weight: 500;
+}
+#topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+#topbar-user { font-size: 13px; opacity: .8; }
+#topbar-role-badge {
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
+  background: rgba(46,158,107,.25); color: #6dffc1;
+}
+#logout-btn { font-size: 12px; opacity: .7; color: #fff; padding: 4px 8px; }
+#logout-btn:hover { opacity: 1; }
+
+/* Layout */
+#shell { flex: 1; display: flex; overflow: hidden; }
+
+/* Sidebar */
+#sidenav {
+  width: var(--sidebar-w); background: var(--surface);
+  border-right: 1px solid var(--border); display: flex;
+  flex-direction: column; flex-shrink: 0; overflow-y: auto;
+}
+.nav-section { padding: 16px 0 4px; }
+.nav-label {
+  padding: 0 16px 6px; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .07em; color: var(--muted);
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 16px; cursor: pointer; border-radius: 0;
+  color: var(--text); font-size: 13px; font-weight: 500;
+  transition: background .1s; border-left: 3px solid transparent;
+  user-select: none; width: 100%; text-align: left;
+}
+.nav-item:hover { background: var(--bg); }
+.nav-item.active {
+  background: rgba(46,158,107,.1); color: var(--green);
+  border-left-color: var(--green); font-weight: 600;
+}
+.nav-item .icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+.nav-item .badge {
+  margin-left: auto; background: var(--red); color: #fff;
+  font-size: 10px; font-weight: 700; border-radius: 10px;
+  padding: 1px 6px; min-width: 18px; text-align: center;
+}
+.nav-divider { height: 1px; background: var(--border); margin: 8px 0; }
+#client-select-wrap { padding: 12px 12px 4px; }
+#client-select {
+  width: 100%; padding: 7px 10px; border-radius: 8px;
+  border: 1.5px solid var(--border); background: var(--bg);
+  color: var(--text); font-size: 13px; outline: none;
+}
+#client-select:focus { border-color: var(--green); }
+#nav-routeworth-section { border-top: 1px solid var(--border); margin-top: auto; }
+
+/* Main column */
+#main-col { flex: 1; display: flex; flex-direction: column; overflow: auto; min-width: 0; }
+
+/* Page header */
+.page-header {
+  background: var(--navy); color: #fff; padding: 20px 28px 0;
+  flex-shrink: 0;
+}
+.page-header-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.page-title { font-family: 'DM Serif Display', serif; font-size: 24px; }
+.page-sub { font-size: 13px; opacity: .7; margin-top: 4px; }
+.page-actions { display: flex; gap: 8px; flex-shrink: 0; margin-top: 4px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; }
+.btn-primary { background: var(--green); color: #fff; }
+.btn-primary:hover { background: var(--green2); }
+.btn-secondary { background: rgba(255,255,255,.12); color: #fff; }
+.btn-secondary:hover { background: rgba(255,255,255,.2); }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+
+/* KPI strip */
+.kpi-strip { display: flex; gap: 0; margin-top: 20px; }
+.kpi {
+  flex: 1; padding: 12px 16px; border-right: 1px solid rgba(255,255,255,.1);
+  min-width: 0;
+}
+.kpi:last-child { border-right: none; }
+.kpi-val { font-size: 22px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.kpi-label { font-size: 11px; opacity: .65; margin-top: 4px; text-transform: uppercase; letter-spacing: .04em; }
+
+/* Tab bar */
+.tab-bar {
+  display: flex; background: var(--navy); padding: 0 28px;
+  border-bottom: 2px solid var(--border); flex-shrink: 0;
+}
+.tab-btn {
+  padding: 10px 16px; font-size: 13px; font-weight: 500;
+  color: rgba(255,255,255,.6); border-bottom: 2px solid transparent;
+  margin-bottom: -2px; white-space: nowrap; cursor: pointer;
+  transition: color .15s, border-color .15s; background: none;
+}
+.tab-btn:hover { color: rgba(255,255,255,.9); }
+.tab-btn.active { color: #fff; border-bottom-color: var(--gold); font-weight: 600; }
+
+/* Main scroll area */
+#main { flex: 1; overflow-y: auto; padding: 24px 28px; }
+
+/* ── Shared components ───────────────────────────────────────── */
+.section-h { font-size: 15px; font-weight: 700; margin-bottom: 14px; color: var(--text); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: visible; margin-bottom: 20px; }
+.card table { width: 100%; }
+.card .table-wrap { overflow-x: auto; }
+.card-h { padding: 14px 18px; border-bottom: 1px solid var(--border); font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: space-between; }
+.card-body { padding: 18px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { padding: 10px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); background: var(--bg); text-align: left; }
+td { padding: 11px 14px; border-top: 1px solid var(--border); vertical-align: middle; }
+tr:hover td { background: rgba(46,158,107,.04); }
+.badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.badge-green  { background: rgba(46,158,107,.15); color: var(--green); }
+.badge-gold   { background: rgba(201,150,58,.15);  color: var(--gold); }
+.badge-red    { background: rgba(217,79,79,.15);   color: var(--red); }
+.badge-blue   { background: rgba(66,133,244,.15);  color: #4285f4; }
+.badge-grey   { background: var(--bg);             color: var(--muted); border: 1px solid var(--border); }
+.empty { text-align: center; padding: 48px 24px; color: var(--muted); }
+.empty .empty-icon { font-size: 36px; margin-bottom: 10px; }
+.spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--green); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-block { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 48px; color: var(--muted); }
+.alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 14px; }
+.alert-red { background: rgba(217,79,79,.1); color: var(--red); border: 1px solid rgba(217,79,79,.25); }
+.alert-gold { background: rgba(201,150,58,.1); color: var(--gold); border: 1px solid rgba(201,150,58,.25); }
+.alert-green { background: rgba(46,158,107,.1); color: var(--green); border: 1px solid rgba(46,158,107,.25); }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+
+/* ── Dashboard ───────────────────────────────────────────────── */
+#dash-kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+@media (max-width: 700px) { #dash-kpi-row { grid-template-columns: 1fr 1fr; } }
+.stat-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 18px; display: flex; flex-direction: column; gap: 6px;
+}
+.stat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.stat-val { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+.stat-sub { font-size: 12px; color: var(--muted); }
+.stat-green { border-left: 3px solid var(--green); }
+.stat-gold  { border-left: 3px solid var(--gold); }
+.stat-red   { border-left: 3px solid var(--red); }
+.stat-blue  { border-left: 3px solid #4285f4; }
+
+/* ── Chart ───────────────────────────────────────────────────── */
+.mini-bar-wrap { display: flex; gap: 6px; align-items: flex-end; height: 80px; }
+.mini-bar-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+.mini-bar { background: var(--green); border-radius: 4px 4px 0 0; min-height: 4px; transition: height .3s; }
+.mini-bar-label { font-size: 10px; color: var(--muted); }
+.mini-bar-val { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ── Accounts ────────────────────────────────────────────────── */
+.acct-type { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); background: var(--bg); padding: 6px 14px; }
+
+/* ── Journal ────────────────────────────────────────────────── */
+.je-line-table th, .je-line-table td { padding: 8px 12px; }
+
+/* ── Modal ────────────────────────────────────────────────────── */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,.55);
+  z-index: 1000; display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal {
+  background: var(--surface); border-radius: 14px; width: 100%; max-width: 540px;
+  max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 80px rgba(0,0,0,.4);
+}
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--border); }
+.modal-header h3 { font-size: 16px; font-weight: 700; }
+.modal-close { font-size: 20px; color: var(--muted); line-height: 1; padding: 2px; }
+.modal-body { padding: 22px; }
+.modal-footer { padding: 14px 22px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+.btn-outline { background: none; border: 1.5px solid var(--border); color: var(--text); }
+.btn-outline:hover { border-color: var(--muted); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-field { margin-bottom: 16px; }
+.form-field label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.form-field input, .form-field select, .form-field textarea {
+  width: 100%; padding: 9px 12px; border-radius: 8px;
+  border: 1.5px solid var(--border); background: var(--bg); color: var(--text);
+  outline: none; transition: border-color .15s;
+}
+.form-field input:focus, .form-field select:focus, .form-field textarea:focus { border-color: var(--green); }
+
+/* ── Responsive sidebar ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  :root { --sidebar-w: 0px; }
+  #sidenav { position: fixed; left: 0; top: 56px; bottom: 0; width: 240px; z-index: 200; transform: translateX(-100%); transition: transform .25s; }
+  #sidenav.open { transform: translateX(0); }
+  #menu-btn { display: flex !important; }
+}
+#menu-btn { display: none; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; background: rgba(255,255,255,.12); color: #fff; font-size: 18px; }
+
+/* ── RouteWorth packages ─────────────────────────────────────── */
+.rw-pkg { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+.rw-pkg-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.rw-pkg-code { font-family: monospace; font-size: 12px; color: var(--muted); }
+.rw-pkg-name { font-weight: 600; font-size: 14px; }
+.rw-pkg-meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN SCREEN ══════════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-mark">M</div>
+      <div>
+        <div class="login-logo-name">Ledger<span>Flow</span></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:1px;">Manrique &amp; Associates LLC</div>
+      </div>
+    </div>
+    <div class="login-h">Sign in to your account</div>
+    <div class="login-sub">Secure access for staff and clients</div>
+    <div class="form-group">
+      <label>Email address</label>
+      <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button id="login-btn">Sign in</button>
+    <div id="login-error"></div>
+    <div style="text-align:right;margin-top:8px">
+      <a href="#" id="forgot-link" style="font-size:12px;color:var(--green)">Forgot password?</a>
+    </div>
+    <div class="login-firm">Manrique &amp; Associates LLC &nbsp;·&nbsp; Secure Portal</div>
+  </div>
+</div>
+
+<!-- ══ APP SHELL ═════════════════════════════════════════════ -->
+<div id="app-shell" hidden>
+
+  <!-- Top bar -->
+  <div id="topbar">
+    <button id="menu-btn" aria-label="Menu">☰</button>
+    <div id="topbar-logo">Ledger<span>Flow</span></div>
+    <div id="topbar-client-badge" hidden></div>
+    <div id="client-portal-banner" hidden style="font-size:12px;font-weight:600;color:var(--gold);background:rgba(201,150,58,.12);border:1px solid rgba(201,150,58,.3);border-radius:6px;padding:3px 10px;letter-spacing:.03em;">CLIENT PORTAL</div>
+    <div id="topbar-right">
+      <span id="topbar-user"></span>
+      <span id="topbar-role-badge"></span>
+      <button id="logout-btn">Sign out</button>
+    </div>
+  </div>
+
+  <div id="shell">
+    <!-- Sidebar -->
+    <nav id="sidenav">
+      <!-- Client selector (staff only) -->
+      <div id="client-select-wrap" hidden>
+        <select id="client-select">
+          <option value="">— All Clients —</option>
+        </select>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-label">Main</div>
+        <button class="nav-item active" data-screen="dashboard" id="nav-dashboard-btn">
+          <span class="icon">📊</span> <span id="nav-dashboard-label">Dashboard</span>
+        </button>
+        <button class="nav-item" data-screen="clients" id="nav-clients-btn">
+          <span class="icon">👥</span> Clients
+        </button>
+        <button class="nav-item" data-screen="accounts" id="nav-accounts-btn">
+          <span class="icon">📒</span> Chart of Accounts
+        </button>
+        <button class="nav-item" data-screen="journal" id="nav-journal-btn">
+          <span class="icon">📋</span> Journal Entries
+        </button>
+      </div>
+
+      <div class="nav-divider"></div>
+      <div class="nav-section">
+        <div class="nav-label">Payroll &amp; Tax</div>
+        <button class="nav-item" data-screen="payroll">
+          <span class="icon">💼</span> Payroll
+        </button>
+        <button class="nav-item" data-screen="tax">
+          <span class="icon">🏛</span> Tax Returns
+        </button>
+      </div>
+
+      <div class="nav-divider"></div>
+      <div class="nav-section" id="nav-staff-only">
+        <div class="nav-label">Firm</div>
+        <button class="nav-item" data-screen="reports">
+          <span class="icon">📈</span> Reports
+        </button>
+        <button class="nav-item" data-screen="routeworth">
+          <span class="icon">🚗</span> RouteWorth Packages
+        </button>
+      </div>
+
+      <!-- Client portal footer info -->
+      <div id="nav-client-footer" hidden style="margin-top:auto;padding:16px;border-top:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Your Firm</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text)">Manrique &amp; Associates</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Secure Client Portal</div>
+      </div>
+    </nav>
+
+    <!-- Main column -->
+    <div id="main-col">
+      <div id="screen-container">
+        <!-- screens injected here -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  CONFIG
+// ════════════════════════════════════════════════════════════
+const SUPA_URL = 'https://ssflitvilylhdeuabfyu.supabase.co';
+const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzZmxpdHZpbHlsaGRldWFiZnl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM3NTYwNzAsImV4cCI6MjEwOTMzMjA3MH0.yTdW1VYQWJyyk0V8LtP5A8W2IVLZDAbxML61VvyU364';
+const sb = supabase.createClient(SUPA_URL, SUPA_ANON);
+
+// ════════════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════════════
+let STATE = {
+  user: null,
+  staffRow: null,
+  isStaff: false,
+  isAdmin: false,
+  clientRows: [],
+  selectedClientId: null,
+  currentScreen: 'dashboard'
+};
+
+// ════════════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════════════
+(async () => {
+  const {
+    data: {
+      session
+    }
+  } = await sb.auth.getSession();
+  if (session) await onSignedIn(session.user);
+  sb.auth.onAuthStateChange((ev, session) => {
+    if (ev === 'PASSWORD_RECOVERY') {
+      // Show a "set new password" form instead of the app
+      showPasswordResetForm();
+      return;
+    }
+    if (session) onSignedIn(session.user);else onSignedOut();
+  });
+
+  // Login form
+  document.getElementById('login-btn').addEventListener('click', doLogin);
+  document.getElementById('forgot-link').addEventListener('click', async e => {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value.trim();
+    if (!email) {
+      document.getElementById('login-error').textContent = 'Enter your email address first.';
+      return;
+    }
+    const {
+      error
+    } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: 'https://noisy-glitter-bdba.gio757.workers.dev'
+    });
+    const errEl = document.getElementById('login-error');
+    if (error) {
+      errEl.style.color = 'var(--red)';
+      errEl.textContent = 'Error: ' + error.message;
+    } else {
+      errEl.style.color = 'var(--green)';
+      errEl.textContent = 'Password reset email sent! Check your inbox.';
+    }
+  });
+  document.getElementById('login-password').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+  });
+
+  // Logout
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    await sb.auth.signOut();
+  });
+
+  // Sidebar navigation
+  document.getElementById('sidenav').addEventListener('click', e => {
+    const btn = e.target.closest('[data-screen]');
+    if (!btn) return;
+    navigateTo(btn.dataset.screen);
+  });
+
+  // Client selector
+  document.getElementById('client-select').addEventListener('change', e => {
+    STATE.selectedClientId = e.target.value || null;
+    renderScreen(STATE.currentScreen);
+  });
+
+  // Mobile menu
+  document.getElementById('menu-btn').addEventListener('click', () => {
+    document.getElementById('sidenav').classList.toggle('open');
+  });
+
+  // Close sidebar on main click (mobile)
+  document.getElementById('main-col').addEventListener('click', () => {
+    document.getElementById('sidenav').classList.remove('open');
+  });
+})();
+
+// ════════════════════════════════════════════════════════════
+//  AUTH HELPERS
+// ════════════════════════════════════════════════════════════
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pwd = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  errEl.textContent = '';
+  if (!email || !pwd) {
+    errEl.textContent = 'Please enter your email and password.';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+  const {
+    error
+  } = await sb.auth.signInWithPassword({
+    email,
+    password: pwd
+  });
+  btn.disabled = false;
+  btn.textContent = 'Sign in';
+  if (error) errEl.textContent = error.message;
+}
+function showPasswordResetForm() {
+  // Hide login screen and app, show a simple set-password form
+  document.getElementById('login-screen').hidden = true;
+  document.getElementById('app-shell').hidden = true;
+  let el = document.getElementById('pw-reset-screen');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'pw-reset-screen';
+    el.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:999';
+    el.innerHTML = "\n      <div style=\"background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:36px;width:100%;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,.3)\">\n        <div style=\"font-size:22px;font-weight:700;color:var(--text);margin-bottom:6px\">Set New Password</div>\n        <div style=\"font-size:13px;color:var(--muted);margin-bottom:24px\">Enter a new password for your account.</div>\n        <label style=\"font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em\">New Password</label>\n        <input type=\"password\" id=\"new-pw-input\" placeholder=\"••••••••\" autocomplete=\"new-password\"\n          style=\"width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;margin-top:6px;margin-bottom:16px;box-sizing:border-box\">\n        <label style=\"font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em\">Confirm Password</label>\n        <input type=\"password\" id=\"new-pw-confirm\" placeholder=\"••••••••\" autocomplete=\"new-password\"\n          style=\"width:100%;padding:10px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;margin-top:6px;margin-bottom:20px;box-sizing:border-box\">\n        <div id=\"new-pw-msg\" style=\"font-size:13px;min-height:18px;margin-bottom:12px\"></div>\n        <button id=\"new-pw-btn\" class=\"btn btn-primary\" style=\"width:100%;padding:12px\">Set Password</button>\n      </div>";
+    document.body.appendChild(el);
+    document.getElementById('new-pw-btn').addEventListener('click', async () => {
+      const pw = document.getElementById('new-pw-input').value;
+      const pw2 = document.getElementById('new-pw-confirm').value;
+      const msg = document.getElementById('new-pw-msg');
+      if (pw.length < 6) {
+        msg.style.color = 'var(--red)';
+        msg.textContent = 'Password must be at least 6 characters.';
+        return;
+      }
+      if (pw !== pw2) {
+        msg.style.color = 'var(--red)';
+        msg.textContent = 'Passwords do not match.';
+        return;
+      }
+      document.getElementById('new-pw-btn').disabled = true;
+      document.getElementById('new-pw-btn').textContent = 'Saving…';
+      const {
+        error
+      } = await sb.auth.updateUser({
+        password: pw
+      });
+      if (error) {
+        msg.style.color = 'var(--red)';
+        msg.textContent = 'Error: ' + error.message;
+        document.getElementById('new-pw-btn').disabled = false;
+        document.getElementById('new-pw-btn').textContent = 'Set Password';
+      } else {
+        msg.style.color = 'var(--green)';
+        msg.textContent = '✓ Password updated! Signing you in…';
+        setTimeout(() => {
+          el.remove();
+        }, 1500);
+      }
+    });
+  }
+  el.hidden = false;
+}
+async function onSignedIn(user) {
+  STATE.user = user;
+
+  // Check if staff
+  const {
+    data: staffRow
+  } = await sb.from('staff').select('*').eq('auth_user_id', user.id).maybeSingle();
+  STATE.staffRow = staffRow;
+  STATE.isStaff = !!staffRow;
+  STATE.isAdmin = staffRow?.role === 'admin';
+  if (STATE.isStaff) {
+    const {
+      data: clients
+    } = await sb.from('clients').select('id,full_name,entity_type').order('full_name');
+    STATE.clientRows = clients || [];
+    populateClientSelect();
+  } else {
+    // Client portal: look up this user's client record
+    const {
+      data: clientRow
+    } = await sb.from('clients').select('*').eq('auth_user_id', user.id).maybeSingle();
+    STATE.clientRow = clientRow || null;
+    STATE.selectedClientId = clientRow?.id || null;
+  }
+  showApp();
+}
+function onSignedOut() {
+  STATE = {
+    user: null,
+    staffRow: null,
+    isStaff: false,
+    isAdmin: false,
+    clientRows: [],
+    clientRow: null,
+    selectedClientId: null,
+    currentScreen: 'dashboard'
+  };
+  document.getElementById('login-screen').hidden = false;
+  document.getElementById('app-shell').hidden = true;
+}
+function showApp() {
+  document.getElementById('login-screen').hidden = true;
+  document.getElementById('app-shell').hidden = false;
+
+  // Topbar
+  const email = STATE.user.email;
+  document.getElementById('topbar-user').textContent = STATE.isStaff ? email.split('@')[0] : STATE.clientRow?.full_name || email.split('@')[0];
+  document.getElementById('topbar-role-badge').textContent = STATE.isAdmin ? 'Admin' : STATE.isStaff ? 'Staff' : 'Client';
+
+  // Sidebar: staff-only sections
+  document.getElementById('nav-clients-btn').hidden = !STATE.isStaff;
+  document.getElementById('nav-staff-only').hidden = !STATE.isStaff;
+  document.getElementById('client-select-wrap').hidden = !STATE.isStaff;
+  // Client-specific nav: hide accounts from client portal
+  document.getElementById('nav-accounts-btn').hidden = !STATE.isStaff;
+
+  // Relabel "Dashboard" to "My Account" for client portal
+  const dashLabel = document.getElementById('nav-dashboard-label');
+  if (dashLabel) dashLabel.textContent = STATE.isStaff ? 'Dashboard' : 'My Account';
+
+  // Show/hide client footer in sidebar
+  const navClientFooter = document.getElementById('nav-client-footer');
+  if (navClientFooter) navClientFooter.hidden = STATE.isStaff;
+
+  // Client portal banner
+  const banner = document.getElementById('client-portal-banner');
+  if (banner) {
+    banner.hidden = STATE.isStaff;
+  }
+  navigateTo('dashboard');
+}
+
+// ════════════════════════════════════════════════════════════
+//  NAVIGATION
+// ════════════════════════════════════════════════════════════
+function navigateTo(screen) {
+  STATE.currentScreen = screen;
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.screen === screen));
+  renderScreen(screen);
+}
+function renderScreen(screen) {
+  const container = document.getElementById('screen-container');
+  switch (screen) {
+    case 'dashboard':
+      renderDashboard(container);
+      break;
+    case 'clients':
+      renderClients(container);
+      break;
+    case 'accounts':
+      renderAccounts(container);
+      break;
+    case 'journal':
+      renderJournal(container);
+      break;
+    case 'payroll':
+      renderPayroll(container);
+      break;
+    case 'tax':
+      renderTax(container);
+      break;
+    case 'reports':
+      renderReports(container);
+      break;
+    case 'routeworth':
+      renderRouteWorth(container);
+      break;
+    default:
+      container.innerHTML = '<div class="loading-block">Screen not found.</div>';
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  CLIENT SELECT
+// ════════════════════════════════════════════════════════════
+function populateClientSelect() {
+  const sel = document.getElementById('client-select');
+  sel.innerHTML = '<option value="">— All Clients —</option>';
+  STATE.clientRows.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.full_name;
+    sel.appendChild(opt);
+  });
+}
+function clientFilter() {
+  if (STATE.selectedClientId) return {
+    column: 'client_id',
+    value: STATE.selectedClientId
+  };
+  return null;
+}
+function applyClientFilter(query) {
+  const f = clientFilter();
+  return f ? query.eq(f.column, f.value) : query;
+}
+function selectedClientName() {
+  if (!STATE.selectedClientId) return 'All Clients';
+  const c = STATE.clientRows.find(r => r.id === STATE.selectedClientId);
+  return c ? c.full_name : 'Client';
+}
+
+// ════════════════════════════════════════════════════════════
+//  SCREEN BUILDERS
+// ════════════════════════════════════════════════════════════
+
+// ── DASHBOARD ──────────────────────────────────────────────
+async function renderDashboard(container) {
+  if (!STATE.isStaff) {
+    await renderClientPortalDashboard(container);
+    return;
+  }
+  container.innerHTML = pageShell('Dashboard', selectedClientName(), '', "\n    <div id=\"dash-kpi-row\">\n      <div class=\"stat-card stat-green\"><div class=\"stat-label\">Clients</div><div class=\"stat-val\" id=\"d-clients\">—</div><div class=\"stat-sub\">Active</div></div>\n      <div class=\"stat-card stat-gold\"><div class=\"stat-label\">Journal Entries</div><div class=\"stat-val\" id=\"d-je\">—</div><div class=\"stat-sub\">Total posted</div></div>\n      <div class=\"stat-card stat-blue\"><div class=\"stat-label\">Tax Returns</div><div class=\"stat-val\" id=\"d-tax\">—</div><div class=\"stat-sub\">This season</div></div>\n      <div class=\"stat-card stat-red\"><div class=\"stat-label\">RouteWorth Pkgs</div><div class=\"stat-val\" id=\"d-rw\">—</div><div class=\"stat-sub\">Received</div></div>\n    </div>\n    <div class=\"two-col\">\n      <div class=\"card\"><div class=\"card-h\">Recent Activity</div><div class=\"card-body\" id=\"d-activity\">Loading…</div></div>\n      <div class=\"card\"><div class=\"card-h\">Quick Links</div><div class=\"card-body\">\n        <div style=\"display:flex;flex-direction:column;gap:10px\">\n          <button class=\"btn btn-secondary\" style=\"background:var(--bg);color:var(--text);justify-content:flex-start\" onclick=\"navigateTo('journal')\">➕ New Journal Entry</button>\n          <button class=\"btn btn-secondary\" style=\"background:var(--bg);color:var(--text);justify-content:flex-start\" onclick=\"navigateTo('tax')\">🏛 View Tax Returns</button>\n          <button class=\"btn btn-secondary\" style=\"background:var(--bg);color:var(--text);justify-content:flex-start\" onclick=\"navigateTo('routeworth')\">🚗 RouteWorth Packages</button>\n          <button class=\"btn btn-secondary\" style=\"background:var(--bg);color:var(--text);justify-content:flex-start\" onclick=\"navigateTo('accounts')\">📒 Chart of Accounts</button>\n        </div>\n      </div></div>\n    </div>\n  ");
+
+  // Load counts — filter by selected client when one is chosen
+  const cid = STATE.selectedClientId;
+  let jeQ = sb.from('journal_entries').select('id', {
+    count: 'exact',
+    head: true
+  });
+  let taxQ = sb.from('tax_returns').select('id', {
+    count: 'exact',
+    head: true
+  });
+  let rwQ = sb.from('routeworth_packages').select('id', {
+    count: 'exact',
+    head: true
+  });
+  let actQ = sb.from('activity_log').select('*').order('logged_at', {
+    ascending: false
+  }).limit(8);
+  if (cid) {
+    jeQ = jeQ.eq('client_id', cid);
+    taxQ = taxQ.eq('client_id', cid);
+    rwQ = rwQ.eq('client_id', cid);
+    actQ = actQ.eq('client_id', cid);
+  }
+  const [clientsRes, jeRes, taxRes, rwRes, actRes] = await Promise.all([sb.from('clients').select('id', {
+    count: 'exact',
+    head: true
+  }).eq('status', 'active'), jeQ, taxQ, rwQ, actQ]);
+
+  // If a client is selected, show their name in the KPI label instead of "Active"
+  const clientsEl = document.getElementById('d-clients');
+  const clientsSubEl = clientsEl?.closest('.stat-card')?.querySelector('.stat-sub');
+  if (cid) {
+    if (clientsEl) clientsEl.textContent = '1';
+    if (clientsSubEl) clientsSubEl.textContent = STATE.clientRows.find(r => r.id === cid)?.full_name || 'Selected';
+  } else {
+    if (clientsEl) clientsEl.textContent = clientsRes.count ?? '—';
+    if (clientsSubEl) clientsSubEl.textContent = 'Active';
+  }
+  document.getElementById('d-je').textContent = jeRes.count ?? '—';
+  document.getElementById('d-tax').textContent = taxRes.count ?? '—';
+  document.getElementById('d-rw').textContent = rwRes.count ?? '—';
+  const actEl = document.getElementById('d-activity');
+  if (actRes.data && actRes.data.length) {
+    actEl.innerHTML = actRes.data.map(a => "\n      <div style=\"display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)\">\n        <span style=\"font-size:16px\">".concat(activityIcon(a.action), "</span>\n        <div style=\"min-width:0\">\n          <div style=\"font-size:13px;font-weight:500\">").concat(esc(a.action), "</div>\n          <div style=\"font-size:11px;color:var(--muted)\">").concat(esc(a.actor_name), " · ").concat(relTime(a.logged_at), "</div>\n        </div>\n      </div>\n    ")).join('');
+  } else {
+    actEl.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>No activity yet.</div>';
+  }
+}
+
+// ── CLIENT PORTAL DASHBOARD ────────────────────────────────
+async function renderClientPortalDashboard(container) {
+  const c = STATE.clientRow;
+  if (!c) {
+    container.innerHTML = pageShell('My Account', '', '', "\n      <div class=\"alert alert-red\" style=\"margin:28px\">\n        Your account is not linked to a client record yet. Please contact Manrique &amp; Associates.\n      </div>\n    ");
+    return;
+  }
+  container.innerHTML = pageShell('My Account', c.full_name, '', "\n    <div id=\"dash-kpi-row\">\n      <div class=\"stat-card stat-gold\"><div class=\"stat-label\">Journal Entries</div><div class=\"stat-val\" id=\"d-je\">—</div><div class=\"stat-sub\">Posted</div></div>\n      <div class=\"stat-card stat-blue\"><div class=\"stat-label\">Tax Returns</div><div class=\"stat-val\" id=\"d-tax\">—</div><div class=\"stat-sub\">On file</div></div>\n      <div class=\"stat-card stat-green\"><div class=\"stat-label\">Pay Runs</div><div class=\"stat-val\" id=\"d-pr\">—</div><div class=\"stat-sub\">Completed</div></div>\n    </div>\n\n    <div class=\"two-col\">\n      <div class=\"card\">\n        <div class=\"card-h\">Account Information</div>\n        <div class=\"card-body\">\n          <table style=\"width:100%;border-collapse:collapse\">\n            ".concat(row('Business Name', c.full_name), "\n            ").concat(row('Entity Type', c.entity_type || '—'), "\n            ").concat(row('Email', c.email || '—'), "\n            ").concat(row('Phone', c.phone || '—'), "\n            ").concat(row('Client Since', c.client_since ? new Date(c.client_since).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  }) : '—'), "\n            ").concat(row('Status', "<span style=\"color:".concat(c.status === 'active' ? 'var(--green)' : 'var(--muted)', ";font-weight:600\">").concat(c.status, "</span>")), "\n          </table>\n        </div>\n      </div>\n      <div class=\"card\">\n        <div class=\"card-h\">Quick Access</div>\n        <div class=\"card-body\">\n          <div style=\"display:flex;flex-direction:column;gap:10px\">\n            <button class=\"btn btn-secondary\" style=\"background:var(--bg);color:var(--text);justify-content:flex-start\" onclick=\"navigateTo('journal')\">📋 View Journal Entries</button>\n            <button class=\"btn btn-secondary\" style=\"background:var(--bg);color:var(--text);justify-content:flex-start\" onclick=\"navigateTo('payroll')\">💼 View Payroll History</button>\n            <button class=\"btn btn-secondary\" style=\"background:var(--bg);color:var(--text);justify-content:flex-start\" onclick=\"navigateTo('tax')\">🏛 View Tax Returns</button>\n          </div>\n          <div style=\"margin-top:20px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\">\n            <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px\">Your Firm</div>\n            <div style=\"font-weight:600;color:var(--text)\">Manrique &amp; Associates LLC</div>\n            <div style=\"font-size:12px;color:var(--muted);margin-top:2px\">Questions? Contact your account manager.</div>\n          </div>\n        </div>\n      </div>\n    </div>\n\n    <div class=\"card\" id=\"d-recent-tax\">\n      <div class=\"card-h\">Recent Tax Returns</div>\n      <div class=\"card-body\" id=\"d-tax-list\"><span class=\"spinner\"></span></div>\n    </div>\n  "));
+  function row(label, val) {
+    return "<tr style=\"border-bottom:1px solid var(--border)\">\n      <td style=\"padding:8px 0;font-size:12px;color:var(--muted);font-weight:600;width:40%;text-transform:uppercase;letter-spacing:.04em\">".concat(label, "</td>\n      <td style=\"padding:8px 0;font-size:13px\">").concat(val, "</td>\n    </tr>");
+  }
+  const [jeRes, taxRes, prRes, taxListRes] = await Promise.all([sb.from('journal_entries').select('id', {
+    count: 'exact',
+    head: true
+  }).eq('client_id', c.id).eq('status', 'posted'), sb.from('tax_returns').select('id', {
+    count: 'exact',
+    head: true
+  }).eq('client_id', c.id), sb.from('pay_runs').select('id', {
+    count: 'exact',
+    head: true
+  }).eq('client_id', c.id).eq('status', 'posted'), sb.from('tax_returns').select('*').eq('client_id', c.id).order('tax_year', {
+    ascending: false
+  }).limit(5)]);
+  document.getElementById('d-je').textContent = jeRes.count ?? '—';
+  document.getElementById('d-tax').textContent = taxRes.count ?? '—';
+  document.getElementById('d-pr').textContent = prRes.count ?? '—';
+  const taxListEl = document.getElementById('d-tax-list');
+  if (taxListRes.data && taxListRes.data.length) {
+    taxListEl.innerHTML = "<table style=\"width:100%;border-collapse:collapse\">\n      <thead><tr>\n        <th style=\"text-align:left;padding:8px 0;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;border-bottom:1px solid var(--border)\">Year</th>\n        <th style=\"text-align:left;padding:8px 0;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;border-bottom:1px solid var(--border)\">Form</th>\n        <th style=\"text-align:left;padding:8px 0;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;border-bottom:1px solid var(--border)\">Status</th>\n        <th style=\"text-align:right;padding:8px 0;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;border-bottom:1px solid var(--border)\">Filed</th>\n      </tr></thead>\n      <tbody>".concat(taxListRes.data.map(t => {
+      const statusColor = {
+        filed: 'var(--green)',
+        in_progress: 'var(--gold)',
+        not_started: 'var(--muted)'
+      }[t.status] || 'var(--muted)';
+      const statusLabel = {
+        filed: 'Filed',
+        in_progress: 'In Progress',
+        not_started: 'Not Started',
+        review: 'Under Review',
+        void: 'Void'
+      }[t.status] || t.status;
+      return "<tr style=\"border-bottom:1px solid var(--border)\">\n          <td style=\"padding:10px 0;font-weight:600\">".concat(esc(String(t.tax_year)), "</td>\n          <td style=\"padding:10px 0\">").concat(esc(t.form), "</td>\n          <td style=\"padding:10px 0\"><span style=\"color:").concat(statusColor, ";font-weight:600;font-size:12px\">").concat(statusLabel, "</span></td>\n          <td style=\"padding:10px 0;text-align:right;font-size:12px;color:var(--muted)\">").concat(t.filed_date ? new Date(t.filed_date).toLocaleDateString() : '—', "</td>\n        </tr>");
+    }).join(''), "</tbody>\n    </table>");
+  } else {
+    taxListEl.innerHTML = '<div class="empty" style="padding:20px 0"><div class="empty-icon">🏛</div>No tax returns on file yet.</div>';
+  }
+}
+
+// ── CLIENTS ────────────────────────────────────────────────
+async function renderClients(container) {
+  container.innerHTML = pageShell('Clients', 'Firm Roster', "\n    <button class=\"btn btn-secondary\" onclick=\"openAddClientModal()\">+ Add Client</button>\n  ", '<div class="loading-block"><span class="spinner"></span> Loading clients…</div>');
+  const {
+    data,
+    error
+  } = await sb.from('clients').select('*').order('full_name');
+  const main = container.querySelector('#main');
+  if (error || !data) {
+    main.innerHTML = '<div class="alert alert-red">Error loading clients: ' + esc(error?.message) + '</div>';
+    return;
+  }
+  if (!data.length) {
+    main.innerHTML = '<div class="empty"><div class="empty-icon">👥</div>No clients yet.</div>';
+    return;
+  }
+  main.innerHTML = "\n    <div class=\"card\">\n      <table>\n        <thead><tr>\n          <th>Client</th><th>Business Type</th><th>EIN / ITIN</th><th>Contact</th><th>Status</th><th></th>\n        </tr></thead>\n        <tbody>".concat(data.map(c => "\n          <tr class=\"client-row\" data-client-id=\"".concat(esc(c.id), "\" style=\"cursor:pointer\">\n            <td><div style=\"font-weight:600\">").concat(esc(c.full_name), "</div></td>\n            <td>").concat(esc(c.entity_type || '—'), "</td>\n            <td style=\"font-family:monospace;font-size:12px\">").concat(esc(c.email || '—'), "</td>\n            <td style=\"font-size:12px\">").concat(esc(c.phone || '—'), "</td>\n            <td><span class=\"badge ").concat(c.status === 'active' ? 'badge-green' : 'badge-grey', "\">").concat(esc(c.status || 'inactive'), "</span></td>\n            <td style=\"text-align:right;padding-right:8px\"><button class=\"btn btn-secondary client-view-btn\" data-client-id=\"").concat(esc(c.id), "\" style=\"font-size:12px;padding:3px 10px\">View →</button></td>\n          </tr>\n        ")).join(''), "</tbody>\n      </table>\n    </div>\n  ");
+
+  // Wire up row / button clicks
+  main.querySelectorAll('.client-view-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const c = data.find(cl => cl.id === btn.dataset.clientId);
+      if (c) openClientDetail(c);
+    });
+  });
+  main.querySelectorAll('.client-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const c = data.find(cl => cl.id === row.dataset.clientId);
+      if (c) openClientDetail(c);
+    });
+  });
+}
+function openClientDetail(c) {
+  try {
+    ensureModalStyles();
+  } catch (e) {}
+  const bd = document.createElement('div');
+  bd.className = 'modal-backdrop';
+  bd.id = 'cdet-backdrop';
+  const info = (label, val) => val ? "\n    <div style=\"display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)\">\n      <span style=\"min-width:140px;font-size:12px;color:var(--muted)\">".concat(label, "</span>\n      <span style=\"font-size:13px;font-weight:500\">").concat(esc(val), "</span>\n    </div>") : '';
+  bd.innerHTML = "\n    <div class=\"modal\" role=\"dialog\" style=\"max-width:520px\">\n      <div class=\"modal-header\">\n        <h3>".concat(esc(c.full_name), "</h3>\n        <button class=\"modal-close\" onclick=\"closeModal('cdet-backdrop')\" aria-label=\"Close\">×</button>\n      </div>\n      <div class=\"modal-body\">\n        <div style=\"margin-bottom:16px\">\n          <span class=\"badge ").concat(c.status === 'active' ? 'badge-green' : 'badge-grey', "\" style=\"margin-right:8px\">").concat(esc(c.status || 'inactive'), "</span>\n          <span style=\"font-size:13px;color:var(--muted)\">").concat(esc(c.entity_type || ''), "</span>\n        </div>\n        ").concat(info('Email', c.email), "\n        ").concat(info('Phone', c.phone), "\n        ").concat(info('Address', c.address), "\n        ").concat(info('EIN / ITIN', c.ein), "\n        ").concat(info('State', c.state), "\n        ").concat(info('Notes', c.notes), "\n\n        <div style=\"margin-top:20px\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">QUICK ACTIONS</div>\n          <div style=\"display:flex;flex-wrap:wrap;gap:8px\">\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('journal')\">📒 Journal Entries</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('payroll')\">💼 Payroll</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('tax')\">🏛 Tax Returns</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\">📊 Dashboard</button>\n          </div>\n        </div>\n\n        <div style=\"margin-top:20px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">🔑 CLIENT PORTAL ACCESS</div>\n          ").concat(c.auth_user_id ? "<div style=\"display:flex;align-items:center;gap:8px\">\n                <span style=\"color:var(--green);font-size:16px\">✓</span>\n                <span style=\"font-size:13px;font-weight:500\">Portal access linked</span>\n              </div>\n              <div style=\"font-size:12px;color:var(--muted);margin-top:4px\">Client email: <strong>".concat(esc(c.email || ''), "</strong></div>\n              <button class=\"btn btn-secondary\" id=\"cdet-resend-btn\" style=\"margin-top:10px;font-size:12px;padding:6px 12px\">↺ Resend password email</button>\n              <div id=\"cdet-resend-msg\" style=\"font-size:12px;margin-top:6px;min-height:16px\"></div>") : "<div style=\"font-size:13px;color:var(--muted);margin-bottom:10px\">This client does not have portal access yet.</div>\n              <div style=\"display:flex;align-items:center;gap:8px\">\n                <input id=\"cdet-portal-email\" type=\"email\" placeholder=\"Client email\" value=\"".concat(esc(c.email || ''), "\" style=\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\">\n                <button class=\"btn btn-primary\" id=\"cdet-invite-btn\" style=\"white-space:nowrap;font-size:12px;padding:7px 14px\">Create Login</button>\n              </div>\n              <div id=\"cdet-invite-msg\" style=\"font-size:12px;margin-top:6px;min-height:16px\"></div>"), "\n        </div>\n      </div>\n      <div class=\"modal-footer\">\n        <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop')\">Close</button>\n        <button class=\"btn btn-primary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\">Select Client →</button>\n      </div>\n    </div>");
+  document.body.appendChild(bd);
+  bd.addEventListener('click', e => {
+    if (e.target === bd) closeModal('cdet-backdrop');
+  });
+
+  // Wire up "Create Login" button if present (client has no portal access yet)
+  const inviteBtn = document.getElementById('cdet-invite-btn');
+  if (inviteBtn) {
+    inviteBtn.addEventListener('click', async () => {
+      const email = document.getElementById('cdet-portal-email')?.value?.trim();
+      const msg = document.getElementById('cdet-invite-msg');
+      if (!email) {
+        msg.textContent = 'Enter an email address.';
+        msg.style.color = 'var(--red)';
+        return;
+      }
+      inviteBtn.disabled = true;
+      inviteBtn.textContent = 'Creating…';
+      msg.textContent = '';
+      msg.style.color = '';
+
+      // Call the Edge Function which uses the service role to create the user
+      // and link it in one atomic operation — no FK issues.
+      let result, resp;
+      try {
+        const {
+          data: {
+            session
+          }
+        } = await sb.auth.getSession();
+        const token = session?.access_token;
+        if (!token) throw new Error('Not signed in — please reload and sign in again.');
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        resp = await fetch("".concat(SUPA_URL, "/functions/v1/create-client-login"), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': "Bearer ".concat(token),
+            'apikey': SUPA_ANON
+          },
+          body: JSON.stringify({
+            client_id: c.id,
+            email
+          }),
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
+        result = await resp.json();
+      } catch (fetchErr) {
+        msg.textContent = 'Error: ' + (fetchErr.name === 'AbortError' ? 'Request timed out. Try again.' : fetchErr.message);
+        msg.style.color = 'var(--red)';
+        inviteBtn.disabled = false;
+        inviteBtn.textContent = 'Create Login';
+        return;
+      }
+      if (!resp.ok || result.error) {
+        msg.textContent = 'Error: ' + (result.error || resp.status);
+        msg.style.color = 'var(--red)';
+        inviteBtn.disabled = false;
+        inviteBtn.textContent = 'Create Login';
+        return;
+      }
+      msg.textContent = result.existing ? '✓ Linked to existing account. A password-reset email was sent to ' + email : '✓ Portal access created! A password-setup email was sent to ' + email;
+      msg.style.color = 'var(--green)';
+      inviteBtn.textContent = 'Done ✓';
+    });
+  }
+  const resendBtn = document.getElementById('cdet-resend-btn');
+  if (resendBtn) {
+    resendBtn.addEventListener('click', async () => {
+      const msg = document.getElementById('cdet-resend-msg');
+      resendBtn.disabled = true;
+      resendBtn.textContent = 'Sending…';
+      msg.textContent = '';
+      msg.style.color = '';
+      try {
+        const {
+          data: {
+            session
+          }
+        } = await sb.auth.getSession();
+        const token = session?.access_token;
+        if (!token) throw new Error('Not signed in');
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), 15000);
+        const resp = await fetch("".concat(SUPA_URL, "/functions/v1/create-client-login"), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': "Bearer ".concat(token),
+            'apikey': SUPA_ANON
+          },
+          body: JSON.stringify({
+            client_id: c.id,
+            email: c.email,
+            resend: true
+          }),
+          signal: controller.signal
+        });
+        const result = await resp.json();
+        if (!resp.ok || result.error) throw new Error(result.error || resp.status);
+        msg.textContent = '✓ Password email sent to ' + c.email;
+        msg.style.color = 'var(--green)';
+        resendBtn.textContent = 'Sent ✓';
+      } catch (e) {
+        msg.textContent = 'Error: ' + e.message;
+        msg.style.color = 'var(--red)';
+        resendBtn.disabled = false;
+        resendBtn.textContent = '↺ Resend password email';
+      }
+    });
+  }
+}
+function updateClientDropdown() {
+  const sel = document.getElementById('client-select');
+  if (sel) sel.value = STATE.selectedClientId || '';
+}
+
+// ── CHART OF ACCOUNTS ──────────────────────────────────────
+async function renderAccounts(container) {
+  container.innerHTML = pageShell('Chart of Accounts', STATE.isStaff ? selectedClientName() : '', "\n    <button class=\"btn btn-secondary\">+ Add Account</button>\n  ", '<div class="loading-block"><span class="spinner"></span> Loading accounts…</div>');
+  const q = applyClientFilter(sb.from('accounts').select('*').order('account_number'));
+  const {
+    data,
+    error
+  } = await q;
+  const main = container.querySelector('#main');
+  if (error) {
+    main.innerHTML = "<div class=\"alert alert-red\">".concat(esc(error.message), "</div>");
+    return;
+  }
+  const types = [...new Set(data.map(a => a.type))];
+  main.innerHTML = types.map(t => {
+    const rows = data.filter(a => a.type === t);
+    return "\n      <div class=\"card\" style=\"margin-bottom:16px\">\n        <div class=\"acct-type\">".concat(esc(t), "</div>\n        <table>\n          <thead><tr><th>Number</th><th>Name</th><th>Sub-type</th><th style=\"text-align:right\">Balance</th></tr></thead>\n          <tbody>").concat(rows.map(a => "\n            <tr>\n              <td style=\"font-family:monospace;font-size:12px\">".concat(esc(a.account_number), "</td>\n              <td style=\"font-weight:500\">").concat(esc(a.name), "</td>\n              <td style=\"font-size:12px;color:var(--muted)\">").concat(esc(a.subtype || ''), "</td>\n              <td style=\"text-align:right;font-variant-numeric:tabular-nums\">").concat(fmt(0), "</td>\n            </tr>\n          ")).join(''), "</tbody>\n        </table>\n      </div>\n    ");
+  }).join('');
+}
+
+// ── JOURNAL ENTRIES ───────────────────────────────────────
+async function renderJournal(container) {
+  container.innerHTML = pageShell('Journal Entries', STATE.isStaff ? selectedClientName() : STATE.clientRow?.full_name || '', STATE.isStaff ? "\n    <button class=\"btn btn-secondary\" onclick=\"openJEModal()\">+ New Entry</button>\n  " : '', '<div class="loading-block"><span class="spinner"></span> Loading…</div>');
+
+  // join accounts + client name
+  const q = applyClientFilter(sb.from('journal_entries').select('*, clients(full_name), journal_lines(*, accounts(account_number, name))').order('entry_date', {
+    ascending: false
+  }));
+  const {
+    data,
+    error
+  } = await q;
+  const main = container.querySelector('#main');
+  if (error) {
+    main.innerHTML = "<div class=\"alert alert-red\">".concat(esc(error.message), "</div>");
+    return;
+  }
+  if (!data.length) {
+    main.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>No journal entries yet.</div>';
+    return;
+  }
+  main.innerHTML = data.map(je => {
+    const lines = je.journal_lines || [];
+    const totalDr = lines.reduce((s, l) => s + (parseFloat(l.debit) || 0), 0);
+    const canEdit = je.status !== 'posted';
+    const clientName = je.clients?.full_name || '';
+    return "\n      <div class=\"card\" style=\"margin-bottom:14px\">\n        <div class=\"card-h\">\n          <div style=\"display:flex;flex-direction:column;gap:3px\">\n            ".concat(clientName ? "<span style=\"font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.06em\">👤 ".concat(esc(clientName), "</span>") : '', "\n            <div>\n              <span style=\"font-family:monospace;font-size:12px;color:var(--muted)\">").concat(esc(je.reference || ''), "</span>\n              <span style=\"font-weight:700;margin-left:8px\">").concat(esc(je.description || 'No description'), "</span>\n            </div>\n          </div>\n          <div style=\"display:flex;align-items:center;gap:10px\">\n            <span style=\"font-variant-numeric:tabular-nums;font-weight:600\">").concat(fmt(totalDr), "</span>\n            <span class=\"badge ").concat(je.status === 'posted' ? 'badge-green' : 'badge-gold', "\">").concat(esc(je.status), "</span>\n            <span style=\"font-size:12px;color:var(--muted)\">").concat(fmtDate(je.entry_date), "</span>\n            ").concat(canEdit ? "<button class=\"btn btn-secondary\" style=\"padding:4px 10px;font-size:12px\" onclick=\"openEditJEModal('".concat(je.id, "')\">Edit</button>") : '', "\n          </div>\n        </div>\n        <table class=\"je-line-table\">\n          <thead><tr><th>Account</th><th>Memo</th><th style=\"text-align:right\">Debit</th><th style=\"text-align:right\">Credit</th></tr></thead>\n          <tbody>").concat(lines.map(l => "\n            <tr>\n              <td style=\"font-size:12px;color:var(--muted)\">".concat(esc((l.accounts?.account_number || '') + ' ' + (l.accounts?.name || '')), "</td>\n              <td>").concat(esc(l.memo || ''), "</td>\n              <td style=\"text-align:right;font-variant-numeric:tabular-nums\">").concat(parseFloat(l.debit) > 0 ? fmt(l.debit) : '', "</td>\n              <td style=\"text-align:right;font-variant-numeric:tabular-nums\">").concat(parseFloat(l.credit) > 0 ? fmt(l.credit) : '', "</td>\n            </tr>\n          ")).join(''), "</tbody>\n        </table>\n      </div>\n    ");
+  }).join('');
+}
+async function openEditJEModal(jeId) {
+  // load the entry + lines
+  const {
+    data: je,
+    error
+  } = await sb.from('journal_entries').select('*, journal_lines(*, accounts(account_number, name))').eq('id', jeId).single();
+  if (error || !je) {
+    alert('Could not load entry.');
+    return;
+  }
+  if (je.status === 'posted') {
+    alert('Posted entries cannot be edited. Reverse it first.');
+    return;
+  }
+  ensureModalStyles();
+  jeLines = (je.journal_lines || []).map(l => ({
+    id: l.id,
+    account_id: l.account_id,
+    debit: parseFloat(l.debit) || '',
+    credit: parseFloat(l.credit) || '',
+    memo: l.memo || ''
+  }));
+  if (jeLines.length < 2) jeLines.push({
+    account_id: '',
+    debit: '',
+    credit: '',
+    memo: ''
+  });
+  const bd = document.createElement('div');
+  bd.className = 'modal-backdrop';
+  bd.id = 'je-backdrop';
+  bd.innerHTML = "\n    <div class=\"modal\" role=\"dialog\" aria-modal=\"true\" style=\"max-width:680px\">\n      <div class=\"modal-header\">\n        <h3>Edit Journal Entry</h3>\n        <button class=\"modal-close\" onclick=\"closeModal('je-backdrop')\" aria-label=\"Close\">×</button>\n      </div>\n      <div class=\"modal-body\">\n        <div class=\"form-group\">\n          <label for=\"jem-client\">Client</label>\n          <select id=\"jem-client\" disabled>\n            ".concat((STATE.clientRows || []).map(c => "<option value=\"".concat(esc(c.id), "\" ").concat(je.client_id === c.id ? 'selected' : '', ">").concat(esc(c.full_name), "</option>")).join(''), "\n          </select>\n        </div>\n        <div class=\"form-row\">\n          <div class=\"form-group\">\n            <label for=\"jem-date\">Date *</label>\n            <input id=\"jem-date\" type=\"date\" value=\"").concat(esc(je.entry_date || ''), "\">\n          </div>\n          <div class=\"form-group\">\n            <label for=\"jem-ref\">Reference #</label>\n            <input id=\"jem-ref\" type=\"text\" value=\"").concat(esc(je.reference || ''), "\" autocomplete=\"off\">\n          </div>\n        </div>\n        <div class=\"form-group\">\n          <label for=\"jem-desc\">Description *</label>\n          <input id=\"jem-desc\" type=\"text\" value=\"").concat(esc(je.description || ''), "\" autocomplete=\"off\">\n        </div>\n        <div style=\"margin-bottom:8px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em\">Journal Lines</div>\n        <div id=\"jem-lines-wrap\" style=\"overflow-x:auto\">\n          <table class=\"je-lines\">\n            <thead><tr>\n              <th style=\"width:35%\">Account</th>\n              <th style=\"width:25%\">Memo</th>\n              <th class=\"amt\" style=\"width:15%\">Debit</th>\n              <th class=\"amt\" style=\"width:15%\">Credit</th>\n              <th style=\"width:10%\"></th>\n            </tr></thead>\n            <tbody id=\"jem-lines\"></tbody>\n          </table>\n        </div>\n        <div class=\"je-totals\" id=\"jem-totals\">\n          <div><span>Debits: </span><strong id=\"jem-total-dr\">0.00</strong></div>\n          <div><span>Credits: </span><strong id=\"jem-total-cr\">0.00</strong></div>\n          <div id=\"jem-bal-status\" class=\"je-bal-ok\">✓ Balanced</div>\n        </div>\n        <button class=\"btn-link\" onclick=\"addJELine()\">+ Add line</button>\n        <div class=\"modal-error\" id=\"jem-error\"></div>\n      </div>\n      <div class=\"modal-footer\">\n        <button class=\"btn btn-secondary\" onclick=\"closeModal('je-backdrop')\">Cancel</button>\n        <button class=\"btn btn-primary\" id=\"jem-save-draft\" onclick=\"updateJE('").concat(jeId, "','draft')\">Save Draft</button>\n        <button class=\"btn btn-primary\" style=\"background:var(--green)\" id=\"jem-post\" onclick=\"updateJE('").concat(jeId, "','posted')\">Post Entry</button>\n      </div>\n    </div>\n  ");
+  document.body.appendChild(bd);
+  bd.addEventListener('click', e => {
+    if (e.target === bd) closeModal('je-backdrop');
+  });
+  renderJELines();
+}
+async function updateJE(jeId, status) {
+  const date = document.getElementById('jem-date').value;
+  const ref = document.getElementById('jem-ref').value.trim();
+  const desc = document.getElementById('jem-desc').value.trim();
+  const errEl = document.getElementById('jem-error');
+  errEl.textContent = '';
+
+  // Read live from DOM
+  const rows = document.querySelectorAll('#jem-lines tr');
+  const liveLines = Array.from(rows).map(row => {
+    const sel = row.querySelector('select');
+    const inputs = row.querySelectorAll('input[type=number]');
+    const memo = row.querySelector('input[type=text]');
+    return {
+      account_id: sel?.value || '',
+      debit: inputs[0]?.value || '',
+      credit: inputs[1]?.value || '',
+      memo: memo?.value || ''
+    };
+  });
+  const validLines = liveLines.filter(l => l.account_id && (parseFloat(l.debit) || 0) + (parseFloat(l.credit) || 0) > 0);
+  if (validLines.length < 2) {
+    errEl.textContent = 'At least 2 lines required.';
+    return;
+  }
+  const dr = validLines.reduce((s, l) => s + (parseFloat(l.debit) || 0), 0);
+  const cr = validLines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
+  if (Math.abs(dr - cr) >= 0.005) {
+    errEl.textContent = "Must balance. Debits (".concat(dr.toFixed(2), ") ≠ Credits (").concat(cr.toFixed(2), ").");
+    return;
+  }
+  if (!date) {
+    errEl.textContent = 'Date is required.';
+    return;
+  }
+  if (!desc) {
+    errEl.textContent = 'Description is required.';
+    return;
+  }
+  const btn = document.getElementById(status === 'draft' ? 'jem-save-draft' : 'jem-post');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  const {
+    error: jeErr
+  } = await sb.from('journal_entries').update({
+    entry_date: date,
+    reference: ref || null,
+    description: desc,
+    status
+  }).eq('id', jeId);
+  if (jeErr) {
+    errEl.textContent = 'Error: ' + jeErr.message;
+    btn.disabled = false;
+    btn.textContent = status === 'draft' ? 'Save Draft' : 'Post Entry';
+    return;
+  }
+
+  // Replace lines: delete old, insert new
+  await sb.from('journal_lines').delete().eq('journal_entry_id', jeId);
+  const payload = validLines.map((l, i) => ({
+    journal_entry_id: jeId,
+    account_id: l.account_id,
+    debit: parseFloat(l.debit) || 0,
+    credit: parseFloat(l.credit) || 0,
+    memo: l.memo || null,
+    sort_order: i
+  }));
+  const {
+    error: lErr
+  } = await sb.from('journal_lines').insert(payload);
+  if (lErr) {
+    errEl.textContent = 'Entry updated but lines failed: ' + lErr.message;
+    btn.disabled = false;
+    return;
+  }
+  closeModal('je-backdrop');
+  navigateTo('journal');
+}
+
+// ── PAYROLL ───────────────────────────────────────────────
+async function renderPayroll(container) {
+  const isClient = !STATE.isStaff;
+  const subtitle = isClient ? STATE.clientRow?.full_name || '' : selectedClientName();
+  const tabs = isClient ? "<button class=\"tab-btn active\" data-tab=\"pay-runs\">Pay History</button>\n       <button class=\"tab-btn\" data-tab=\"tax-filings\">Tax Filings</button>" : "<button class=\"tab-btn active\" data-tab=\"employees\">Employees</button>\n       <button class=\"tab-btn\" data-tab=\"pay-runs\">Pay Runs</button>\n       <button class=\"tab-btn\" data-tab=\"tax-filings\">Tax Filings</button>";
+  container.innerHTML = pageShell('Payroll', subtitle, '', "\n    <div id=\"payroll-tabs-wrap\">\n      <div class=\"tab-bar\" id=\"payroll-tab-bar\">".concat(tabs, "</div>\n      <div id=\"payroll-tab-content\"></div>\n    </div>\n  "), false);
+  document.getElementById('payroll-tab-bar').addEventListener('click', e => {
+    const btn = e.target.closest('[data-tab]');
+    if (!btn) return;
+    document.querySelectorAll('#payroll-tab-bar .tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+    loadPayrollTab(btn.dataset.tab);
+  });
+  loadPayrollTab(isClient ? 'pay-runs' : 'employees');
+}
+async function loadPayrollTab(tab) {
+  const el = document.getElementById('payroll-tab-content');
+  el.innerHTML = '<div class="loading-block"><span class="spinner"></span></div>';
+  const main = document.getElementById('main');
+  main.style.padding = '0';
+  if (tab === 'employees') {
+    const q = applyClientFilter(sb.from('employees').select('*').order('full_name'));
+    const {
+      data,
+      error: empErr
+    } = await q;
+    if (empErr) console.error('employees query error:', empErr);
+    el.innerHTML = "<div style=\"padding:20px 28px\">\n      ".concat(STATE.isStaff ? "<div style=\"display:flex;justify-content:flex-end;margin-bottom:12px\">\n        <button class=\"btn btn-primary\" onclick=\"openAddEmployeeModal()\">+ Add Employee</button>\n      </div>" : '', "\n      <div class=\"card\"><div class=\"table-wrap\"><table>\n        <thead><tr><th>Name</th><th>Title</th><th>Type</th><th style=\"text-align:right\">Rate</th><th>Status</th><th></th></tr></thead>\n        <tbody>").concat(data && data.length ? data.map(emp => "\n          <tr class=\"emp-row\" data-emp-id=\"".concat(esc(emp.id), "\" style=\"cursor:pointer\">\n            <td style=\"font-weight:600\">").concat(esc(emp.full_name || '—'), "</td>\n            <td style=\"font-size:12px\">").concat(esc(emp.job_title || '—'), "</td>\n            <td>").concat(emp.pay_type === 'salary' ? 'Salary' : 'Hourly', "</td>\n            <td style=\"text-align:right;font-variant-numeric:tabular-nums\">").concat(fmt(emp.pay_rate || 0), "</td>\n            <td><span class=\"badge ").concat(emp.status === 'active' ? 'badge-green' : 'badge-grey', "\">").concat(esc(emp.status || 'inactive'), "</span></td>\n            <td style=\"text-align:right;padding-right:8px\"><button class=\"btn btn-secondary emp-edit-btn\" data-emp-id=\"").concat(esc(emp.id), "\" style=\"font-size:12px;padding:3px 10px\">Edit</button></td>\n          </tr>\n        ")).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px">No employees yet. Click + Add Employee to get started.</td></tr>', "</tbody>\n      </table></div></div>\n    </div>");
+    // Wire up Edit buttons — use dataset to avoid quote-breaking
+    el.querySelectorAll('.emp-edit-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const emp = data.find(em => em.id === btn.dataset.empId);
+        if (emp) openEditEmployeeModal(emp);
+      });
+    });
+  } else if (tab === 'pay-runs') {
+    const q = applyClientFilter(sb.from('pay_runs').select('*').order('period_end', {
+      ascending: false
+    }));
+    const {
+      data
+    } = await q;
+    const emptyMsg = STATE.isStaff ? 'No pay runs yet. Click ▶ Run Payroll to get started.' : 'No completed pay runs on file yet.';
+    el.innerHTML = "<div style=\"padding:20px 28px\">\n      ".concat(STATE.isStaff ? "<div style=\"display:flex;justify-content:flex-end;margin-bottom:12px\">\n        <button class=\"btn btn-primary\" style=\"background:var(--green)\" onclick=\"openRunPayrollModal()\">▶ Run Payroll</button>\n      </div>" : '', "\n      <div class=\"card\"><div class=\"table-wrap\"><table>\n        <thead><tr><th>Period</th><th>Type</th><th style=\"text-align:right\">Gross</th><th style=\"text-align:right\">Net</th><th>Status</th><th></th></tr></thead>\n        <tbody>").concat(data && data.length ? data.map(r => "\n          <tr style=\"cursor:pointer\" class=\"pr-row\" data-id=\"".concat(esc(r.id), "\" data-start=\"").concat(esc(r.period_start), "\" data-end=\"").concat(esc(r.period_end), "\">\n            <td>").concat(fmtDate(r.period_start), " – ").concat(fmtDate(r.period_end), "</td>\n            <td style=\"font-size:12px\">").concat(esc(r.label || ''), "</td>\n            <td style=\"text-align:right;font-variant-numeric:tabular-nums\">").concat(fmt(r.total_gross || 0), "</td>\n            <td style=\"text-align:right;font-variant-numeric:tabular-nums\">").concat(fmt(r.total_net || 0), "</td>\n            <td><span class=\"badge badge-").concat(r.status === 'posted' ? 'green' : r.status === 'draft' ? 'gold' : 'blue', "\">").concat(esc(r.status), "</span></td>\n            <td style=\"color:var(--muted);font-size:11px\">View →</td>\n          </tr>\n        ")).join('') : "<tr><td colspan=\"6\" style=\"text-align:center;color:var(--muted);padding:32px\">".concat(emptyMsg, "</td></tr>"), "</tbody>\n      </table></div></div>\n    </div>");
+    // Wire up row clicks after render
+    el.querySelectorAll('.pr-row').forEach(row => {
+      row.addEventListener('click', () => openPayRunDetail(row.dataset.id, row.dataset.start, row.dataset.end));
+    });
+  } else if (tab === 'tax-filings') {
+    const q = applyClientFilter(sb.from('payroll_tax_filings').select('*').order('due_date', {
+      ascending: false
+    }));
+    const {
+      data
+    } = await q;
+    el.innerHTML = "<div style=\"padding:20px 28px\"><div class=\"card\"><table>\n      <thead><tr><th>Form</th><th>Period</th><th>Due</th><th style=\"text-align:right\">Amount</th><th>Status</th></tr></thead>\n      <tbody>".concat((data || []).map(f => "\n        <tr>\n          <td style=\"font-weight:600;font-family:monospace\">".concat(esc(f.form_type), "</td>\n          <td style=\"font-size:12px\">").concat(esc(f.period_label || ''), "</td>\n          <td style=\"font-size:12px\">").concat(fmtDate(f.due_date), "</td>\n          <td style=\"text-align:right;font-variant-numeric:tabular-nums\">").concat(fmt(f.amount_due || 0), "</td>\n          <td><span class=\"badge ").concat(f.status === 'filed' ? 'badge-green' : f.status === 'pending' ? 'badge-gold' : 'badge-red', "\">").concat(esc(f.status), "</span></td>\n        </tr>\n      ")).join(''), "</tbody>\n    </table></div></div>");
+  }
+}
+
+// ── TAX RETURNS ───────────────────────────────────────────
+async function renderTax(container) {
+  container.innerHTML = pageShell('Tax Returns', STATE.isStaff ? selectedClientName() : STATE.clientRow?.full_name || '', STATE.isStaff ? "\n    <button class=\"btn btn-secondary\">+ New Return</button>\n  " : '', '<div class="loading-block"><span class="spinner"></span> Loading…</div>');
+  const q = applyClientFilter(sb.from('tax_returns').select('*').order('tax_year', {
+    ascending: false
+  }));
+  const {
+    data,
+    error
+  } = await q;
+  const main = container.querySelector('#main');
+  if (error) {
+    main.innerHTML = "<div class=\"alert alert-red\">".concat(esc(error.message), "</div>");
+    return;
+  }
+  if (!data || !data.length) {
+    main.innerHTML = '<div class="empty"><div class="empty-icon">🏛</div>No tax returns yet.</div>';
+    return;
+  }
+  main.innerHTML = "\n    <div class=\"card\"><table>\n      <thead><tr><th>Year</th><th>Form</th><th>Filed Date</th><th style=\"text-align:right\">Refund</th><th style=\"text-align:right\">Balance Due</th><th>Status</th></tr></thead>\n      <tbody>".concat((data || []).map(r => "\n        <tr>\n          <td style=\"font-weight:600\">".concat(r.tax_year, "</td>\n          <td style=\"font-family:monospace;font-size:12px\">").concat(esc(r.form || '—'), "</td>\n          <td style=\"font-size:12px\">").concat(r.filed_date ? fmtDate(r.filed_date) : '—', "</td>\n          <td style=\"text-align:right;font-variant-numeric:tabular-nums;color:var(--green)\">").concat(r.refund_amount > 0 ? fmt(r.refund_amount) : '—', "</td>\n          <td style=\"text-align:right;font-variant-numeric:tabular-nums;color:var(--red)\">").concat(r.balance_due > 0 ? fmt(r.balance_due) : '—', "</td>\n          <td><span class=\"badge ").concat(r.status === 'filed' ? 'badge-green' : r.status === 'in_review' ? 'badge-blue' : r.status === 'draft' ? 'badge-gold' : 'badge-grey', "\">").concat(esc((r.status || '').replace('_', ' ')), "</span></td>\n        </tr>\n      ")).join(''), "</tbody>\n    </table></div>\n  ");
+}
+
+// ── REPORTS (staff only) ──────────────────────────────────
+async function renderReports(container) {
+  if (!STATE.isStaff) {
+    container.innerHTML = '<div class="alert alert-red" style="margin:28px">Access denied.</div>';
+    return;
+  }
+  container.innerHTML = pageShell('Reports', 'Admin Only', "\n    <button class=\"btn btn-secondary\">Generate Report</button>\n  ", "\n    <div class=\"alert alert-gold\">🔒 This section is visible to firm staff only.</div>\n    <div id=\"saved-reports-content\"><div class=\"loading-block\"><span class=\"spinner\"></span></div></div>\n  ");
+  const {
+    data,
+    error
+  } = await sb.from('saved_reports').select('*').order('generated_at', {
+    ascending: false
+  }).limit(20);
+  const el = document.getElementById('saved-reports-content');
+  if (error) {
+    el.innerHTML = "<div class=\"alert alert-red\">".concat(esc(error.message), "</div>");
+    return;
+  }
+  if (!data || !data.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📈</div><p>No saved reports yet.</p><p style="font-size:12px;margin-top:4px;color:var(--muted)">Generate reports from your data to see them here.</p></div>';
+    return;
+  }
+  el.innerHTML = "<div class=\"card\"><table>\n    <thead><tr><th>Title</th><th>Type</th><th>Client</th><th>Generated</th><th></th></tr></thead>\n    <tbody>".concat(data.map(r => "\n      <tr>\n        <td style=\"font-weight:600\">".concat(esc(r.title), "</td>\n        <td>").concat(esc(r.report_type), "</td>\n        <td>").concat(esc(r.client_name || 'All'), "</td>\n        <td style=\"font-size:12px\">").concat(relTime(r.generated_at), "</td>\n        <td><button class=\"btn btn-sm btn-secondary\" style=\"background:var(--bg);color:var(--text)\">View</button></td>\n      </tr>\n    ")).join(''), "</tbody>\n  </table></div>");
+}
+
+// ── ROUTEWORTH PACKAGES (staff only) ─────────────────────
+async function renderRouteWorth(container) {
+  if (!STATE.isStaff) {
+    container.innerHTML = '<div class="alert alert-red" style="margin:28px">Access denied.</div>';
+    return;
+  }
+  container.innerHTML = pageShell('RouteWorth Packages', 'Driver Tax Packages', '', "\n    <div class=\"alert alert-green\">🔗 Packages received from drivers via RouteWorth mobile app.</div>\n    <div id=\"rw-content\"><div class=\"loading-block\"><span class=\"spinner\"></span></div></div>\n  ");
+  const {
+    data,
+    error
+  } = await sb.from('routeworth_packages').select('*').order('received_at', {
+    ascending: false
+  });
+  const el = document.getElementById('rw-content');
+  if (error) {
+    el.innerHTML = "<div class=\"alert alert-red\">".concat(esc(error.message), "</div>");
+    return;
+  }
+  if (!data || !data.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🚗</div>No packages received yet.</div>';
+    return;
+  }
+  el.innerHTML = data.map(function (pkg) {
+    var badgeClass = pkg.status === 'received' ? 'badge-green' : 'badge-gold';
+    var summaryHtml = '';
+    if (pkg.summary) {
+      summaryHtml = '<div style="margin-top:12px;padding:12px;background:var(--bg);border-radius:8px;font-size:12px"><div style="display:flex;gap:24px;flex-wrap:wrap">' + '<div><div style="font-weight:600;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.05em">Gross Income</div><div style="font-variant-numeric:tabular-nums;font-weight:600;margin-top:2px">' + fmt(pkg.summary.gross_income || 0) + '</div></div>' + '<div><div style="font-weight:600;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.05em">Total Expenses</div><div style="font-variant-numeric:tabular-nums;font-weight:600;margin-top:2px">' + fmt(pkg.summary.total_expenses || 0) + '</div></div>' + '<div><div style="font-weight:600;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.05em">Miles</div><div style="font-variant-numeric:tabular-nums;font-weight:600;margin-top:2px">' + (pkg.summary.total_miles || 0).toLocaleString() + '</div></div>' + '<div><div style="font-weight:600;color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.05em">Net Income</div><div style="font-variant-numeric:tabular-nums;font-weight:600;margin-top:2px">' + fmt(pkg.summary.net_income || 0) + '</div></div>' + '</div></div>';
+    }
+    return '<div class="rw-pkg">' + '<div class="rw-pkg-top">' + '<div>' + '<div class="rw-pkg-name">' + esc(pkg.driver_name || 'Driver') + '</div>' + '<div class="rw-pkg-code">' + esc(pkg.package_code || pkg.id.slice(0, 8)) + '</div>' + '<div class="rw-pkg-meta">' + (pkg.tax_year ? 'Tax Year ' + pkg.tax_year : '') + ' · Received ' + relTime(pkg.received_at) + '</div>' + '</div>' + '<div style="display:flex;gap:8px;align-items:center;flex-shrink:0">' + '<span class="badge ' + badgeClass + '">' + esc(pkg.status || 'pending') + '</span>' + '<button class="btn btn-sm btn-primary" onclick="markRWReceived(\'' + pkg.id + '\', this)">✓ Mark Received</button>' + '</div>' + '</div>' + summaryHtml + '</div>';
+  }).join('');
+}
+async function markRWReceived(id, btn) {
+  btn.disabled = true;
+  btn.textContent = '…';
+  const {
+    error
+  } = await sb.from('routeworth_packages').update({
+    status: 'received'
+  }).eq('id', id);
+  if (error) {
+    alert('Error: ' + error.message);
+    btn.disabled = false;
+    btn.textContent = '✓ Mark Received';
+    return;
+  }
+  renderRouteWorth(document.getElementById('screen-container'));
+}
+
+// ════════════════════════════════════════════════════════════
+//  UI HELPERS
+// ════════════════════════════════════════════════════════════
+function pageShell(title, sub, actionsHtml, bodyHtml, withTabs = true) {
+  return "\n    <div class=\"page-header\">\n      <div class=\"page-header-top\">\n        <div>\n          <div class=\"page-title\">".concat(esc(title), "</div>\n          ").concat(sub ? "<div class=\"page-sub\">".concat(esc(sub), "</div>") : '', "\n        </div>\n        <div class=\"page-actions\">").concat(actionsHtml || '', "</div>\n      </div>\n    </div>\n    <div id=\"main\" style=\"flex:1;overflow-y:auto;padding:24px 28px\">").concat(bodyHtml || '', "</div>\n  ");
+}
+function fmt(n) {
+  if (n === null || n === undefined) return '—';
+  return '$' + Number(n).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+function fmtDate(d) {
+  if (!d) return '—';
+  try {
+    return new Date(d + 'T12:00:00').toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  } catch {
+    return d;
+  }
+}
+function relTime(iso) {
+  if (!iso) return '—';
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return mins + 'm ago';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h ago';
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return days + 'd ago';
+  return fmtDate(iso);
+}
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function activityIcon(action) {
+  const icons = {
+    login: '🔐',
+    create_je: '📋',
+    view_package: '🚗',
+    send_package: '📦',
+    update_client: '👤',
+    file_tax: '🏛'
+  };
+  return icons[action] || '📌';
+}
+
+/* ── MODAL STYLES (injected once) ──────────────────────────── */
+function ensureModalStyles() {
+  if (document.getElementById('modal-styles')) return;
+  const s = document.createElement('style');
+  s.id = 'modal-styles';
+  s.textContent = "\n    .modal-backdrop {\n      position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;\n      display:flex;align-items:center;justify-content:center;padding:16px;\n    }\n    .modal {\n      background:var(--surface);border-radius:14px;width:100%;max-width:540px;\n      box-shadow:0 24px 64px rgba(0,0,0,.35);overflow:hidden;\n      max-height:90vh;display:flex;flex-direction:column;\n    }\n    .modal-header {\n      padding:20px 24px;border-bottom:1px solid var(--border);\n      display:flex;align-items:center;justify-content:space-between;\n      background:var(--navy);color:#fff;flex-shrink:0;\n    }\n    .modal-header h3 { font-size:16px;font-weight:700;margin:0; }\n    .modal-close {\n      background:none;border:none;color:#fff;font-size:20px;cursor:pointer;\n      opacity:.7;line-height:1;padding:0 4px;\n    }\n    .modal-close:hover { opacity:1; }\n    .modal-body { padding:24px;overflow-y:auto;flex:1; }\n    .modal-footer {\n      padding:16px 24px;border-top:1px solid var(--border);\n      display:flex;gap:10px;justify-content:flex-end;flex-shrink:0;\n    }\n    .modal .form-row { display:flex;gap:12px; }\n    .modal .form-row .form-group { flex:1; }\n    .modal .form-group { margin-bottom:14px; }\n    .modal .form-group label {\n      display:block;font-size:11px;font-weight:600;margin-bottom:5px;\n      color:var(--muted);text-transform:uppercase;letter-spacing:.05em;\n    }\n    .modal .form-group input,\n    .modal .form-group select,\n    .modal .form-group textarea {\n      width:100%;padding:9px 12px;border-radius:7px;\n      border:1.5px solid var(--border);background:var(--bg);\n      color:var(--text);outline:none;transition:border-color .15s;\n    }\n    .modal .form-group input:focus,\n    .modal .form-group select:focus,\n    .modal .form-group textarea:focus { border-color:var(--green); }\n    .modal .form-group textarea { resize:vertical;min-height:70px; }\n    .modal-error { color:var(--red);font-size:12px;margin-top:8px;min-height:16px; }\n    .toggle-row {\n      display:flex;align-items:center;gap:10px;\n      padding:10px 0;border-top:1px solid var(--border);margin-top:4px;\n    }\n    .toggle-row label { font-size:13px;font-weight:500;color:var(--text);cursor:pointer; }\n    /* JE lines table */\n    .je-lines { width:100%;border-collapse:collapse;margin-bottom:8px; }\n    .je-lines th {\n      font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;\n      letter-spacing:.05em;padding:6px 8px;border-bottom:1px solid var(--border);\n      text-align:left;\n    }\n    .je-lines td { padding:4px 4px; }\n    .je-lines td input, .je-lines td select {\n      width:100%;padding:7px 8px;border-radius:6px;\n      border:1.5px solid var(--border);background:var(--bg);color:var(--text);\n      font-size:13px;outline:none;\n    }\n    .je-lines td input:focus, .je-lines td select:focus { border-color:var(--green); }\n    .je-lines td.amt input { text-align:right;font-variant-numeric:tabular-nums; }\n    .je-totals {\n      display:flex;gap:24px;justify-content:flex-end;\n      font-size:13px;padding:8px 4px;border-top:1px solid var(--border);\n      font-variant-numeric:tabular-nums;\n    }\n    .je-totals span { color:var(--muted); }\n    .je-totals strong { color:var(--text); }\n    .je-bal-ok { color:var(--green); }\n    .je-bal-err { color:var(--red); }\n    .btn-link {\n      background:none;border:none;color:var(--green);font-size:13px;\n      cursor:pointer;padding:4px 0;text-decoration:underline;\n    }\n    .btn-link:hover { opacity:.8; }\n  ";
+  document.head.appendChild(s);
+}
+
+// ── ADD CLIENT MODAL ────────────────────────────────────────
+function openAddClientModal() {
+  ensureModalStyles();
+  const bd = document.createElement('div');
+  bd.className = 'modal-backdrop';
+  bd.id = 'add-client-backdrop';
+  bd.innerHTML = "\n    <div class=\"modal\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"acm-title\">\n      <div class=\"modal-header\">\n        <h3 id=\"acm-title\">Add New Client</h3>\n        <button class=\"modal-close\" onclick=\"closeModal('add-client-backdrop')\" aria-label=\"Close\">×</button>\n      </div>\n      <div class=\"modal-body\">\n        <div class=\"form-row\">\n          <div class=\"form-group\">\n            <label for=\"acm-name\">Full Name / Business Name *</label>\n            <input id=\"acm-name\" type=\"text\" placeholder=\"e.g. John Smith or Acme LLC\" autocomplete=\"off\">\n          </div>\n        </div>\n        <div class=\"form-row\">\n          <div class=\"form-group\">\n            <label for=\"acm-entity\">Entity Type *</label>\n            <select id=\"acm-entity\">\n              <option value=\"\">— Select —</option>\n              <option value=\"Individual\">Individual</option>\n              <option value=\"LLC\">LLC</option>\n              <option value=\"Partnership\">Partnership</option>\n              <option value=\"S-Corp\">S-Corp</option>\n              <option value=\"C-Corp\">C-Corp</option>\n              <option value=\"Non-Profit\">Non-Profit</option>\n            </select>\n          </div>\n          <div class=\"form-group\">\n            <label for=\"acm-status\">Status</label>\n            <select id=\"acm-status\">\n              <option value=\"active\">Active</option>\n              <option value=\"inactive\">Inactive</option>\n              <option value=\"prospect\">Prospect</option>\n            </select>\n          </div>\n        </div>\n        <div class=\"form-row\">\n          <div class=\"form-group\">\n            <label for=\"acm-email\">Email *</label>\n            <input id=\"acm-email\" type=\"email\" placeholder=\"client@example.com\" autocomplete=\"off\">\n          </div>\n          <div class=\"form-group\">\n            <label for=\"acm-phone\">Phone</label>\n            <input id=\"acm-phone\" type=\"tel\" placeholder=\"(305) 555-0100\" autocomplete=\"off\">\n          </div>\n        </div>\n        <div class=\"form-group\">\n          <label for=\"acm-notes\">Notes</label>\n          <textarea id=\"acm-notes\" placeholder=\"Any additional notes…\"></textarea>\n        </div>\n        <div class=\"toggle-row\">\n          <input type=\"checkbox\" id=\"acm-gig\" style=\"width:auto;accent-color:var(--green)\">\n          <label for=\"acm-gig\">Gig / rideshare worker (links RouteWorth data)</label>\n        </div>\n        <div class=\"modal-error\" id=\"acm-error\"></div>\n      </div>\n      <div class=\"modal-footer\">\n        <button class=\"btn btn-secondary\" onclick=\"closeModal('add-client-backdrop')\">Cancel</button>\n        <button class=\"btn btn-primary\" id=\"acm-save\" onclick=\"saveNewClient()\">Save Client</button>\n      </div>\n    </div>\n  ";
+  document.body.appendChild(bd);
+  bd.addEventListener('click', e => {
+    if (e.target === bd) closeModal('add-client-backdrop');
+  });
+  document.getElementById('acm-name').focus();
+}
+async function saveNewClient() {
+  const name = document.getElementById('acm-name').value.trim();
+  const entity = document.getElementById('acm-entity').value;
+  const email = document.getElementById('acm-email').value.trim();
+  const phone = document.getElementById('acm-phone').value.trim();
+  const status = document.getElementById('acm-status').value;
+  const gig = document.getElementById('acm-gig').checked;
+  const notes = document.getElementById('acm-notes').value.trim();
+  const errEl = document.getElementById('acm-error');
+  const btn = document.getElementById('acm-save');
+  errEl.textContent = '';
+  if (!name) {
+    errEl.textContent = 'Full name is required.';
+    return;
+  }
+  if (!entity) {
+    errEl.textContent = 'Please select an entity type.';
+    return;
+  }
+  if (!email) {
+    errEl.textContent = 'Email is required.';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  const {
+    error
+  } = await sb.from('clients').insert({
+    full_name: name,
+    entity_type: entity,
+    email,
+    phone: phone || null,
+    status,
+    gig_worker: gig,
+    notes: notes || null,
+    client_since: new Date().toISOString().slice(0, 10),
+    ytd_billed: 0
+  });
+  if (error) {
+    errEl.textContent = 'Error: ' + error.message;
+    btn.disabled = false;
+    btn.textContent = 'Save Client';
+    return;
+  }
+  closeModal('add-client-backdrop');
+  // Refresh the clients screen if visible
+  const main = document.querySelector('#main');
+  if (main) navigateTo('clients');
+}
+
+// ── NEW JOURNAL ENTRY MODAL ─────────────────────────────────
+let jeLines = [];
+function openJEModal() {
+  ensureModalStyles();
+  jeLines = [{
+    account_id: '',
+    debit: '',
+    credit: '',
+    memo: ''
+  }, {
+    account_id: '',
+    debit: '',
+    credit: '',
+    memo: ''
+  }];
+  const bd = document.createElement('div');
+  bd.className = 'modal-backdrop';
+  bd.id = 'je-backdrop';
+  bd.innerHTML = "\n    <div class=\"modal\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"jem-title\" style=\"max-width:680px\">\n      <div class=\"modal-header\">\n        <h3 id=\"jem-title\">New Journal Entry</h3>\n        <button class=\"modal-close\" onclick=\"closeModal('je-backdrop')\" aria-label=\"Close\">×</button>\n      </div>\n      <div class=\"modal-body\">\n        <div class=\"form-group\">\n          <label for=\"jem-client\">Client *</label>\n          <select id=\"jem-client\">\n            <option value=\"\">— Select client —</option>\n            ".concat((STATE.clientRows || []).map(c => "<option value=\"".concat(esc(c.id), "\" ").concat(STATE.selectedClientId === c.id ? 'selected' : '', ">").concat(esc(c.full_name), "</option>")).join(''), "\n          </select>\n        </div>\n        <div class=\"form-row\">\n          <div class=\"form-group\">\n            <label for=\"jem-date\">Date *</label>\n            <input id=\"jem-date\" type=\"date\" value=\"").concat(new Date().toISOString().slice(0, 10), "\">\n          </div>\n          <div class=\"form-group\">\n            <label for=\"jem-ref\">Reference #</label>\n            <input id=\"jem-ref\" type=\"text\" placeholder=\"e.g. JE-2026-001\" autocomplete=\"off\">\n          </div>\n        </div>\n        <div class=\"form-group\">\n          <label for=\"jem-desc\">Description *</label>\n          <input id=\"jem-desc\" type=\"text\" placeholder=\"e.g. November payroll accrual\" autocomplete=\"off\">\n        </div>\n        <div style=\"margin-bottom:8px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em\">Journal Lines</div>\n        <div id=\"jem-lines-wrap\" style=\"overflow-x:auto\">\n          <table class=\"je-lines\">\n            <thead><tr>\n              <th style=\"width:35%\">Account</th>\n              <th style=\"width:25%\">Memo</th>\n              <th class=\"amt\" style=\"width:15%\">Debit</th>\n              <th class=\"amt\" style=\"width:15%\">Credit</th>\n              <th style=\"width:10%\"></th>\n            </tr></thead>\n            <tbody id=\"jem-lines\"></tbody>\n          </table>\n        </div>\n        <div class=\"je-totals\" id=\"jem-totals\">\n          <div><span>Debits: </span><strong id=\"jem-total-dr\">0.00</strong></div>\n          <div><span>Credits: </span><strong id=\"jem-total-cr\">0.00</strong></div>\n          <div id=\"jem-bal-status\" class=\"je-bal-ok\">✓ Balanced</div>\n        </div>\n        <button class=\"btn-link\" onclick=\"addJELine()\">+ Add line</button>\n        <div class=\"modal-error\" id=\"jem-error\"></div>\n      </div>\n      <div class=\"modal-footer\">\n        <button class=\"btn btn-secondary\" onclick=\"closeModal('je-backdrop')\">Cancel</button>\n        <button class=\"btn btn-primary\" id=\"jem-save-draft\" onclick=\"saveJE('draft')\">Save Draft</button>\n        <button class=\"btn btn-primary\" style=\"background:var(--green)\" id=\"jem-post\" onclick=\"saveJE('posted')\">Post Entry</button>\n      </div>\n    </div>\n  ");
+  document.body.appendChild(bd);
+  bd.addEventListener('click', e => {
+    if (e.target === bd) closeModal('je-backdrop');
+  });
+  renderJELines();
+  document.getElementById('jem-desc').focus();
+}
+function renderJELines() {
+  // Need accounts list — load if not cached
+  if (!window._acctCache) {
+    sb.from('accounts').select('id,account_number,name').order('account_number').then(({
+      data
+    }) => {
+      window._acctCache = data || [];
+      renderJELines();
+    });
+    return;
+  }
+  const accts = window._acctCache;
+  const tbody = document.getElementById('jem-lines');
+  if (!tbody) return;
+  tbody.innerHTML = jeLines.map((ln, i) => "\n    <tr>\n      <td>\n        <select onchange=\"jeLineChange(".concat(i, ",'account_id',this.value)\">\n          <option value=\"\">— Account —</option>\n          ").concat(accts.map(a => "<option value=\"".concat(esc(a.id), "\" ").concat(ln.account_id === a.id ? 'selected' : '', ">").concat(esc(a.account_number), " ").concat(esc(a.name), "</option>")).join(''), "\n        </select>\n      </td>\n      <td><input type=\"text\" placeholder=\"Memo\" value=\"").concat(esc(ln.memo), "\" oninput=\"jeLineChange(").concat(i, ",'memo',this.value)\"></td>\n      <td class=\"amt\"><input type=\"number\" min=\"0\" step=\"0.01\" placeholder=\"0.00\" value=\"").concat(ln.debit, "\" oninput=\"jeLineChange(").concat(i, ",'debit',this.value)\" onfocus=\"if(this.value==='')jeLineChange(").concat(i, ",'credit','')\"></td>\n      <td class=\"amt\"><input type=\"number\" min=\"0\" step=\"0.01\" placeholder=\"0.00\" value=\"").concat(ln.credit, "\" oninput=\"jeLineChange(").concat(i, ",'credit',this.value)\" onfocus=\"if(this.value==='')jeLineChange(").concat(i, ",'debit','')\"></td>\n      <td style=\"text-align:center\">\n        ").concat(jeLines.length > 2 ? "<button style=\"color:var(--red);font-size:16px;background:none;border:none;cursor:pointer\" onclick=\"removeJELine(".concat(i, ")\" title=\"Remove\">×</button>") : '', "\n      </td>\n    </tr>\n  ")).join('');
+  updateJETotals();
+}
+function jeLineChange(i, field, val) {
+  jeLines[i][field] = val;
+  if (field === 'debit' && val) jeLines[i].credit = '';
+  if (field === 'credit' && val) jeLines[i].debit = '';
+  updateJETotals();
+}
+function addJELine() {
+  jeLines.push({
+    account_id: '',
+    debit: '',
+    credit: '',
+    memo: ''
+  });
+  renderJELines();
+}
+function removeJELine(i) {
+  jeLines.splice(i, 1);
+  renderJELines();
+}
+function updateJETotals() {
+  const dr = jeLines.reduce((s, l) => s + (parseFloat(l.debit) || 0), 0);
+  const cr = jeLines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
+  const drEl = document.getElementById('jem-total-dr');
+  const crEl = document.getElementById('jem-total-cr');
+  const balEl = document.getElementById('jem-bal-status');
+  if (!drEl) return;
+  drEl.textContent = dr.toFixed(2);
+  crEl.textContent = cr.toFixed(2);
+  const balanced = Math.abs(dr - cr) < 0.005 && dr > 0;
+  balEl.textContent = balanced ? '✓ Balanced' : dr > 0 || cr > 0 ? "⚠ Off by ".concat(Math.abs(dr - cr).toFixed(2)) : '';
+  balEl.className = balanced ? 'je-bal-ok' : 'je-bal-err';
+}
+async function saveJE(status) {
+  const date = document.getElementById('jem-date').value;
+  const ref = document.getElementById('jem-ref').value.trim();
+  const desc = document.getElementById('jem-desc').value.trim();
+  const errEl = document.getElementById('jem-error');
+  errEl.textContent = '';
+  const clientId = document.getElementById('jem-client')?.value || STATE.selectedClientId || null;
+  if (!clientId) {
+    errEl.textContent = 'Please select a client.';
+    return;
+  }
+  if (!date) {
+    errEl.textContent = 'Date is required.';
+    return;
+  }
+  if (!desc) {
+    errEl.textContent = 'Description is required.';
+    return;
+  }
+
+  // Read values fresh from DOM (Safari spinner inputs don't always fire oninput)
+  const rows = document.querySelectorAll('#jem-lines tr');
+  const liveLines = Array.from(rows).map(row => {
+    const sel = row.querySelector('select');
+    const inputs = row.querySelectorAll('input[type=number]');
+    const memo = row.querySelector('input[type=text]');
+    return {
+      account_id: sel ? sel.value : '',
+      debit: inputs[0] ? inputs[0].value : '',
+      credit: inputs[1] ? inputs[1].value : '',
+      memo: memo ? memo.value : ''
+    };
+  });
+  const validLines = liveLines.filter(l => l.account_id && (parseFloat(l.debit) || 0) + (parseFloat(l.credit) || 0) > 0);
+  if (validLines.length < 2) {
+    errEl.textContent = 'At least 2 lines with an account and amount are required.';
+    return;
+  }
+  const dr = validLines.reduce((s, l) => s + (parseFloat(l.debit) || 0), 0);
+  const cr = validLines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0);
+  if (Math.abs(dr - cr) >= 0.005) {
+    errEl.textContent = "Entry must balance. Debits (".concat(dr.toFixed(2), ") ≠ Credits (").concat(cr.toFixed(2), ").");
+    return;
+  }
+  const btn = document.getElementById(status === 'draft' ? 'jem-save-draft' : 'jem-post');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  const {
+    data: je,
+    error: jeErr
+  } = await sb.from('journal_entries').insert({
+    client_id: clientId,
+    entry_date: date,
+    reference: ref || null,
+    description: desc,
+    status,
+    created_by: STATE.staffRow?.id || null
+  }).select('id').single();
+  if (jeErr) {
+    errEl.textContent = 'Error: ' + jeErr.message;
+    btn.disabled = false;
+    btn.textContent = status === 'draft' ? 'Save Draft' : 'Post Entry';
+    return;
+  }
+  const linesPayload = validLines.map((l, i) => ({
+    // validLines already filtered from live DOM
+    journal_entry_id: je.id,
+    account_id: l.account_id,
+    debit: parseFloat(l.debit) || 0,
+    credit: parseFloat(l.credit) || 0,
+    memo: l.memo || null,
+    sort_order: i
+  }));
+  const {
+    error: linesErr
+  } = await sb.from('journal_lines').insert(linesPayload);
+  if (linesErr) {
+    errEl.textContent = 'Entry saved but lines failed: ' + linesErr.message;
+    btn.disabled = false;
+    return;
+  }
+  closeModal('je-backdrop');
+  navigateTo('journal');
+}
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+// ── ADD EMPLOYEE MODAL ────────────────────────────────────
+function empSwitchTab(tab) {
+  ['emp-tab-employment', 'emp-tab-w4'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = id !== tab;
+  });
+  document.querySelectorAll('.emp-tab-btn').forEach(btn => {
+    btn.style.borderBottom = btn.dataset.tab === tab ? '2px solid var(--gold)' : '2px solid transparent';
+    btn.style.color = btn.dataset.tab === tab ? 'var(--fg)' : 'var(--muted)';
+  });
+}
+function openAddEmployeeModal() {
+  try {
+    ensureModalStyles();
+  } catch (e) {}
+  const bd = document.createElement('div');
+  bd.className = 'modal-backdrop';
+  bd.id = 'emp-backdrop';
+  const clientOpts = (STATE.clientRows || []).map(c => "<option value=\"".concat(esc(c.id), "\" ").concat(STATE.selectedClientId === c.id ? 'selected' : '', ">").concat(esc(c.full_name), "</option>")).join('');
+  bd.innerHTML = "\n    <div class=\"modal\" role=\"dialog\" style=\"max-width:580px\">\n      <div class=\"modal-header\"><h3>Add Employee</h3><button class=\"modal-close\" onclick=\"closeModal('emp-backdrop')\" aria-label=\"Close\">×</button></div>\n      <div class=\"modal-body\" style=\"padding-top:0\">\n\n        <!-- Tab bar -->\n        <div style=\"display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px\">\n          <button class=\"emp-tab-btn\" data-tab=\"emp-tab-employment\" onclick=\"empSwitchTab('emp-tab-employment')\"\n            style=\"background:none;border:none;padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid var(--gold);color:var(--fg)\">\n            Employment\n          </button>\n          <button class=\"emp-tab-btn\" data-tab=\"emp-tab-w4\" onclick=\"empSwitchTab('emp-tab-w4')\"\n            style=\"background:none;border:none;padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid transparent;color:var(--muted)\">\n            W-4 Withholding\n          </button>\n        </div>\n\n        <!-- Tab 1: Employment Info -->\n        <div id=\"emp-tab-employment\">\n          <div class=\"form-group\"><label>Client *</label><select id=\"emp-client\"><option value=\"\">— Select client —</option>".concat(clientOpts, "</select></div>\n          <div class=\"form-group\"><label>Full Name *</label><input id=\"emp-name\" type=\"text\" autocomplete=\"off\" placeholder=\"e.g. Maria Lopez\"></div>\n          <div class=\"form-row\">\n            <div class=\"form-group\"><label>Job Title</label><input id=\"emp-title\" type=\"text\" autocomplete=\"off\"></div>\n            <div class=\"form-group\"><label>Department</label><input id=\"emp-dept\" type=\"text\" autocomplete=\"off\"></div>\n          </div>\n          <div class=\"form-row\">\n            <div class=\"form-group\"><label>Employment Type</label>\n              <select id=\"emp-emptype\"><option value=\"FT\">Full Time</option><option value=\"PT\">Part Time</option><option value=\"Contractor\">Contractor</option><option value=\"Seasonal\">Seasonal</option></select>\n            </div>\n            <div class=\"form-group\"><label>Pay Type *</label>\n              <select id=\"emp-paytype\"><option value=\"hourly\">Hourly</option><option value=\"salary\">Salary</option></select>\n            </div>\n          </div>\n          <div class=\"form-row\">\n            <div class=\"form-group\"><label id=\"emp-rate-label\">Pay Rate * <span style=\"font-size:11px;color:var(--muted)\">(hourly $)</span></label>\n              <input id=\"emp-rate\" type=\"number\" min=\"0\" step=\"0.01\" placeholder=\"0.00\">\n            </div>\n            <div class=\"form-group\"><label>Pay Frequency</label>\n              <select id=\"emp-payfreq\"><option value=\"weekly\">Weekly</option><option value=\"bi-weekly\" selected>Bi-weekly</option><option value=\"semi-monthly\">Semi-monthly</option><option value=\"monthly\">Monthly</option></select>\n            </div>\n          </div>\n          <div class=\"form-row\">\n            <div class=\"form-group\"><label>Hire Date</label><input id=\"emp-start\" type=\"date\"></div>\n            <div class=\"form-group\"><label>Email</label><input id=\"emp-email\" type=\"email\" autocomplete=\"off\"></div>\n          </div>\n        </div>\n\n        <!-- Tab 2: W-4 Info -->\n        <div id=\"emp-tab-w4\" hidden>\n          <p style=\"font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5\">\n            Enter information from the employee's <strong>W-4 form</strong>. This is used to calculate federal income tax withholding each pay period.\n          </p>\n\n          <div class=\"form-group\">\n            <label>Step 1 — Filing Status</label>\n            <select id=\"emp-w4-status\">\n              <option value=\"single\">Single or Married Filing Separately</option>\n              <option value=\"mfj\">Married Filing Jointly (or Qualifying Widow(er))</option>\n              <option value=\"hoh\">Head of Household</option>\n            </select>\n          </div>\n\n          <div class=\"form-group\">\n            <label style=\"display:flex;align-items:center;gap:8px;cursor:pointer\">\n              <input type=\"checkbox\" id=\"emp-w4-multijob\" style=\"width:16px;height:16px\">\n              <span>Step 2 — Multiple Jobs / Spouse also works</span>\n            </label>\n            <p style=\"font-size:11px;color:var(--muted);margin-top:4px;margin-left:24px\">Check if the employee has more than one job or if filing jointly and both spouses work. This increases withholding.</p>\n          </div>\n\n          <div class=\"form-group\">\n            <label>Step 3 — Dependents Amount ($)</label>\n            <input id=\"emp-w4-dependents\" type=\"number\" min=\"0\" step=\"0.01\" placeholder=\"0.00\">\n            <p style=\"font-size:11px;color:var(--muted);margin-top:4px\">Annual dollar amount claimed for dependents (e.g. $2,000 per qualifying child under 17).</p>\n          </div>\n\n          <div class=\"form-row\">\n            <div class=\"form-group\">\n              <label>Step 4a — Other Income ($)</label>\n              <input id=\"emp-w4-other-income\" type=\"number\" min=\"0\" step=\"0.01\" placeholder=\"0.00\">\n              <p style=\"font-size:11px;color:var(--muted);margin-top:4px\">Annual other income not from jobs (interest, dividends, etc.).</p>\n            </div>\n            <div class=\"form-group\">\n              <label>Step 4b — Deductions ($)</label>\n              <input id=\"emp-w4-deductions\" type=\"number\" min=\"0\" step=\"0.01\" placeholder=\"0.00\">\n              <p style=\"font-size:11px;color:var(--muted);margin-top:4px\">Annual deductions beyond the standard deduction.</p>\n            </div>\n          </div>\n\n          <div class=\"form-group\">\n            <label>Step 4c — Extra Withholding per Period ($)</label>\n            <input id=\"emp-w4-extra\" type=\"number\" min=\"0\" step=\"0.01\" placeholder=\"0.00\">\n            <p style=\"font-size:11px;color:var(--muted);margin-top:4px\">Additional amount to withhold each pay period if the employee requested it.</p>\n          </div>\n        </div>\n\n        <div class=\"modal-error\" id=\"emp-error\"></div>\n      </div>\n      <div class=\"modal-footer\">\n        <button class=\"btn btn-secondary\" onclick=\"closeModal('emp-backdrop')\">Cancel</button>\n        <button class=\"btn btn-primary\" id=\"emp-save\" onclick=\"saveEmployee()\">Save Employee</button>\n      </div>\n    </div>");
+  document.body.appendChild(bd);
+  bd.addEventListener('click', e => {
+    if (e.target === bd) closeModal('emp-backdrop');
+  });
+
+  // Update rate label when pay type changes
+  document.getElementById('emp-paytype').addEventListener('change', function () {
+    const lbl = document.getElementById('emp-rate-label');
+    if (lbl) lbl.innerHTML = this.value === 'salary' ? 'Pay Rate * <span style="font-size:11px;color:var(--muted)">(annual salary $)</span>' : 'Pay Rate * <span style="font-size:11px;color:var(--muted)">(hourly $)</span>';
+  });
+}
+
+// Calculate federal withholding using IRS Pub 15-T 2024 Percentage Method
+function calcFedWH({
+  gross,
+  payFrequency,
+  filingStatus,
+  multipleJobs,
+  dependentsAmt,
+  otherIncome,
+  deductions,
+  extraWH
+}) {
+  // Annualize gross based on frequency
+  const periods = {
+    'weekly': 52,
+    'bi-weekly': 26,
+    'semi-monthly': 24,
+    'monthly': 12
+  };
+  const n = periods[payFrequency] || 26;
+  let annualWage = gross * n;
+
+  // Step 2: Add other income
+  annualWage += otherIncome || 0;
+
+  // Step 3: Subtract deductions (standard deduction already in tables below)
+  annualWage -= deductions || 0;
+
+  // 2024 Standard deductions for Pub 15-T Percentage Method
+  const stdDed = {
+    single: 14600,
+    mfj: 29200,
+    hoh: 21900
+  };
+  // Adjusted annual wage = annualWage - standard deduction
+  let adjWage = annualWage - (stdDed[filingStatus] || 14600);
+
+  // Multiple jobs adjustment: halve the adjusted wage
+  if (multipleJobs) adjWage = adjWage / 2;
+
+  // Subtract tentative withholding for dependents
+  // Tentative hold on dependents = dependentsAmt / n (spread over pay periods)
+  const depAdj = dependentsAmt || 0;
+
+  // 2024 IRS Pub 15-T Table for Percentage Method (Annual amounts)
+  const tables = {
+    single: [[0, 11600, 0, 0.10], [11600, 33550, 1160, 0.12], [33550, 74900, 3796, 0.22], [74900, 104525, 12908, 0.24], [104525, 186700, 20004, 0.32], [186700, 519050, 46278, 0.35], [519050, Infinity, 162718, 0.37]],
+    mfj: [[0, 23200, 0, 0.10], [23200, 67100, 2320, 0.12], [67100, 149900, 7592, 0.22], [149900, 209050, 25812, 0.24], [209050, 373600, 39996, 0.32], [373600, 694450, 92556, 0.35], [694450, Infinity, 204556, 0.37]],
+    hoh: [[0, 16550, 0, 0.10], [16550, 44550, 1655, 0.12], [44550, 81050, 5015, 0.22], [81050, 100500, 13045, 0.24], [100500, 181600, 17713, 0.32], [181600, 514100, 43663, 0.35], [514100, Infinity, 149763, 0.37]]
+  };
+  const table = tables[filingStatus] || tables.single;
+  let annualWH = 0;
+  for (const [lo, hi, base, rate] of table) {
+    if (adjWage > lo) {
+      annualWH = base + (Math.min(adjWage, hi) - lo) * rate;
+    }
+  }
+
+  // Subtract dependent credit (annual)
+  annualWH = Math.max(0, annualWH - depAdj);
+
+  // Per-period withholding
+  let perPeriod = annualWH / n;
+
+  // Add extra withholding
+  perPeriod += extraWH || 0;
+  return Math.max(0, perPeriod);
+}
+async function saveEmployee() {
+  const errEl = document.getElementById('emp-error');
+  errEl.textContent = '';
+  try {
+    const name = document.getElementById('emp-name').value.trim();
+    const rateEl = document.getElementById('emp-rate');
+    const rate = rateEl.valueAsNumber || parseFloat(rateEl.value) || 0;
+    const clientId = document.getElementById('emp-client')?.value || STATE.selectedClientId || null;
+    if (!clientId) {
+      errEl.textContent = 'Please select a client.';
+      return;
+    }
+    if (!name) {
+      errEl.textContent = 'Full name is required.';
+      return;
+    }
+    const getNum = id => {
+      const el = document.getElementById(id);
+      return el ? el.valueAsNumber || parseFloat(el.value) || 0 : 0;
+    };
+    const btn = document.getElementById('emp-save');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    const {
+      error
+    } = await sb.from('employees').insert({
+      client_id: clientId,
+      full_name: name,
+      job_title: document.getElementById('emp-title').value.trim() || null,
+      department: document.getElementById('emp-dept').value.trim() || null,
+      employment_type: ['FT', 'PT', 'Contractor', 'Seasonal'].includes(document.getElementById('emp-emptype')?.value) ? document.getElementById('emp-emptype').value : 'FT',
+      pay_type: document.getElementById('emp-paytype').value || 'hourly',
+      pay_frequency: document.getElementById('emp-payfreq').value || 'bi-weekly',
+      pay_rate: rate || null,
+      hire_date: document.getElementById('emp-start').value || null,
+      email: document.getElementById('emp-email').value.trim() || null,
+      status: 'active',
+      // W-4
+      w4_filing_status: document.getElementById('emp-w4-status').value || 'single',
+      w4_multiple_jobs: document.getElementById('emp-w4-multijob').checked,
+      w4_dependents_amt: getNum('emp-w4-dependents'),
+      w4_other_income: getNum('emp-w4-other-income'),
+      w4_deductions: getNum('emp-w4-deductions'),
+      w4_extra_wh: getNum('emp-w4-extra')
+    });
+    if (error) {
+      errEl.textContent = 'Error: ' + error.message;
+      btn.disabled = false;
+      btn.textContent = 'Save Employee';
+      return;
+    }
+    closeModal('emp-backdrop');
+    navigateTo('payroll');
+  } catch (e) {
+    errEl.textContent = 'Unexpected error: ' + e.message;
+  }
+}
+
+// ── EDIT EMPLOYEE MODAL ────────────────────────────────────
+function openEditEmployeeModal(emp) {
+  try {
+    ensureModalStyles();
+  } catch (e) {}
+  const bd = document.createElement('div');
+  bd.className = 'modal-backdrop';
+  bd.id = 'empedit-backdrop';
+  bd.innerHTML = "\n    <div class=\"modal\" role=\"dialog\" style=\"max-width:580px\">\n      <div class=\"modal-header\"><h3>Edit Employee</h3><button class=\"modal-close\" onclick=\"closeModal('empedit-backdrop')\" aria-label=\"Close\">×</button></div>\n      <div class=\"modal-body\" style=\"padding-top:0\">\n\n        <!-- Tab bar -->\n        <div style=\"display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px\">\n          <button class=\"empedit-tab-btn\" data-tab=\"empedit-tab-employment\" onclick=\"empEditSwitchTab('empedit-tab-employment')\"\n            style=\"background:none;border:none;padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid var(--gold);color:var(--fg)\">\n            Employment\n          </button>\n          <button class=\"empedit-tab-btn\" data-tab=\"empedit-tab-w4\" onclick=\"empEditSwitchTab('empedit-tab-w4')\"\n            style=\"background:none;border:none;padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid transparent;color:var(--muted)\">\n            W-4 Withholding\n          </button>\n        </div>\n\n        <!-- Tab 1: Employment -->\n        <div id=\"empedit-tab-employment\">\n          <div class=\"form-group\"><label>Full Name *</label><input id=\"empedit-name\" type=\"text\" autocomplete=\"off\" value=\"".concat(esc(emp.full_name || ''), "\"></div>\n          <div class=\"form-row\">\n            <div class=\"form-group\"><label>Job Title</label><input id=\"empedit-title\" type=\"text\" autocomplete=\"off\" value=\"").concat(esc(emp.job_title || ''), "\"></div>\n            <div class=\"form-group\"><label>Department</label><input id=\"empedit-dept\" type=\"text\" autocomplete=\"off\" value=\"").concat(esc(emp.department || ''), "\"></div>\n          </div>\n          <div class=\"form-row\">\n            <div class=\"form-group\"><label>Employment Type</label>\n              <select id=\"empedit-emptype\">\n                ").concat(['FT', 'PT', 'Contractor', 'Seasonal'].map(t => "<option value=\"".concat(t, "\" ").concat(emp.employment_type === t ? 'selected' : '', ">").concat(t === 'FT' ? 'Full Time' : t === 'PT' ? 'Part Time' : t, "</option>")).join(''), "\n              </select>\n            </div>\n            <div class=\"form-group\"><label>Pay Type</label>\n              <select id=\"empedit-paytype\">\n                <option value=\"hourly\" ").concat(emp.pay_type === 'hourly' ? 'selected' : '', ">Hourly</option>\n                <option value=\"salary\" ").concat(emp.pay_type === 'salary' ? 'selected' : '', ">Salary</option>\n              </select>\n            </div>\n          </div>\n          <div class=\"form-row\">\n            <div class=\"form-group\">\n              <label id=\"empedit-rate-label\">Pay Rate <span style=\"font-size:11px;color:var(--muted)\">(").concat(emp.pay_type === 'salary' ? 'annual salary' : 'hourly', " $)</span></label>\n              <input id=\"empedit-rate\" type=\"number\" min=\"0\" step=\"0.01\" value=\"").concat(parseFloat(emp.pay_rate || 0).toFixed(2), "\">\n            </div>\n            <div class=\"form-group\"><label>Pay Frequency</label>\n              <select id=\"empedit-payfreq\">\n                ").concat(['weekly', 'bi-weekly', 'semi-monthly', 'monthly'].map(f => "<option value=\"".concat(f, "\" ").concat(emp.pay_frequency === f ? 'selected' : '', ">").concat(f.charAt(0).toUpperCase() + f.slice(1), "</option>")).join(''), "\n              </select>\n            </div>\n          </div>\n          <div class=\"form-row\">\n            <div class=\"form-group\"><label>Hire Date</label><input id=\"empedit-start\" type=\"date\" value=\"").concat(emp.hire_date || '', "\"></div>\n            <div class=\"form-group\"><label>Email</label><input id=\"empedit-email\" type=\"email\" autocomplete=\"off\" value=\"").concat(esc(emp.email || ''), "\"></div>\n          </div>\n          <div class=\"form-group\"><label>Status</label>\n            <select id=\"empedit-status\">\n              <option value=\"active\" ").concat(emp.status === 'active' ? 'selected' : '', ">Active</option>\n              <option value=\"inactive\" ").concat(emp.status === 'inactive' ? 'selected' : '', ">Inactive</option>\n              <option value=\"terminated\" ").concat(emp.status === 'terminated' ? 'selected' : '', ">Terminated</option>\n            </select>\n          </div>\n        </div>\n\n        <!-- Tab 2: W-4 -->\n        <div id=\"empedit-tab-w4\" hidden>\n          <p style=\"font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5\">\n            Enter information from the employee's <strong>W-4 form</strong>. Used to estimate federal income tax withholding each pay period.\n          </p>\n          <div class=\"form-group\"><label>Step 1 — Filing Status</label>\n            <select id=\"empedit-w4-status\">\n              <option value=\"single\" ").concat((emp.w4_filing_status || 'single') === 'single' ? 'selected' : '', ">Single or Married Filing Separately</option>\n              <option value=\"mfj\" ").concat(emp.w4_filing_status === 'mfj' ? 'selected' : '', ">Married Filing Jointly (or Qualifying Widow(er))</option>\n              <option value=\"hoh\" ").concat(emp.w4_filing_status === 'hoh' ? 'selected' : '', ">Head of Household</option>\n            </select>\n          </div>\n          <div class=\"form-group\">\n            <label style=\"display:flex;align-items:center;gap:8px;cursor:pointer\">\n              <input type=\"checkbox\" id=\"empedit-w4-multijob\" style=\"width:16px;height:16px\" ").concat(emp.w4_multiple_jobs ? 'checked' : '', ">\n              <span>Step 2 — Multiple Jobs / Spouse also works</span>\n            </label>\n          </div>\n          <div class=\"form-group\"><label>Step 3 — Dependents Amount ($)</label>\n            <input id=\"empedit-w4-dependents\" type=\"number\" min=\"0\" step=\"0.01\" value=\"").concat(parseFloat(emp.w4_dependents_amt || 0).toFixed(2), "\">\n          </div>\n          <div class=\"form-row\">\n            <div class=\"form-group\"><label>Step 4a — Other Income ($)</label>\n              <input id=\"empedit-w4-other-income\" type=\"number\" min=\"0\" step=\"0.01\" value=\"").concat(parseFloat(emp.w4_other_income || 0).toFixed(2), "\">\n            </div>\n            <div class=\"form-group\"><label>Step 4b — Deductions ($)</label>\n              <input id=\"empedit-w4-deductions\" type=\"number\" min=\"0\" step=\"0.01\" value=\"").concat(parseFloat(emp.w4_deductions || 0).toFixed(2), "\">\n            </div>\n          </div>\n          <div class=\"form-group\"><label>Step 4c — Extra Withholding per Period ($)</label>\n            <input id=\"empedit-w4-extra\" type=\"number\" min=\"0\" step=\"0.01\" value=\"").concat(parseFloat(emp.w4_extra_wh || 0).toFixed(2), "\">\n          </div>\n        </div>\n\n        <div class=\"modal-error\" id=\"empedit-error\"></div>\n      </div>\n      <div class=\"modal-footer\">\n        <button class=\"btn btn-secondary\" onclick=\"closeModal('empedit-backdrop')\">Cancel</button>\n        <button class=\"btn btn-primary\" id=\"empedit-save\" onclick=\"saveEditEmployee('").concat(esc(emp.id), "')\">Save Changes</button>\n      </div>\n    </div>");
+  document.body.appendChild(bd);
+  bd.addEventListener('click', e => {
+    if (e.target === bd) closeModal('empedit-backdrop');
+  });
+  document.getElementById('empedit-paytype').addEventListener('change', function () {
+    const lbl = document.getElementById('empedit-rate-label');
+    if (lbl) lbl.innerHTML = "Pay Rate <span style=\"font-size:11px;color:var(--muted)\">(".concat(this.value === 'salary' ? 'annual salary' : 'hourly', " $)</span>");
+  });
+}
+function empEditSwitchTab(tab) {
+  ['empedit-tab-employment', 'empedit-tab-w4'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.hidden = id !== tab;
+  });
+  document.querySelectorAll('.empedit-tab-btn').forEach(btn => {
+    btn.style.borderBottom = btn.dataset.tab === tab ? '2px solid var(--gold)' : '2px solid transparent';
+    btn.style.color = btn.dataset.tab === tab ? 'var(--fg)' : 'var(--muted)';
+  });
+}
+async function saveEditEmployee(empId) {
+  const errEl = document.getElementById('empedit-error');
+  errEl.textContent = '';
+  try {
+    const name = document.getElementById('empedit-name').value.trim();
+    if (!name) {
+      errEl.textContent = 'Full name is required.';
+      return;
+    }
+    const rateEl = document.getElementById('empedit-rate');
+    const rate = rateEl.valueAsNumber || parseFloat(rateEl.value) || 0;
+    const getNum = id => {
+      const el = document.getElementById(id);
+      return el ? el.valueAsNumber || parseFloat(el.value) || 0 : 0;
+    };
+    const btn = document.getElementById('empedit-save');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    const {
+      error
+    } = await sb.from('employees').update({
+      full_name: name,
+      job_title: document.getElementById('empedit-title').value.trim() || null,
+      department: document.getElementById('empedit-dept').value.trim() || null,
+      employment_type: document.getElementById('empedit-emptype').value || 'FT',
+      pay_type: document.getElementById('empedit-paytype').value || 'hourly',
+      pay_frequency: document.getElementById('empedit-payfreq').value || 'bi-weekly',
+      pay_rate: rate || null,
+      hire_date: document.getElementById('empedit-start').value || null,
+      email: document.getElementById('empedit-email').value.trim() || null,
+      status: document.getElementById('empedit-status').value || 'active',
+      w4_filing_status: document.getElementById('empedit-w4-status').value || 'single',
+      w4_multiple_jobs: document.getElementById('empedit-w4-multijob').checked,
+      w4_dependents_amt: getNum('empedit-w4-dependents'),
+      w4_other_income: getNum('empedit-w4-other-income'),
+      w4_deductions: getNum('empedit-w4-deductions'),
+      w4_extra_wh: getNum('empedit-w4-extra')
+    }).eq('id', empId);
+    if (error) {
+      errEl.textContent = 'Error: ' + error.message;
+      btn.disabled = false;
+      btn.textContent = 'Save Changes';
+      return;
+    }
+    closeModal('empedit-backdrop');
+    navigateTo('payroll');
+  } catch (e) {
+    document.getElementById('empedit-error').textContent = 'Unexpected error: ' + e.message;
+  }
+}
+
+// ── RUN PAYROLL MODAL ─────────────────────────────────────
+async function openRunPayrollModal() {
+  try {
+    ensureModalStyles();
+  } catch (e) {}
+  const today = new Date().toISOString().slice(0, 10);
+  const clientOpts = (STATE.clientRows || []).map(c => "<option value=\"".concat(esc(c.id), "\" ").concat(STATE.selectedClientId === c.id ? 'selected' : '', ">").concat(esc(c.full_name), "</option>")).join('');
+  const bd = document.createElement('div');
+  bd.className = 'modal-backdrop';
+  bd.id = 'pr-backdrop';
+  bd.innerHTML = "\n    <div class=\"modal\" role=\"dialog\" style=\"max-width:860px;width:98vw\">\n      <div class=\"modal-header\"><h3>Run Payroll</h3><button class=\"modal-close\" onclick=\"closeModal('pr-backdrop')\" aria-label=\"Close\">×</button></div>\n      <div class=\"modal-body\">\n        <div class=\"form-row\">\n          <div class=\"form-group\"><label>Client *</label>\n            <select id=\"pr-client\" onchange=\"prLoadEmployees()\">\n              <option value=\"\">— Select client —</option>".concat(clientOpts, "\n            </select>\n          </div>\n          <div class=\"form-group\"><label>Frequency / Label</label>\n            <select id=\"pr-freq\">\n              <option value=\"Weekly\">Weekly</option>\n              <option value=\"Bi-weekly\" selected>Bi-weekly</option>\n              <option value=\"Semi-monthly\">Semi-monthly</option>\n              <option value=\"Monthly\">Monthly</option>\n            </select>\n          </div>\n        </div>\n        <div class=\"form-row\">\n          <div class=\"form-group\"><label>Period Start *</label><input id=\"pr-start\" type=\"date\" value=\"").concat(today, "\"></div>\n          <div class=\"form-group\"><label>Period End *</label><input id=\"pr-end\" type=\"date\" value=\"").concat(today, "\"></div>\n          <div class=\"form-group\"><label>Pay Date</label><input id=\"pr-paydate\" type=\"date\" value=\"").concat(today, "\"></div>\n        </div>\n\n        <div id=\"pr-emp-section\" style=\"margin-top:8px\">\n          <p style=\"color:var(--muted);font-size:13px\">Select a client above to load employees.</p>\n        </div>\n\n        <div style=\"margin-top:12px;padding:10px 14px;background:var(--surface2,var(--surface));border-radius:8px;display:flex;gap:32px;font-size:13px\">\n          <span>Total Gross: <strong id=\"pr-tot-gross\" style=\"font-variant-numeric:tabular-nums\">$0.00</strong></span>\n          <span>Total Deductions: <strong id=\"pr-tot-ded\" style=\"font-variant-numeric:tabular-nums\">$0.00</strong></span>\n          <span>Total Net: <strong id=\"pr-tot-net\" style=\"color:var(--green);font-variant-numeric:tabular-nums\">$0.00</strong></span>\n        </div>\n        <div class=\"modal-error\" id=\"pr-error\"></div>\n      </div>\n      <div class=\"modal-footer\">\n        <button class=\"btn btn-secondary\" onclick=\"closeModal('pr-backdrop')\">Cancel</button>\n        <button class=\"btn btn-primary\" id=\"pr-draft\" onclick=\"savePayRun('draft')\">Save Draft</button>\n        <button class=\"btn btn-primary\" style=\"background:var(--green)\" id=\"pr-paid\" onclick=\"savePayRun('paid')\">Mark as Paid</button>\n      </div>\n    </div>");
+  document.body.appendChild(bd);
+  bd.addEventListener('click', e => {
+    if (e.target === bd) closeModal('pr-backdrop');
+  });
+
+  // Auto-load employees if client already selected
+  if (STATE.selectedClientId) await prLoadEmployees();
+}
+async function prLoadEmployees() {
+  const clientId = document.getElementById('pr-client')?.value || STATE.selectedClientId;
+  const sec = document.getElementById('pr-emp-section');
+  if (!clientId) {
+    sec.innerHTML = '<p style="color:var(--muted);font-size:13px">Select a client above to load employees.</p>';
+    return;
+  }
+  sec.innerHTML = '<div class="loading-block" style="padding:12px"><span class="spinner"></span></div>';
+  const {
+    data: emps,
+    error
+  } = await sb.from('employees').select('*').eq('client_id', clientId).eq('status', 'active').order('full_name');
+  if (error || !emps || !emps.length) {
+    sec.innerHTML = '<p style="color:var(--muted);font-size:13px;margin-top:4px">No active employees found for this client. Add employees first.</p>';
+    return;
+  }
+  sec.innerHTML = "\n    <div style=\"overflow-x:auto;margin-top:4px\">\n    <table style=\"width:100%;font-size:12px;border-collapse:collapse\">\n      <thead>\n        <tr style=\"border-bottom:1px solid var(--border)\">\n          <th style=\"text-align:left;padding:6px 8px;white-space:nowrap\">Employee</th>\n          <th style=\"text-align:left;padding:6px 8px\">Type</th>\n          <th style=\"padding:6px 4px;text-align:right\">Hours</th>\n          <th style=\"padding:6px 4px;text-align:right\">Gross Pay</th>\n          <th style=\"padding:6px 4px;text-align:right\">Fed WH</th>\n          <th style=\"padding:6px 4px;text-align:right\">SS</th>\n          <th style=\"padding:6px 4px;text-align:right\">Medicare</th>\n          <th style=\"padding:6px 4px;text-align:right\">State WH</th>\n          <th style=\"padding:6px 4px;text-align:right\">Other Ded.</th>\n          <th style=\"padding:6px 4px;text-align:right;color:var(--green)\">Net Pay</th>\n        </tr>\n      </thead>\n      <tbody id=\"pr-emp-rows\">\n        ".concat(emps.map(emp => {
+    const isSalary = emp.pay_type === 'salary';
+    const rate = parseFloat(emp.pay_rate) || 0;
+    // Salary: default gross = annual / 26 (bi-weekly). Hourly: gross auto-fills when hours entered.
+    const defaultGross = isSalary && rate ? (rate / 26).toFixed(2) : '';
+    const rateLabel = !isSalary && rate ? "<span style=\"font-size:10px;color:var(--muted);display:block\">$".concat(rate.toFixed(2), "/hr</span>") : '';
+    return "<tr\n              data-emp-id=\"".concat(esc(emp.id), "\" data-rate=\"").concat(rate, "\" data-pay-type=\"").concat(esc(emp.pay_type), "\"\n              data-pay-frequency=\"").concat(esc(emp.pay_frequency || 'bi-weekly'), "\"\n              data-w4-status=\"").concat(esc(emp.w4_filing_status || 'single'), "\"\n              data-w4-multi-jobs=\"").concat(emp.w4_multiple_jobs ? 'true' : 'false', "\"\n              data-w4-dependents=\"").concat(parseFloat(emp.w4_dependents_amt) || 0, "\"\n              data-w4-other-inc=\"").concat(parseFloat(emp.w4_other_income) || 0, "\"\n              data-w4-deductions=\"").concat(parseFloat(emp.w4_deductions) || 0, "\"\n              data-w4-extra-wh=\"").concat(parseFloat(emp.w4_extra_wh) || 0, "\"\n              style=\"border-bottom:1px solid var(--border)\">\n            <td style=\"padding:5px 8px;font-weight:600;white-space:nowrap\">").concat(esc(emp.full_name)).concat(rateLabel, "</td>\n            <td style=\"padding:5px 8px;color:var(--muted)\">").concat(isSalary ? 'Salary' : 'Hourly', "</td>\n            <td style=\"padding:4px\"><input type=\"number\" min=\"0\" step=\"0.5\" value=\"").concat(isSalary ? '' : '', "\" placeholder=\"").concat(isSalary ? '—' : 'hrs', "\" ").concat(isSalary ? 'disabled' : '', " style=\"width:60px;text-align:right\" oninput=\"prRecalcRow(this)\" class=\"pr-hours\"></td>\n            <td style=\"padding:4px\"><input type=\"number\" min=\"0\" step=\"0.01\" value=\"").concat(defaultGross, "\" placeholder=\"0.00\" style=\"width:90px;text-align:right\" oninput=\"prRecalcRow(this)\" class=\"pr-gross\"></td>\n            <td style=\"padding:4px\"><input type=\"number\" min=\"0\" step=\"0.01\" placeholder=\"0.00\" style=\"width:75px;text-align:right\" oninput=\"prRecalcTotals()\" class=\"pr-fedwh\"></td>\n            <td style=\"padding:4px\"><input type=\"number\" min=\"0\" step=\"0.01\" placeholder=\"0.00\" style=\"width:65px;text-align:right\" oninput=\"prRecalcTotals()\" class=\"pr-ss\"></td>\n            <td style=\"padding:4px\"><input type=\"number\" min=\"0\" step=\"0.01\" placeholder=\"0.00\" style=\"width:75px;text-align:right\" oninput=\"prRecalcTotals()\" class=\"pr-medicare\"></td>\n            <td style=\"padding:4px\"><input type=\"number\" min=\"0\" step=\"0.01\" placeholder=\"0.00\" style=\"width:75px;text-align:right\" oninput=\"prRecalcTotals()\" class=\"pr-statewh\"></td>\n            <td style=\"padding:4px\"><input type=\"number\" min=\"0\" step=\"0.01\" placeholder=\"0.00\" style=\"width:75px;text-align:right\" oninput=\"prRecalcTotals()\" class=\"pr-otherded\"></td>\n            <td style=\"padding:5px 8px;text-align:right;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums\" class=\"pr-net-cell\">$0.00</td>\n          </tr>");
+  }).join(''), "\n      </tbody>\n    </table>\n    </div>");
+
+  // Auto-calc deductions for salary employees whose gross was pre-filled
+  document.querySelectorAll('#pr-emp-rows tr').forEach(row => {
+    if (row.dataset.payType === 'salary') prAutoCalcDeductions(row);
+  });
+  prRecalcTotals();
+}
+function prGetNum(input) {
+  if (!input) return 0;
+  return input.valueAsNumber || parseFloat(input.value) || 0;
+}
+
+// Auto-calculate standard federal FICA deductions from gross
+// SS: 6.2%, Medicare: 1.45%
+// Fed WH: uses per-employee W-4 data from row data-* attributes when available
+function prEstimateFedWH(grossBiweekly) {
+  // Legacy fallback: Single, 0 allowances (kept for direct calls without W-4 data)
+  // 2024 IRS Pub 15-T bi-weekly withholding table, Single/MFS
+  const brackets = [[0, 530, 0, 0], [530, 1030, 0, 0.10], [1030, 2095, 50, 0.12], [2095, 3819, 177.80, 0.22], [3819, 7231, 556.88, 0.24], [7231, 9119, 1375.76, 0.32], [9119, 11019, 1979.92, 0.35], [11019, Infinity, 2645.42, 0.37]];
+  for (const [lo, hi, base, rate] of brackets) {
+    if (grossBiweekly >= lo && grossBiweekly < hi) {
+      return base + (grossBiweekly - lo) * rate;
+    }
+  }
+  return 0;
+}
+function prAutoCalcDeductions(row) {
+  const gross = prGetNum(row.querySelector('.pr-gross'));
+  if (!gross) return;
+  const ss = parseFloat((gross * 0.062).toFixed(2));
+  const med = parseFloat((gross * 0.0145).toFixed(2));
+
+  // Use per-employee W-4 data from data-* attributes if available
+  const w4Status = row.dataset.w4Status || 'single';
+  const w4MultiJobs = row.dataset.w4MultiJobs === 'true';
+  const w4Dependents = parseFloat(row.dataset.w4Dependents || '0');
+  const w4OtherInc = parseFloat(row.dataset.w4OtherInc || '0');
+  const w4Deductions = parseFloat(row.dataset.w4Deductions || '0');
+  const w4ExtraWH = parseFloat(row.dataset.w4ExtraWh || '0');
+  const payFreq = row.dataset.payFrequency || 'bi-weekly';
+  const fwh = parseFloat(calcFedWH({
+    gross,
+    payFrequency: payFreq,
+    filingStatus: w4Status,
+    multipleJobs: w4MultiJobs,
+    dependentsAmt: w4Dependents,
+    otherIncome: w4OtherInc,
+    deductions: w4Deductions,
+    extraWH: w4ExtraWH
+  }).toFixed(2));
+  const ssEl = row.querySelector('.pr-ss');
+  const medEl = row.querySelector('.pr-medicare');
+  const fwhEl = row.querySelector('.pr-fedwh');
+  if (ssEl && !prGetNum(ssEl)) ssEl.value = ss;
+  if (medEl && !prGetNum(medEl)) medEl.value = med;
+  if (fwhEl && !prGetNum(fwhEl)) fwhEl.value = fwh;
+}
+function prRecalcRow(changedInput) {
+  const row = changedInput.closest('tr');
+  if (!row) return;
+  // For hourly employees: auto-fill gross = hours × rate when hours input changes
+  if (changedInput.classList.contains('pr-hours') && row.dataset.payType !== 'salary') {
+    const rate = parseFloat(row.dataset.rate) || 0;
+    const hours = prGetNum(changedInput);
+    if (rate && hours) {
+      const grossInput = row.querySelector('.pr-gross');
+      if (grossInput) grossInput.value = (hours * rate).toFixed(2);
+    }
+  }
+  // When gross changes, auto-fill deductions if they are still zero
+  if (changedInput.classList.contains('pr-gross') || changedInput.classList.contains('pr-hours')) {
+    prAutoCalcDeductions(row);
+  }
+  const gross = prGetNum(row.querySelector('.pr-gross'));
+  const fedwh = prGetNum(row.querySelector('.pr-fedwh'));
+  const ss = prGetNum(row.querySelector('.pr-ss'));
+  const med = prGetNum(row.querySelector('.pr-medicare'));
+  const stWh = prGetNum(row.querySelector('.pr-statewh'));
+  const other = prGetNum(row.querySelector('.pr-otherded'));
+  const net = gross - fedwh - ss - med - stWh - other;
+  const netCell = row.querySelector('.pr-net-cell');
+  if (netCell) netCell.textContent = '$' + Math.max(0, net).toFixed(2);
+  prRecalcTotals();
+}
+function prRecalcTotals() {
+  const rows = document.querySelectorAll('#pr-emp-rows tr');
+  let totGross = 0,
+    totDed = 0,
+    totNet = 0;
+  rows.forEach(row => {
+    const gross = prGetNum(row.querySelector('.pr-gross'));
+    const fedwh = prGetNum(row.querySelector('.pr-fedwh'));
+    const ss = prGetNum(row.querySelector('.pr-ss'));
+    const med = prGetNum(row.querySelector('.pr-medicare'));
+    const stWh = prGetNum(row.querySelector('.pr-statewh'));
+    const other = prGetNum(row.querySelector('.pr-otherded'));
+    const ded = fedwh + ss + med + stWh + other;
+    const net = gross - ded;
+    // update net cell
+    const netCell = row.querySelector('.pr-net-cell');
+    if (netCell) netCell.textContent = '$' + Math.max(0, net).toFixed(2);
+    totGross += gross;
+    totDed += ded;
+    totNet += Math.max(0, net);
+  });
+  const fmtN = n => '$' + n.toFixed(2);
+  const tg = document.getElementById('pr-tot-gross');
+  if (tg) tg.textContent = fmtN(totGross);
+  const td = document.getElementById('pr-tot-ded');
+  if (td) td.textContent = fmtN(totDed);
+  const tn = document.getElementById('pr-tot-net');
+  if (tn) tn.textContent = fmtN(totNet);
+}
+async function markPayRunPaid(runId) {
+  const btn = document.getElementById('prd-mark-paid');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+  }
+  const {
+    error
+  } = await sb.from('pay_runs').update({
+    status: 'paid'
+  }).eq('id', runId);
+  if (error) {
+    alert('Error: ' + error.message);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Mark as Paid';
+    }
+    return;
+  }
+  closeModal('prd-backdrop');
+  navigateTo('payroll');
+}
+function deletePayRunDraft(runId) {
+  // Replace footer with an inline confirm bar (confirm() is blocked in iframes)
+  const footer = document.getElementById('prd-footer');
+  if (!footer) return;
+  footer.innerHTML = "\n    <span style=\"font-size:13px;color:var(--red,#e53e3e);flex:1\">\n      ⚠️ Delete this draft permanently?\n    </span>\n    <button class=\"btn btn-secondary\" id=\"prd-del-cancel\">Cancel</button>\n    <button class=\"btn btn-primary\" id=\"prd-del-confirm\" style=\"background:var(--red,#e53e3e)\">Yes, Delete</button>\n  ";
+  document.getElementById('prd-del-cancel').onclick = () => {
+    closeModal('prd-backdrop');
+    navigateTo('payroll');
+  };
+  document.getElementById('prd-del-confirm').onclick = async () => {
+    const btn = document.getElementById('prd-del-confirm');
+    btn.disabled = true;
+    btn.textContent = 'Deleting…';
+    const {
+      error: lErr
+    } = await sb.from('pay_run_lines').delete().eq('pay_run_id', runId);
+    if (lErr) {
+      footer.innerHTML = "<span style=\"color:var(--red,#e53e3e)\">Error: ".concat(lErr.message, "</span>");
+      return;
+    }
+    const {
+      error: rErr
+    } = await sb.from('pay_runs').delete().eq('id', runId).eq('status', 'draft');
+    if (rErr) {
+      footer.innerHTML = "<span style=\"color:var(--red,#e53e3e)\">Error: ".concat(rErr.message, "</span>");
+      return;
+    }
+    closeModal('prd-backdrop');
+    navigateTo('payroll');
+  };
+}
+async function openPayRunDetail(runId, periodStart, periodEnd) {
+  try {
+    ensureModalStyles();
+  } catch (e) {}
+  const bd = document.createElement('div');
+  bd.className = 'modal-backdrop';
+  bd.id = 'prd-backdrop';
+  bd.innerHTML = "<div class=\"modal\" role=\"dialog\" style=\"max-width:720px;width:98vw\">\n    <div class=\"modal-header\">\n      <h3>Pay Run — ".concat(fmtDate(periodStart), " to ").concat(fmtDate(periodEnd), "</h3>\n      <button class=\"modal-close\" onclick=\"closeModal('prd-backdrop')\" aria-label=\"Close\">×</button>\n    </div>\n    <div class=\"modal-body\" id=\"prd-body\"><div class=\"loading-block\"><span class=\"spinner\"></span></div></div>\n    <div class=\"modal-footer\" id=\"prd-footer\"><button class=\"btn btn-secondary\" onclick=\"closeModal('prd-backdrop')\">Close</button></div>\n  </div>");
+  document.body.appendChild(bd);
+  bd.addEventListener('click', e => {
+    if (e.target === bd) closeModal('prd-backdrop');
+  });
+
+  // Fetch pay run header (for status) and lines in parallel
+  const [{
+    data: run
+  }, {
+    data: lines,
+    error
+  }] = await Promise.all([sb.from('pay_runs').select('status, label').eq('id', runId).single(), sb.from('pay_run_lines').select('*, employees(full_name, pay_type)').eq('pay_run_id', runId).order('employees(full_name)')]);
+
+  // Add draft action buttons if still a draft
+  if (run?.status === 'draft') {
+    const footer = document.getElementById('prd-footer');
+    if (footer) {
+      // Delete draft
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn btn-secondary';
+      delBtn.style.color = 'var(--red,#e53e3e)';
+      delBtn.style.borderColor = 'var(--red,#e53e3e)';
+      delBtn.textContent = '🗑 Delete Draft';
+      delBtn.onclick = () => deletePayRunDraft(runId);
+      footer.insertBefore(delBtn, footer.firstChild.nextSibling); // after Close btn
+
+      // Mark as Paid
+      const payBtn = document.createElement('button');
+      payBtn.id = 'prd-mark-paid';
+      payBtn.className = 'btn btn-primary';
+      payBtn.style.background = 'var(--green)';
+      payBtn.textContent = '✓ Mark as Paid';
+      payBtn.onclick = () => markPayRunPaid(runId);
+      footer.appendChild(payBtn);
+    }
+  }
+  const body = document.getElementById('prd-body');
+  if (error || !lines || !lines.length) {
+    body.innerHTML = '<p style="color:var(--muted);text-align:center;padding:24px">No employee lines found for this pay run.</p>';
+    return;
+  }
+  const fmtN = n => '$' + parseFloat(n || 0).toFixed(2);
+  const statusBadge = run ? "<span class=\"badge badge-".concat(run.status === 'paid' ? 'green' : 'gold', "\" style=\"margin-left:8px\">").concat(run.status, "</span>") : '';
+  body.innerHTML = "\n    <div style=\"margin-bottom:12px;font-size:13px;color:var(--muted)\">\n      ".concat(run?.label ? "<strong>".concat(esc(run.label), "</strong> · ") : '', "Status: ").concat(statusBadge, "\n    </div>\n    <div style=\"overflow-x:auto\">\n    <table style=\"width:100%;font-size:13px;border-collapse:collapse\">\n      <thead><tr style=\"border-bottom:2px solid var(--border)\">\n        <th style=\"text-align:left;padding:7px 8px\">Employee</th>\n        <th style=\"padding:7px 4px;text-align:right\">Hours</th>\n        <th style=\"padding:7px 4px;text-align:right\">Gross</th>\n        <th style=\"padding:7px 4px;text-align:right\">Fed WH</th>\n        <th style=\"padding:7px 4px;text-align:right\">SS</th>\n        <th style=\"padding:7px 4px;text-align:right\">Medicare</th>\n        <th style=\"padding:7px 4px;text-align:right\">State WH</th>\n        <th style=\"padding:7px 4px;text-align:right\">Other</th>\n        <th style=\"padding:7px 8px;text-align:right;color:var(--green)\">Net Pay</th>\n      </tr></thead>\n      <tbody>\n        ").concat(lines.map(l => "<tr style=\"border-bottom:1px solid var(--border)\">\n          <td style=\"padding:6px 8px;font-weight:600\">".concat(esc(l.employees?.full_name || '—'), "</td>\n          <td style=\"padding:6px 4px;text-align:right;color:var(--muted)\">").concat(l.hours ? l.hours : '—', "</td>\n          <td style=\"padding:6px 4px;text-align:right;font-variant-numeric:tabular-nums\">").concat(fmtN(l.gross_pay), "</td>\n          <td style=\"padding:6px 4px;text-align:right;font-variant-numeric:tabular-nums\">").concat(fmtN(l.fed_wh), "</td>\n          <td style=\"padding:6px 4px;text-align:right;font-variant-numeric:tabular-nums\">").concat(fmtN(l.ss_ee), "</td>\n          <td style=\"padding:6px 4px;text-align:right;font-variant-numeric:tabular-nums\">").concat(fmtN(l.medicare_ee), "</td>\n          <td style=\"padding:6px 4px;text-align:right;font-variant-numeric:tabular-nums\">").concat(fmtN(l.state_wh), "</td>\n          <td style=\"padding:6px 4px;text-align:right;font-variant-numeric:tabular-nums\">").concat(fmtN(l.other_deduct), "</td>\n          <td style=\"padding:6px 8px;text-align:right;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums\">").concat(fmtN(l.net_pay), "</td>\n        </tr>")).join(''), "\n      </tbody>\n      <tfoot><tr style=\"border-top:2px solid var(--border);font-weight:700\">\n        <td style=\"padding:7px 8px\">Totals</td>\n        <td></td>\n        <td style=\"padding:7px 4px;text-align:right;font-variant-numeric:tabular-nums\">").concat(fmtN(lines.reduce((s, l) => s + parseFloat(l.gross_pay || 0), 0)), "</td>\n        <td style=\"padding:7px 4px;text-align:right;font-variant-numeric:tabular-nums\">").concat(fmtN(lines.reduce((s, l) => s + parseFloat(l.fed_wh || 0), 0)), "</td>\n        <td style=\"padding:7px 4px;text-align:right;font-variant-numeric:tabular-nums\">").concat(fmtN(lines.reduce((s, l) => s + parseFloat(l.ss_ee || 0), 0)), "</td>\n        <td style=\"padding:7px 4px;text-align:right;font-variant-numeric:tabular-nums\">").concat(fmtN(lines.reduce((s, l) => s + parseFloat(l.medicare_ee || 0), 0)), "</td>\n        <td style=\"padding:7px 4px;text-align:right;font-variant-numeric:tabular-nums\">").concat(fmtN(lines.reduce((s, l) => s + parseFloat(l.state_wh || 0), 0)), "</td>\n        <td style=\"padding:7px 4px;text-align:right;font-variant-numeric:tabular-nums\">").concat(fmtN(lines.reduce((s, l) => s + parseFloat(l.other_deduct || 0), 0)), "</td>\n        <td style=\"padding:7px 8px;text-align:right;color:var(--green);font-variant-numeric:tabular-nums\">").concat(fmtN(lines.reduce((s, l) => s + parseFloat(l.net_pay || 0), 0)), "</td>\n      </tr></tfoot>\n    </table></div>");
+}
+async function savePayRun(status) {
+  const errEl = document.getElementById('pr-error');
+  errEl.textContent = '';
+  try {
+    const start = document.getElementById('pr-start').value;
+    const end = document.getElementById('pr-end').value;
+    const clientId = document.getElementById('pr-client')?.value || STATE.selectedClientId || null;
+    if (!clientId) {
+      errEl.textContent = 'Please select a client.';
+      return;
+    }
+    if (!start || !end) {
+      errEl.textContent = 'Period start and end are required.';
+      return;
+    }
+
+    // Collect employee lines from DOM
+    const empRows = document.querySelectorAll('#pr-emp-rows tr');
+    if (!empRows.length) {
+      errEl.textContent = 'No employees loaded. Please select a client with active employees.';
+      return;
+    }
+    const lines = Array.from(empRows).map(row => {
+      const empId = row.dataset.empId;
+      const gross = prGetNum(row.querySelector('.pr-gross'));
+      const fedwh = prGetNum(row.querySelector('.pr-fedwh'));
+      const ss = prGetNum(row.querySelector('.pr-ss'));
+      const med = prGetNum(row.querySelector('.pr-medicare'));
+      const stWh = prGetNum(row.querySelector('.pr-statewh'));
+      const other = prGetNum(row.querySelector('.pr-otherded'));
+      const hours = prGetNum(row.querySelector('.pr-hours'));
+      const net = Math.max(0, gross - fedwh - ss - med - stWh - other);
+      return {
+        employee_id: empId,
+        gross_pay: gross,
+        fed_wh: fedwh,
+        ss_ee: ss,
+        medicare_ee: med,
+        state_wh: stWh,
+        other_deduct: other,
+        net_pay: net,
+        hours: hours || null
+      };
+    }).filter(l => l.gross_pay > 0); // only include employees with a gross entered
+
+    if (!lines.length) {
+      errEl.textContent = 'Please enter gross pay for at least one employee.';
+      return;
+    }
+    const totalGross = lines.reduce((s, l) => s + l.gross_pay, 0);
+    const totalNet = lines.reduce((s, l) => s + l.net_pay, 0);
+    const btnId = status === 'draft' ? 'pr-draft' : 'pr-paid';
+    const btn = document.getElementById(btnId);
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    // Insert pay_run header
+    const {
+      data: runData,
+      error: runErr
+    } = await sb.from('pay_runs').insert({
+      client_id: clientId,
+      period_start: start,
+      period_end: end,
+      pay_date: document.getElementById('pr-paydate').value || null,
+      label: document.getElementById('pr-freq').value,
+      total_gross: totalGross,
+      total_net: totalNet,
+      created_by: STATE.staffRow?.id || null,
+      status
+    }).select('id').single();
+    if (runErr) {
+      errEl.textContent = 'Error: ' + runErr.message;
+      btn.disabled = false;
+      btn.textContent = status === 'draft' ? 'Save Draft' : 'Mark as Paid';
+      return;
+    }
+
+    // Insert pay_run_lines
+    const lineRows = lines.map(l => ({
+      ...l,
+      pay_run_id: runData.id
+    }));
+    const {
+      error: lineErr
+    } = await sb.from('pay_run_lines').insert(lineRows);
+    if (lineErr) {
+      errEl.textContent = 'Pay run saved but employee lines failed: ' + lineErr.message;
+      btn.disabled = false;
+      btn.textContent = status === 'draft' ? 'Save Draft' : 'Mark as Paid';
+      return;
+    }
+    closeModal('pr-backdrop');
+    navigateTo('payroll');
+  } catch (e) {
+    errEl.textContent = 'Unexpected error: ' + e.message;
+  }
+}
+
+</script>
+</body>
+</html>
