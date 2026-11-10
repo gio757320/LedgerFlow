@@ -993,7 +993,7 @@ function openClientDetail(c) {
   bd.className = 'modal-backdrop';
   bd.id = 'cdet-backdrop';
   const info = (label, val) => val ? "\n    <div style=\"display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)\">\n      <span style=\"min-width:140px;font-size:12px;color:var(--muted)\">".concat(label, "</span>\n      <span style=\"font-size:13px;font-weight:500\">").concat(esc(val), "</span>\n    </div>") : '';
-  bd.innerHTML = "\n    <div class=\"modal\" role=\"dialog\" style=\"max-width:520px\">\n      <div class=\"modal-header\">\n        <h3>".concat(esc(c.full_name), "</h3>\n        <button class=\"modal-close\" onclick=\"closeModal('cdet-backdrop')\" aria-label=\"Close\">×</button>\n      </div>\n      <div class=\"modal-body\">\n        <div style=\"margin-bottom:16px\">\n          <span class=\"badge ").concat(c.status === 'active' ? 'badge-green' : 'badge-grey', "\" style=\"margin-right:8px\">").concat(esc(c.status || 'inactive'), "</span>\n          <span style=\"font-size:13px;color:var(--muted)\">").concat(esc(c.entity_type || ''), "</span>\n        </div>\n        ").concat(info('Email', c.email), "\n        ").concat(info('Phone', c.phone), "\n        ").concat(info('Address', c.address), "\n        ").concat(info('EIN / ITIN', c.ein), "\n        ").concat(info('State', c.state), "\n        ").concat(info('Notes', c.notes), "\n\n        <div style=\"margin-top:20px\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">QUICK ACTIONS</div>\n          <div style=\"display:flex;flex-wrap:wrap;gap:8px\">\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('journal')\">📒 Journal Entries</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('payroll')\">💼 Payroll</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('tax')\">🏛 Tax Returns</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\">📊 Dashboard</button>\n          </div>\n        </div>\n\n        <div style=\"margin-top:20px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">🔑 CLIENT PORTAL ACCESS</div>\n          ").concat(c.auth_user_id ? "<div style=\"display:flex;align-items:center;gap:8px\">\n                <span style=\"color:var(--green);font-size:16px\">✓</span>\n                <span style=\"font-size:13px;font-weight:500\">Portal access linked</span>\n              </div>\n              <div style=\"font-size:12px;color:var(--muted);margin-top:4px\">Client email: <strong>".concat(esc(c.email || ''), "</strong></div>\n              <button class=\"btn btn-secondary\" id=\"cdet-resend-btn\" style=\"margin-top:10px;font-size:12px;padding:6px 12px\">↺ Resend password email</button>\n              <div id=\"cdet-resend-msg\" style=\"font-size:12px;margin-top:6px;min-height:16px\"></div>") : "<div style=\"font-size:13px;color:var(--muted);margin-bottom:10px\">This client does not have portal access yet.</div>\n              <div style=\"display:flex;align-items:center;gap:8px\">\n                <input id=\"cdet-portal-email\" type=\"email\" placeholder=\"Client email\" value=\"".concat(esc(c.email || ''), "\" style=\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\">\n                <button class=\"btn btn-primary\" id=\"cdet-invite-btn\" style=\"white-space:nowrap;font-size:12px;padding:7px 14px\">Create Login</button>\n              </div>\n              <div id=\"cdet-invite-msg\" style=\"font-size:12px;margin-top:6px;min-height:16px\"></div>"), "\n        </div>\n      </div>\n      <div class=\"modal-footer\">\n        <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop')\">Close</button>\n        <button class=\"btn btn-primary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\">Select Client →</button>\n      </div>\n    </div>");
+  bd.innerHTML = "\n    <div class=\"modal\" role=\"dialog\" style=\"max-width:520px\">\n      <div class=\"modal-header\">\n        <h3>".concat(esc(c.full_name), "</h3>\n        <button class=\"modal-close\" onclick=\"closeModal('cdet-backdrop')\" aria-label=\"Close\">×</button>\n      </div>\n      <div class=\"modal-body\">\n        <div style=\"margin-bottom:16px\">\n          <span class=\"badge ").concat(c.status === 'active' ? 'badge-green' : 'badge-grey', "\" style=\"margin-right:8px\">").concat(esc(c.status || 'inactive'), "</span>\n          <span style=\"font-size:13px;color:var(--muted)\">").concat(esc(c.entity_type || ''), "</span>\n        </div>\n        ").concat(info('Email', c.email), "\n        ").concat(info('Phone', c.phone), "\n        ").concat(info('Address', c.address), "\n        ").concat(info('EIN / ITIN', c.ein), "\n        ").concat(info('State', c.state), "\n        ").concat(info('Notes', c.notes), "\n\n        <div style=\"margin-top:20px\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">QUICK ACTIONS</div>\n          <div style=\"display:flex;flex-wrap:wrap;gap:8px\">\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('journal')\">📒 Journal Entries</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('payroll')\">💼 Payroll</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('tax')\">🏛 Tax Returns</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\">📊 Dashboard</button>\n          </div>\n        </div>\n\n        <div style=\"margin-top:20px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">🔑 CLIENT PORTAL ACCESS</div>\n          ").concat(c.auth_user_id ? "<div style=\"display:flex;align-items:center;gap:8px\">\n                <span style=\"color:var(--green);font-size:16px\">✓</span>\n                <span style=\"font-size:13px;font-weight:500\">Portal access linked</span>\n              </div>\n              <div style=\"font-size:12px;color:var(--muted);margin-top:4px\">Client email: <strong>".concat(esc(c.email || ''), "</strong></div>\n              <button class=\"btn btn-secondary\" id=\"cdet-resend-btn\" style=\"margin-top:10px;font-size:12px;padding:6px 12px\">↺ Resend password email</button>\n              <div id=\"cdet-resend-msg\" style=\"font-size:12px;margin-top:6px;min-height:16px\"></div>") : "<div style=\"font-size:13px;color:var(--muted);margin-bottom:10px\">This client does not have portal access yet.</div>\n              <div style=\"display:flex;align-items:center;gap:8px\">\n                <input id=\"cdet-portal-email\" type=\"email\" placeholder=\"Client email\" value=\"".concat(esc(c.email || ''), "\" style=\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\">\n                <button class=\"btn btn-primary\" id=\"cdet-invite-btn\" style=\"white-space:nowrap;font-size:12px;padding:7px 14px\">Create Login</button>\n              </div>\n              <div id=\"cdet-invite-msg\" style=\"font-size:12px;margin-top:6px;min-height:16px\"></div>"), "\n        </div>\n      </div>\n      <div class=\"modal-footer\">\n        <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop')\">Close</button>\n        <button class=\"btn btn-secondary\" id=\"cdet-edit-btn\" style=\"margin-left:auto\">✏️ Edit Info</button>\n        <button class=\"btn btn-primary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\">Select Client →</button>\n      </div>\n    </div>");
   document.body.appendChild(bd);
   bd.addEventListener('click', e => {
     if (e.target === bd) closeModal('cdet-backdrop');
@@ -1106,6 +1106,103 @@ function openClientDetail(c) {
         resendBtn.disabled = false;
         resendBtn.textContent = '↺ Resend password email';
       }
+    });
+  }
+
+  // ── EDIT INFO button ──
+  const editBtn = document.getElementById('cdet-edit-btn');
+  if (editBtn) {
+    editBtn.addEventListener('click', () => {
+      // Replace modal body with an editable form
+      const modalBody = document.querySelector('#cdet-backdrop .modal-body');
+      const modalFooter = document.querySelector('#cdet-backdrop .modal-footer');
+      if (!modalBody || !modalFooter) return;
+
+      modalBody.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em">FULL NAME</label>
+            <input id="edit-name" type="text" value="${esc(c.full_name||'')}" style="width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;box-sizing:border-box">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em">EMAIL</label>
+            <input id="edit-email" type="email" value="${esc(c.email||'')}" style="width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;box-sizing:border-box">
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">⚠️ Changing the email will also update the client portal login email.</div>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em">PHONE</label>
+            <input id="edit-phone" type="tel" value="${esc(c.phone||'')}" style="width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;box-sizing:border-box">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em">ADDRESS</label>
+            <input id="edit-address" type="text" value="${esc(c.address||'')}" style="width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;box-sizing:border-box">
+          </div>
+          <div style="display:flex;gap:12px">
+            <div class="form-group" style="margin:0;flex:1">
+              <label style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em">EIN / ITIN</label>
+              <input id="edit-ein" type="text" value="${esc(c.ein||'')}" style="width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;box-sizing:border-box">
+            </div>
+            <div class="form-group" style="margin:0;flex:1">
+              <label style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em">STATE</label>
+              <input id="edit-state" type="text" value="${esc(c.state||'')}" maxlength="2" style="width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;box-sizing:border-box;text-transform:uppercase">
+            </div>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em">STATUS</label>
+            <select id="edit-status" style="width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px">
+              <option value="active" ${c.status==='active'?'selected':''}>Active</option>
+              <option value="inactive" ${c.status==='inactive'?'selected':''}>Inactive</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <label style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em">NOTES</label>
+            <textarea id="edit-notes" rows="3" style="width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;box-sizing:border-box;resize:vertical">${esc(c.notes||'')}</textarea>
+          </div>
+          <div id="edit-msg" style="font-size:13px;min-height:18px"></div>
+        </div>`;
+
+      modalFooter.innerHTML = `
+        <button class="btn btn-secondary" id="edit-cancel-btn">Cancel</button>
+        <button class="btn btn-primary" id="edit-save-btn" style="margin-left:auto">Save Changes</button>`;
+
+      document.getElementById('edit-cancel-btn').addEventListener('click', () => {
+        openClientDetail(c);
+      });
+
+      document.getElementById('edit-save-btn').addEventListener('click', async () => {
+        const saveBtn = document.getElementById('edit-save-btn');
+        const msg = document.getElementById('edit-msg');
+        const updates = {
+          full_name: document.getElementById('edit-name').value.trim(),
+          email:     document.getElementById('edit-email').value.trim(),
+          phone:     document.getElementById('edit-phone').value.trim(),
+          address:   document.getElementById('edit-address').value.trim(),
+          ein:       document.getElementById('edit-ein').value.trim(),
+          state:     document.getElementById('edit-state').value.trim().toUpperCase(),
+          status:    document.getElementById('edit-status').value,
+          notes:     document.getElementById('edit-notes').value.trim(),
+        };
+        if (!updates.full_name) { msg.style.color='var(--red)'; msg.textContent='Name is required.'; return; }
+        if (!updates.email)     { msg.style.color='var(--red)'; msg.textContent='Email is required.'; return; }
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving…';
+        msg.textContent = '';
+
+        const { error } = await sb.from('clients').update(updates).eq('id', c.id);
+        if (error) {
+          msg.style.color = 'var(--red)';
+          msg.textContent = error.message;
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save Changes';
+        } else {
+          // Update local state so re-opening shows fresh data
+          const idx = STATE.clientRows.findIndex(r => r.id === c.id);
+          if (idx !== -1) STATE.clientRows[idx] = { ...STATE.clientRows[idx], ...updates };
+          // Re-open modal with updated data
+          openClientDetail({ ...c, ...updates });
+        }
+      });
     });
   }
 }
