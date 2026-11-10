@@ -70,7 +70,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   display: flex; align-items: center; justify-content: center;
   font-family: 'DM Serif Display', serif; color: #fff; font-size: 22px;
 }
-.login-logo-name { font-weight: 700; font-size: 20px; color: #fff; }
+.login-logo-name { font-weight: 700; font-size: 20px; color: var(--text); }
 .login-logo-name span { color: var(--green); }
 .login-h { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
 .login-sub { color: var(--muted); margin-bottom: 28px; font-size: 13px; }
@@ -323,7 +323,7 @@ tr:hover td { background: rgba(46,158,107,.04); }
     <!-- Login type tabs -->
     <div style="display:flex;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:20px">
       <button id="tab-staff" onclick="switchLoginTab('staff')" style="flex:1;padding:9px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:var(--green);color:#fff;transition:all .2s">Staff</button>
-      <button id="tab-client" onclick="switchLoginTab('client')" style="flex:1;padding:9px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:var(--surface);color:var(--muted);transition:all .2s">Client</button>
+      <button id="tab-client" onclick="switchLoginTab('client')" style="flex:1;padding:9px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:transparent;color:var(--muted);transition:all .2s">Client</button>
     </div>
 
     <!-- Staff login (password) -->
@@ -344,7 +344,7 @@ tr:hover td { background: rgba(46,158,107,.04); }
     </div>
 
     <!-- Client login (OTP code) -->
-    <div id="login-client-panel" hidden>
+    <div id="login-client-panel" hidden="hidden">
       <!-- Step 1: enter email -->
       <div id="otp-step1">
         <div class="form-group">
