@@ -5,6 +5,8 @@
     "@babel/plugin-transform-template-literals": "^8.0.1"
   },
   "dependencies": {
+    "@babel/plugin-transform-nullish-coalescing-operator": "^8.0.1",
+    "@babel/plugin-transform-optional-chaining": "^8.0.5",
     "@supabase/supabase-js": "^2.47.0"
   }
 }
