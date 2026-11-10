@@ -319,19 +319,56 @@ tr:hover td { background: rgba(46,158,107,.04); }
     </div>
     <div class="login-h">Sign in to your account</div>
     <div class="login-sub">Secure access for staff and clients</div>
-    <div class="form-group">
-      <label>Email address</label>
-      <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email">
+
+    <!-- Login type tabs -->
+    <div style="display:flex;border:1.5px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:20px">
+      <button id="tab-staff" onclick="switchLoginTab('staff')" style="flex:1;padding:9px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:var(--green);color:#fff;transition:all .2s">Staff</button>
+      <button id="tab-client" onclick="switchLoginTab('client')" style="flex:1;padding:9px;font-size:13px;font-weight:600;border:none;cursor:pointer;background:var(--surface);color:var(--muted);transition:all .2s">Client</button>
     </div>
-    <div class="form-group">
-      <label>Password</label>
-      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+
+    <!-- Staff login (password) -->
+    <div id="login-staff-panel">
+      <div class="form-group">
+        <label>Email address</label>
+        <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button id="login-btn">Sign in</button>
+      <div id="login-error"></div>
+      <div style="text-align:right;margin-top:8px">
+        <a href="#" id="forgot-link" style="font-size:12px;color:var(--green)">Forgot password?</a>
+      </div>
     </div>
-    <button id="login-btn">Sign in</button>
-    <div id="login-error"></div>
-    <div style="text-align:right;margin-top:8px">
-      <a href="#" id="forgot-link" style="font-size:12px;color:var(--green)">Forgot password?</a>
+
+    <!-- Client login (OTP code) -->
+    <div id="login-client-panel" hidden>
+      <!-- Step 1: enter email -->
+      <div id="otp-step1">
+        <div class="form-group">
+          <label>Your email address</label>
+          <input type="email" id="otp-email" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <button id="otp-send-btn" style="width:100%;padding:12px;border:none;border-radius:8px;background:var(--green);color:#fff;font-size:15px;font-weight:600;cursor:pointer">Send Code</button>
+        <div id="otp-send-error" style="color:var(--red);font-size:13px;margin-top:10px;min-height:18px"></div>
+      </div>
+      <!-- Step 2: enter code -->
+      <div id="otp-step2" hidden>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:16px">We sent a 6-digit code to <strong id="otp-email-shown"></strong>. Check your inbox.</div>
+        <div class="form-group">
+          <label>Enter your code</label>
+          <input type="text" id="otp-code" placeholder="123456" maxlength="10" autocomplete="one-time-code" style="font-size:22px;letter-spacing:4px;text-align:center">
+        </div>
+        <button id="otp-verify-btn" style="width:100%;padding:12px;border:none;border-radius:8px;background:var(--green);color:#fff;font-size:15px;font-weight:600;cursor:pointer">Verify Code</button>
+        <div id="otp-verify-error" style="color:var(--red);font-size:13px;margin-top:10px;min-height:18px"></div>
+        <div style="text-align:center;margin-top:12px">
+          <a href="#" id="otp-back-link" style="font-size:12px;color:var(--muted)">← Use a different email</a>
+        </div>
+      </div>
     </div>
+
     <div class="login-firm">Manrique &amp; Associates LLC &nbsp;·&nbsp; Secure Portal</div>
   </div>
 </div>
@@ -458,6 +495,75 @@ let STATE = {
   });
 
   // Login form
+  // ── Login tab switching ──────────────────────────────────────
+  window.switchLoginTab = function(tab) {
+    const isStaff = tab === 'staff';
+    document.getElementById('login-staff-panel').hidden = !isStaff;
+    document.getElementById('login-client-panel').hidden = isStaff;
+    document.getElementById('tab-staff').style.background = isStaff ? 'var(--green)' : 'var(--surface)';
+    document.getElementById('tab-staff').style.color = isStaff ? '#fff' : 'var(--muted)';
+    document.getElementById('tab-client').style.background = isStaff ? 'var(--surface)' : 'var(--green)';
+    document.getElementById('tab-client').style.color = isStaff ? 'var(--muted)' : '#fff';
+  };
+
+  // ── OTP send ────────────────────────────────────────────────
+  document.getElementById('otp-send-btn').addEventListener('click', async () => {
+    const email = document.getElementById('otp-email').value.trim();
+    const errEl = document.getElementById('otp-send-error');
+    const btn = document.getElementById('otp-send-btn');
+    errEl.textContent = '';
+    if (!email) { errEl.textContent = 'Please enter your email address.'; return; }
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+    btn.disabled = false;
+    btn.textContent = 'Send Code';
+    if (error) {
+      errEl.textContent = error.message.includes('not found') || error.message.includes('signup') || error.message.includes('disabled')
+        ? 'No client account found for that email. Please contact Manrique & Associates.'
+        : 'Error: ' + error.message;
+    } else {
+      document.getElementById('otp-email-shown').textContent = email;
+      document.getElementById('otp-step1').hidden = true;
+      document.getElementById('otp-step2').hidden = false;
+      document.getElementById('otp-code').focus();
+    }
+  });
+
+  // ── OTP verify ──────────────────────────────────────────────
+  document.getElementById('otp-verify-btn').addEventListener('click', async () => {
+    const email = document.getElementById('otp-email').value.trim();
+    const token = document.getElementById('otp-code').value.trim();
+    const errEl = document.getElementById('otp-verify-error');
+    const btn = document.getElementById('otp-verify-btn');
+    errEl.textContent = '';
+    if (!token) { errEl.textContent = 'Please enter the code from your email.'; return; }
+    btn.disabled = true;
+    btn.textContent = 'Verifying…';
+    const { error } = await sb.auth.verifyOtp({ email, token, type: 'email' });
+    btn.disabled = false;
+    btn.textContent = 'Verify Code';
+    if (error) {
+      errEl.textContent = error.message.includes('expired') || error.message.includes('invalid')
+        ? 'Invalid or expired code. Please try again.'
+        : 'Error: ' + error.message;
+    }
+    // On success, onSignedIn fires automatically via auth state change
+  });
+
+  // ── OTP back link ───────────────────────────────────────────
+  document.getElementById('otp-back-link').addEventListener('click', e => {
+    e.preventDefault();
+    document.getElementById('otp-step1').hidden = false;
+    document.getElementById('otp-step2').hidden = true;
+    document.getElementById('otp-verify-error').textContent = '';
+    document.getElementById('otp-code').value = '';
+  });
+
+  document.getElementById('otp-code').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('otp-verify-btn').click();
+  });
+
   document.getElementById('login-btn').addEventListener('click', doLogin);
   document.getElementById('forgot-link').addEventListener('click', async e => {
     e.preventDefault();
