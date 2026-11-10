@@ -269,13 +269,13 @@ tr:hover td { background: rgba(46,158,107,.04); }
 }
 .modal {
   background: var(--surface); border-radius: 14px; width: 100%; max-width: 540px;
-  max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 80px rgba(0,0,0,.4);
+  max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 24px 80px rgba(0,0,0,.4);
 }
-.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--border); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .modal-header h3 { font-size: 16px; font-weight: 700; }
 .modal-close { font-size: 20px; color: var(--muted); line-height: 1; padding: 2px; }
-.modal-body { padding: 22px; }
-.modal-footer { padding: 14px 22px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+.modal-body { padding: 22px; overflow-y: auto; flex: 1; }
+.modal-footer { padding: 14px 22px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; flex-shrink: 0; }
 .btn-outline { background: none; border: 1.5px solid var(--border); color: var(--text); }
 .btn-outline:hover { border-color: var(--muted); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
