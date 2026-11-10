@@ -719,7 +719,7 @@ async function renderJournal(container) {
           <thead><tr><th>Account</th><th>Memo</th><th style="text-align:right">Debit</th><th style="text-align:right">Credit</th></tr></thead>
           <tbody>${lines.map(l => `
             <tr>
-              <td style="font-size:12px;color:var(--muted)">${esc((l.accounts?.account_number || '') + ' ' + (l.accounts?.name || ''))}</td>
+              <td style="font-size:12px;color:var(--muted)">${esc(((l.accounts ? l.accounts.account_number : '') || '') + ' ' + ((l.accounts ? l.accounts.name : '') || ''))}</td>
               <td>${esc(l.memo || '')}</td>
               <td style="text-align:right;font-variant-numeric:tabular-nums">${parseFloat(l.debit) > 0 ? fmt(l.debit) : ''}</td>
               <td style="text-align:right;font-variant-numeric:tabular-nums">${parseFloat(l.credit) > 0 ? fmt(l.credit) : ''}</td>
@@ -2298,7 +2298,7 @@ async function openPayRunDetail(runId, periodStart, periodEnd) {
   const statusBadge = run ? `<span class="badge badge-${run.status==='paid'?'green':'gold'}" style="margin-left:8px">${run.status}</span>` : '';
   body.innerHTML = `
     <div style="margin-bottom:12px;font-size:13px;color:var(--muted)">
-      ${run?.label ? `<strong>${esc(run.label)}</strong> · ` : ''}Status: ${statusBadge}
+      ${(run && run.label) ? `<strong>${esc(run.label)}</strong> · ` : ''}Status: ${statusBadge}
     </div>
     <div style="overflow-x:auto">
     <table style="width:100%;font-size:13px;border-collapse:collapse">
@@ -2315,7 +2315,7 @@ async function openPayRunDetail(runId, periodStart, periodEnd) {
       </tr></thead>
       <tbody>
         ${lines.map(l => `<tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:6px 8px;font-weight:600">${esc(l.employees?.full_name || '—')}</td>
+          <td style="padding:6px 8px;font-weight:600">${esc((l.employees ? l.employees.full_name : '') || '—')}</td>
           <td style="padding:6px 4px;text-align:right;color:var(--muted)">${l.hours ? l.hours : '—'}</td>
           <td style="padding:6px 4px;text-align:right;font-variant-numeric:tabular-nums">${fmtN(l.gross_pay)}</td>
           <td style="padding:6px 4px;text-align:right;font-variant-numeric:tabular-nums">${fmtN(l.fed_wh)}</td>
