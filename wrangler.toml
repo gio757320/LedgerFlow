@@ -1,3 +1,9 @@
-name = "noisy-glitter-bdba"
-main = "worker.js"
-compatibility_date = "2024-01-01"
+name = "ledgerflow"
+main = "worker-github.js"
+compatibility_date = "2026-11-10"
+
+[vars]
+
+[[routes]]
+pattern = "ledgerflow.gio757.workers.dev/*"
+zone_name = "gio757.workers.dev"
