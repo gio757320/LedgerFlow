@@ -926,55 +926,153 @@ async function renderDashboard(container) {
 
 // ── CLIENT PORTAL DASHBOARD ────────────────────────────────
 async function renderClientPortalDashboard(container) {
-  var _jeRes$count2, _taxRes$count2, _prRes$count;
   const c = STATE.clientRow;
   if (!c) {
-    container.innerHTML = pageShell('My Account', '', '', "\n      <div class=\"alert alert-red\" style=\"margin:28px\">\n        Your account is not linked to a client record yet. Please contact Manrique &amp; Associates.\n      </div>\n    ");
+    container.innerHTML = pageShell('My Account', '', '', `
+      <div class="alert alert-red" style="margin:28px">
+        Your account is not linked to a client record yet. Please contact Manrique &amp; Associates.
+      </div>`);
     return;
   }
-  container.innerHTML = pageShell('My Account', c.full_name, '', "\n    <div id=\"dash-kpi-row\">\n      <div class=\"stat-card stat-gold\"><div class=\"stat-label\">Journal Entries</div><div class=\"stat-val\" id=\"d-je\">—</div><div class=\"stat-sub\">Posted</div></div>\n      <div class=\"stat-card stat-blue\"><div class=\"stat-label\">Tax Returns</div><div class=\"stat-val\" id=\"d-tax\">—</div><div class=\"stat-sub\">On file</div></div>\n      <div class=\"stat-card stat-green\"><div class=\"stat-label\">Pay Runs</div><div class=\"stat-val\" id=\"d-pr\">—</div><div class=\"stat-sub\">Completed</div></div>\n    </div>\n\n    <div class=\"two-col\">\n      <div class=\"card\">\n        <div class=\"card-h\">Account Information</div>\n        <div class=\"card-body\">\n          <table style=\"width:100%;border-collapse:collapse\">\n            ".concat(row('Business Name', c.full_name), "\n            ").concat(row('Entity Type', c.entity_type || '—'), "\n            ").concat(row('Email', c.email || '—'), "\n            ").concat(row('Phone', c.phone || '—'), "\n            ").concat(row('Client Since', c.client_since ? new Date(c.client_since).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  }) : '—'), "\n            ").concat(row('Status', "<span style=\"color:".concat(c.status === 'active' ? 'var(--green)' : 'var(--muted)', ";font-weight:600\">").concat(c.status, "</span>")), "\n          </table>\n        </div>\n      </div>\n      <div class=\"card\">\n        <div class=\"card-h\">Quick Access</div>\n        <div class=\"card-body\">\n          <div style=\"display:flex;flex-direction:column;gap:10px\">\n            <button class=\"btn btn-secondary\" style=\"background:var(--bg);color:var(--text);justify-content:flex-start\" onclick=\"navigateTo('journal')\">📋 View Journal Entries</button>\n            <button class=\"btn btn-secondary\" style=\"background:var(--bg);color:var(--text);justify-content:flex-start\" onclick=\"navigateTo('payroll')\">💼 View Payroll History</button>\n            <button class=\"btn btn-secondary\" style=\"background:var(--bg);color:var(--text);justify-content:flex-start\" onclick=\"navigateTo('tax')\">🏛 View Tax Returns</button>\n          </div>\n          <div style=\"margin-top:20px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\">\n            <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px\">Your Firm</div>\n            <div style=\"font-weight:600;color:var(--text)\">Manrique &amp; Associates LLC</div>\n            <div style=\"font-size:12px;color:var(--muted);margin-top:2px\">Questions? Contact your account manager.</div>\n          </div>\n        </div>\n      </div>\n    </div>\n\n    <div class=\"card\" id=\"d-recent-tax\">\n      <div class=\"card-h\">Recent Tax Returns</div>\n      <div class=\"card-body\" id=\"d-tax-list\"><span class=\"spinner\"></span></div>\n    </div>\n  "));
-  function row(label, val) {
-    return "<tr style=\"border-bottom:1px solid var(--border)\">\n      <td style=\"padding:8px 0;font-size:12px;color:var(--muted);font-weight:600;width:40%;text-transform:uppercase;letter-spacing:.04em\">".concat(label, "</td>\n      <td style=\"padding:8px 0;font-size:13px\">").concat(val, "</td>\n    </tr>");
+  container.innerHTML = pageShell('My Account', c.full_name, '', `
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-h" style="display:flex;justify-content:space-between;align-items:center">
+        <span>📋 To-Do List</span>
+        <span id="tasks-badge" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+      <div class="card-body" id="tasks-list"><span class="spinner"></span></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-h" style="display:flex;justify-content:space-between;align-items:center">
+        <span>📁 My Documents</span>
+        <label class="btn btn-primary" style="font-size:12px;padding:6px 14px;cursor:pointer">
+          ⬆️ Upload File
+          <input type="file" id="doc-upload-input" style="display:none" multiple
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp">
+        </label>
+      </div>
+      <div id="doc-upload-progress" style="padding:0 22px;min-height:0"></div>
+      <div class="card-body" id="docs-list"><span class="spinner"></span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h">Your Firm</div>
+      <div class="card-body">
+        <div style="font-weight:600;font-size:15px">Manrique &amp; Associates LLC</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:4px">Questions about your account? Reply to any email from our office or visit manriqueassociates.com.</div>
+      </div>
+    </div>
+  `);
+
+  // ── Load tasks ──
+  async function loadTasks() {
+    const { data: tasks, error } = await sb.from('client_tasks')
+      .select('*').eq('client_id', c.id).order('completed').order('priority', { ascending: false }).order('due_date', { nullsFirst: false });
+    const el = document.getElementById('tasks-list');
+    const badge = document.getElementById('tasks-badge');
+    if (!el) return;
+    if (error) { el.innerHTML = `<div class="alert alert-red">${esc(error.message)}</div>`; return; }
+    if (!tasks.length) {
+      el.innerHTML = '<div class="empty" style="padding:20px 0"><div class="empty-icon">✅</div>No tasks assigned yet.</div>';
+      if (badge) badge.textContent = '';
+      return;
+    }
+    const pending = tasks.filter(t => !t.completed).length;
+    if (badge) badge.textContent = pending ? `${pending} pending` : 'All done ✓';
+    el.innerHTML = tasks.map(t => {
+      const priorityColor = { urgent: 'var(--red)', normal: 'var(--gold)', low: 'var(--muted)' }[t.priority] || 'var(--muted)';
+      const priorityLabel = { urgent: '🔴 Urgent', normal: '🟡 Normal', low: '⚪ Low' }[t.priority] || '';
+      const due = t.due_date ? `· Due ${new Date(t.due_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : '';
+      return `<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);${t.completed ? 'opacity:.5' : ''}">
+        <input type="checkbox" data-task-id="${esc(t.id)}" ${t.completed ? 'checked' : ''}
+          style="width:18px;height:18px;margin-top:2px;cursor:pointer;accent-color:var(--green)"
+          onchange="toggleClientTask(this)">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:14px;${t.completed ? 'text-decoration:line-through' : ''}">${esc(t.title)}</div>
+          ${t.description ? `<div style="font-size:12px;color:var(--muted);margin-top:3px">${esc(t.description)}</div>` : ''}
+          <div style="font-size:11px;color:${priorityColor};margin-top:4px;font-weight:600">${priorityLabel} ${due}</div>
+        </div>
+      </div>`;
+    }).join('');
   }
-  const [jeRes, taxRes, prRes, taxListRes] = await Promise.all([sb.from('journal_entries').select('id', {
-    count: 'exact',
-    head: true
-  }).eq('client_id', c.id).eq('status', 'posted'), sb.from('tax_returns').select('id', {
-    count: 'exact',
-    head: true
-  }).eq('client_id', c.id), sb.from('pay_runs').select('id', {
-    count: 'exact',
-    head: true
-  }).eq('client_id', c.id).eq('status', 'posted'), sb.from('tax_returns').select('*').eq('client_id', c.id).order('tax_year', {
-    ascending: false
-  }).limit(5)]);
-  document.getElementById('d-je').textContent = (_jeRes$count2 = jeRes.count) !== null && _jeRes$count2 !== void 0 ? _jeRes$count2 : '—';
-  document.getElementById('d-tax').textContent = (_taxRes$count2 = taxRes.count) !== null && _taxRes$count2 !== void 0 ? _taxRes$count2 : '—';
-  document.getElementById('d-pr').textContent = (_prRes$count = prRes.count) !== null && _prRes$count !== void 0 ? _prRes$count : '—';
-  const taxListEl = document.getElementById('d-tax-list');
-  if (taxListRes.data && taxListRes.data.length) {
-    taxListEl.innerHTML = "<table style=\"width:100%;border-collapse:collapse\">\n      <thead><tr>\n        <th style=\"text-align:left;padding:8px 0;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;border-bottom:1px solid var(--border)\">Year</th>\n        <th style=\"text-align:left;padding:8px 0;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;border-bottom:1px solid var(--border)\">Form</th>\n        <th style=\"text-align:left;padding:8px 0;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;border-bottom:1px solid var(--border)\">Status</th>\n        <th style=\"text-align:right;padding:8px 0;font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;border-bottom:1px solid var(--border)\">Filed</th>\n      </tr></thead>\n      <tbody>".concat(taxListRes.data.map(t => {
-      const statusColor = {
-        filed: 'var(--green)',
-        in_progress: 'var(--gold)',
-        not_started: 'var(--muted)'
-      }[t.status] || 'var(--muted)';
-      const statusLabel = {
-        filed: 'Filed',
-        in_progress: 'In Progress',
-        not_started: 'Not Started',
-        review: 'Under Review',
-        void: 'Void'
-      }[t.status] || t.status;
-      return "<tr style=\"border-bottom:1px solid var(--border)\">\n          <td style=\"padding:10px 0;font-weight:600\">".concat(esc(String(t.tax_year)), "</td>\n          <td style=\"padding:10px 0\">").concat(esc(t.form), "</td>\n          <td style=\"padding:10px 0\"><span style=\"color:").concat(statusColor, ";font-weight:600;font-size:12px\">").concat(statusLabel, "</span></td>\n          <td style=\"padding:10px 0;text-align:right;font-size:12px;color:var(--muted)\">").concat(t.filed_date ? new Date(t.filed_date).toLocaleDateString() : '—', "</td>\n        </tr>");
-    }).join(''), "</tbody>\n    </table>");
-  } else {
-    taxListEl.innerHTML = '<div class="empty" style="padding:20px 0"><div class="empty-icon">🏛</div>No tax returns on file yet.</div>';
+  await loadTasks();
+
+  // Toggle task complete
+  window.toggleClientTask = async function(cb) {
+    const taskId = cb.dataset.taskId;
+    const completed = cb.checked;
+    cb.disabled = true;
+    await sb.from('client_tasks').update({
+      completed,
+      completed_at: completed ? new Date().toISOString() : null
+    }).eq('id', taskId);
+    await loadTasks();
+  };
+
+  // ── Load documents ──
+  async function loadDocs() {
+    const { data: docs, error } = await sb.from('client_documents')
+      .select('*').eq('client_id', c.id).order('uploaded_at', { ascending: false });
+    const el = document.getElementById('docs-list');
+    if (!el) return;
+    if (error) { el.innerHTML = `<div class="alert alert-red">${esc(error.message)}</div>`; return; }
+    if (!docs.length) {
+      el.innerHTML = '<div class="empty" style="padding:20px 0"><div class="empty-icon">📂</div>No documents uploaded yet.</div>';
+      return;
+    }
+    el.innerHTML = docs.map(d => {
+      const icon = d.mime_type?.startsWith('image/') ? '🖼️' :
+                   d.mime_type === 'application/pdf' ? '📄' : '📎';
+      const size = d.file_size ? (d.file_size > 1048576 ? `${(d.file_size/1048576).toFixed(1)} MB` : `${Math.round(d.file_size/1024)} KB`) : '';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:22px">${icon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:500;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.file_name)}</div>
+          <div style="font-size:11px;color:var(--muted)">${new Date(d.uploaded_at).toLocaleDateString()} ${size ? '· ' + size : ''}</div>
+          ${d.note ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(d.note)}</div>` : ''}
+        </div>
+        <button onclick="viewClientDoc('${esc(d.file_path)}','${esc(d.file_name)}')"
+          style="background:none;border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--text)">View</button>
+      </div>`;
+    }).join('');
   }
+  await loadDocs();
+
+  // View doc via signed URL
+  window.viewClientDoc = async function(path, name) {
+    const { data, error } = await sb.storage.from('client-documents').createSignedUrl(path, 300);
+    if (error) { alert('Could not open file: ' + error.message); return; }
+    window.open(data.signedUrl, '_blank');
+  };
+
+  // Upload files
+  document.getElementById('doc-upload-input').addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    const prog = document.getElementById('doc-upload-progress');
+    prog.innerHTML = `<div style="padding:8px 0;font-size:13px;color:var(--muted)">Uploading ${files.length} file(s)…</div>`;
+    let uploaded = 0, failed = 0;
+    for (const file of files) {
+      const ext = file.name.split('.').pop();
+      const path = `${c.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: upErr } = await sb.storage.from('client-documents').upload(path, file);
+      if (upErr) { failed++; continue; }
+      await sb.from('client_documents').insert({
+        client_id: c.id,
+        file_name: file.name,
+        file_path: path,
+        file_size: file.size,
+        mime_type: file.type,
+        uploaded_by: (await sb.auth.getUser()).data.user?.id
+      });
+      uploaded++;
+    }
+    prog.innerHTML = `<div style="padding:8px 0;font-size:13px;color:var(--green)">✓ ${uploaded} file(s) uploaded${failed ? ` · ${failed} failed` : ''}.</div>`;
+    e.target.value = '';
+    setTimeout(() => { if (prog) prog.innerHTML = ''; }, 3000);
+    await loadDocs();
+  });
 }
 
 // ── CLIENTS ────────────────────────────────────────────────
@@ -1018,11 +1116,94 @@ function openClientDetail(c) {
   bd.className = 'modal-backdrop';
   bd.id = 'cdet-backdrop';
   const info = (label, val) => val ? "\n    <div style=\"display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)\">\n      <span style=\"min-width:140px;font-size:12px;color:var(--muted)\">".concat(label, "</span>\n      <span style=\"font-size:13px;font-weight:500\">").concat(esc(val), "</span>\n    </div>") : '';
-  bd.innerHTML = "\n    <div class=\"modal\" role=\"dialog\" style=\"max-width:520px\">\n      <div class=\"modal-header\">\n        <h3>".concat(esc(c.full_name), "</h3>\n        <button class=\"modal-close\" onclick=\"closeModal('cdet-backdrop')\" aria-label=\"Close\">×</button>\n      </div>\n      <div class=\"modal-body\">\n        <div style=\"margin-bottom:16px\">\n          <span class=\"badge ").concat(c.status === 'active' ? 'badge-green' : 'badge-grey', "\" style=\"margin-right:8px\">").concat(esc(c.status || 'inactive'), "</span>\n          <span style=\"font-size:13px;color:var(--muted)\">").concat(esc(c.entity_type || ''), "</span>\n        </div>\n        ").concat(info('Email', c.email), "\n        ").concat(info('Phone', c.phone), "\n        ").concat(info('Address', c.address), "\n        ").concat(info('EIN / ITIN', c.ein), "\n        ").concat(info('State', c.state), "\n        ").concat(info('Notes', c.notes), "\n\n        <div style=\"margin-top:20px\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">QUICK ACTIONS</div>\n          <div style=\"display:flex;flex-wrap:wrap;gap:8px\">\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('journal')\">📒 Journal Entries</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('payroll')\">💼 Payroll</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('tax')\">🏛 Tax Returns</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\">📊 Dashboard</button>\n          </div>\n        </div>\n\n        <div style=\"margin-top:20px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">🔑 CLIENT PORTAL ACCESS</div>\n          ").concat(c.auth_user_id ? "<div style=\"display:flex;align-items:center;gap:8px\">\n                <span style=\"color:var(--green);font-size:16px\">✓</span>\n                <span style=\"font-size:13px;font-weight:500\">Portal access linked</span>\n              </div>\n              <div style=\"font-size:12px;color:var(--muted);margin-top:4px\">Client email: <strong>".concat(esc(c.email || ''), "</strong></div>\n              <button class=\"btn btn-secondary\" id=\"cdet-resend-btn\" style=\"margin-top:10px;font-size:12px;padding:6px 12px\">↺ Resend password email</button>\n              <div id=\"cdet-resend-msg\" style=\"font-size:12px;margin-top:6px;min-height:16px\"></div>") : "<div style=\"font-size:13px;color:var(--muted);margin-bottom:10px\">This client does not have portal access yet.</div>\n              <div style=\"display:flex;align-items:center;gap:8px\">\n                <input id=\"cdet-portal-email\" type=\"email\" placeholder=\"Client email\" value=\"".concat(esc(c.email || ''), "\" style=\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\">\n                <button class=\"btn btn-primary\" id=\"cdet-invite-btn\" style=\"white-space:nowrap;font-size:12px;padding:7px 14px\">Create Login</button>\n              </div>\n              <div id=\"cdet-invite-msg\" style=\"font-size:12px;margin-top:6px;min-height:16px\"></div>"), "\n        </div>\n      </div>\n      <div class=\"modal-footer\">\n        <button class=\"btn\" onclick=\"closeModal('cdet-backdrop')\" style=\"background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Close</button>\n        <button class=\"btn\" id=\"cdet-edit-btn\" style=\"margin-left:auto;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">✏️ Edit Info</button>\n        <button class=\"btn btn-primary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\">Select Client →</button>\n      </div>\n    </div>");
+  bd.innerHTML = "\n    <div class=\"modal\" role=\"dialog\" style=\"max-width:520px\">\n      <div class=\"modal-header\">\n        <h3>".concat(esc(c.full_name), "</h3>\n        <button class=\"modal-close\" onclick=\"closeModal('cdet-backdrop')\" aria-label=\"Close\">×</button>\n      </div>\n      <div class=\"modal-body\">\n        <div style=\"margin-bottom:16px\">\n          <span class=\"badge ").concat(c.status === 'active' ? 'badge-green' : 'badge-grey', "\" style=\"margin-right:8px\">").concat(esc(c.status || 'inactive'), "</span>\n          <span style=\"font-size:13px;color:var(--muted)\">").concat(esc(c.entity_type || ''), "</span>\n        </div>\n        ").concat(info('Email', c.email), "\n        ").concat(info('Phone', c.phone), "\n        ").concat(info('Address', c.address), "\n        ").concat(info('EIN / ITIN', c.ein), "\n        ").concat(info('State', c.state), "\n        ").concat(info('Notes', c.notes), "\n\n        <div style=\"margin-top:20px\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">QUICK ACTIONS</div>\n          <div style=\"display:flex;flex-wrap:wrap;gap:8px\">\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('journal')\">📒 Journal Entries</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('payroll')\">💼 Payroll</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('tax')\">🏛 Tax Returns</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\">📊 Dashboard</button>\n          </div>\n        </div>\n\n        <div style=\"margin-top:20px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">🔑 CLIENT PORTAL ACCESS</div>\n          ").concat(c.auth_user_id ? "<div style=\"display:flex;align-items:center;gap:8px\">\n                <span style=\"color:var(--green);font-size:16px\">✓</span>\n                <span style=\"font-size:13px;font-weight:500\">Portal access linked</span>\n              </div>\n              <div style=\"font-size:12px;color:var(--muted);margin-top:4px\">Client email: <strong>".concat(esc(c.email || ''), "</strong></div>\n              <button class=\"btn btn-secondary\" id=\"cdet-resend-btn\" style=\"margin-top:10px;font-size:12px;padding:6px 12px\">↺ Resend password email</button>\n              <div id=\"cdet-resend-msg\" style=\"font-size:12px;margin-top:6px;min-height:16px\"></div>") : "<div style=\"font-size:13px;color:var(--muted);margin-bottom:10px\">This client does not have portal access yet.</div>\n              <div style=\"display:flex;align-items:center;gap:8px\">\n                <input id=\"cdet-portal-email\" type=\"email\" placeholder=\"Client email\" value=\"".concat(esc(c.email || ''), "\" style=\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\">\n                <button class=\"btn btn-primary\" id=\"cdet-invite-btn\" style=\"white-space:nowrap;font-size:12px;padding:7px 14px\">Create Login</button>\n              </div>\n              <div id=\"cdet-invite-msg\" style=\"font-size:12px;margin-top:6px;min-height:16px\"></div>"), "\n        </div>\n      </div>\n        <div style=\"margin-top:20px\">\n          <div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:10px\">\n            <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em\">📋 TASKS</div>\n            <button class=\"btn btn-primary\" id=\"cdet-add-task-btn\" style=\"font-size:11px;padding:4px 10px\">+ Add Task</button>\n          </div>\n          <div id=\"cdet-task-form\" style=\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:12px;margin-bottom:12px\">\n            <input id=\"cdet-task-title\" type=\"text\" placeholder=\"Task title\" style=\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\">\n            <textarea id=\"cdet-task-desc\" placeholder=\"Description (optional)\" rows=\"2\" style=\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;resize:vertical;margin-bottom:8px\"></textarea>\n            <div style=\"display:flex;gap:8px;align-items:center\">\n              <select id=\"cdet-task-priority\" style=\"padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px\">\n                <option value=\"normal\">Normal</option>\n                <option value=\"urgent\">🔴 Urgent</option>\n                <option value=\"low\">⚪ Low</option>\n              </select>\n              <input id=\"cdet-task-due\" type=\"date\" style=\"padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px\">\n              <button class=\"btn btn-primary\" id=\"cdet-task-save\" style=\"font-size:12px;padding:6px 12px\">Save</button>\n              <button class=\"btn\" id=\"cdet-task-cancel\" style=\"font-size:12px;padding:6px 12px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Cancel</button>\n            </div>\n            <div id=\"cdet-task-err\" style=\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\"></div>\n          </div>\n          <div id=\"cdet-tasks-list\"><span class=\"spinner\" style=\"width:14px;height:14px\"></span></div>\n        </div>\n      </div>\n      <div class=\"modal-footer\">\n        <button class=\"btn\" onclick=\"closeModal('cdet-backdrop')\" style=\"background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Close</button>\n        <button class=\"btn\" id=\"cdet-edit-btn\" style=\"margin-left:auto;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">✏️ Edit Info</button>\n        <button class=\"btn btn-primary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\">Select Client →</button>\n      </div>\n    </div>");
   document.body.appendChild(bd);
   bd.addEventListener('click', e => {
     if (e.target === bd) closeModal('cdet-backdrop');
   });
+
+  // ── Admin tasks section ──
+  async function loadAdminTasks() {
+    const { data: tasks, error } = await sb.from('client_tasks')
+      .select('*').eq('client_id', c.id).order('completed').order('priority', { ascending: false }).order('due_date', { nullsFirst: false });
+    const el = document.getElementById('cdet-tasks-list');
+    if (!el) return;
+    if (error) { el.innerHTML = `<div style="font-size:12px;color:var(--red)">${esc(error.message)}</div>`; return; }
+    if (!tasks || !tasks.length) {
+      el.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0">No tasks yet. Add one above.</div>';
+      return;
+    }
+    el.innerHTML = tasks.map(t => {
+      const priorityColor = { urgent: 'var(--red)', normal: 'var(--gold)', low: 'var(--muted)' }[t.priority] || 'var(--muted)';
+      const due = t.due_date ? ` · Due ${new Date(t.due_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : '';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);${t.completed ? 'opacity:.5' : ''}">
+        <input type="checkbox" data-atask-id="${esc(t.id)}" ${t.completed ? 'checked' : ''}
+          style="width:15px;height:15px;cursor:pointer;accent-color:var(--green);flex-shrink:0"
+          onchange="toggleAdminTask(this)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:500;${t.completed ? 'text-decoration:line-through' : ''}">${esc(t.title)}</div>
+          ${t.description ? `<div style="font-size:11px;color:var(--muted)">${esc(t.description)}</div>` : ''}
+          <div style="font-size:11px;color:${priorityColor};font-weight:600">${{ urgent:'🔴', normal:'🟡', low:'⚪' }[t.priority] || ''}${due}</div>
+        </div>
+        <button onclick="deleteAdminTask('${esc(t.id)}')"
+          style="background:none;border:none;cursor:pointer;color:var(--red);font-size:14px;padding:0 4px;flex-shrink:0" title="Delete task">🗑</button>
+      </div>`;
+    }).join('');
+  }
+  loadAdminTasks();
+
+  window.toggleAdminTask = async function(cb) {
+    const taskId = cb.dataset.ataskId;
+    cb.disabled = true;
+    await sb.from('client_tasks').update({
+      completed: cb.checked,
+      completed_at: cb.checked ? new Date().toISOString() : null
+    }).eq('id', taskId);
+    loadAdminTasks();
+  };
+
+  window.deleteAdminTask = async function(taskId) {
+    if (!confirm('Delete this task?')) return;
+    await sb.from('client_tasks').delete().eq('id', taskId);
+    loadAdminTasks();
+  };
+
+  const addTaskBtn = document.getElementById('cdet-add-task-btn');
+  const taskForm = document.getElementById('cdet-task-form');
+  if (addTaskBtn && taskForm) {
+    addTaskBtn.addEventListener('click', () => { taskForm.style.display = 'block'; addTaskBtn.style.display = 'none'; });
+    document.getElementById('cdet-task-cancel').addEventListener('click', () => { taskForm.style.display = 'none'; addTaskBtn.style.display = ''; });
+    document.getElementById('cdet-task-save').addEventListener('click', async () => {
+      const title = document.getElementById('cdet-task-title').value.trim();
+      const errEl = document.getElementById('cdet-task-err');
+      if (!title) { errEl.textContent = 'Title is required.'; return; }
+      errEl.textContent = '';
+      document.getElementById('cdet-task-save').disabled = true;
+      document.getElementById('cdet-task-save').textContent = 'Saving…';
+      const dueVal = document.getElementById('cdet-task-due').value;
+      const { error } = await sb.from('client_tasks').insert({
+        client_id: c.id,
+        title,
+        description: document.getElementById('cdet-task-desc').value.trim() || null,
+        priority: document.getElementById('cdet-task-priority').value,
+        due_date: dueVal || null
+      });
+      if (error) {
+        errEl.textContent = error.message;
+        document.getElementById('cdet-task-save').disabled = false;
+        document.getElementById('cdet-task-save').textContent = 'Save';
+        return;
+      }
+      document.getElementById('cdet-task-title').value = '';
+      document.getElementById('cdet-task-desc').value = '';
+      document.getElementById('cdet-task-due').value = '';
+      taskForm.style.display = 'none';
+      addTaskBtn.style.display = '';
+      document.getElementById('cdet-task-save').disabled = false;
+      document.getElementById('cdet-task-save').textContent = 'Save';
+      loadAdminTasks();
+    });
+  }
 
   // Wire up "Create Login" button if present (client has no portal access yet)
   const inviteBtn = document.getElementById('cdet-invite-btn');
