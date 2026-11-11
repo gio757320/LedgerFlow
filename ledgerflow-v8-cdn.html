@@ -1879,67 +1879,245 @@ function ensureModalStyles() {
   document.head.appendChild(s);
 }
 
-// ── ADD CLIENT MODAL ────────────────────────────────────────
+// ── ONBOARDING TASK TEMPLATES ────────────────────────────────
+const ONBOARDING_TASKS = {
+  tax: [
+    { title: 'Upload W-2(s)',              description: 'Upload all W-2 forms received from employers.',          priority: 'urgent' },
+    { title: 'Upload 1099s / 1099-NEC',    description: 'Upload any 1099 forms (freelance, interest, dividends).', priority: 'urgent' },
+    { title: 'Upload last year\'s tax return', description: 'Upload a copy of your prior year federal return.',    priority: 'normal' },
+    { title: 'Sign engagement letter',     description: 'Review and sign the engagement letter sent to your email.', priority: 'urgent' },
+    { title: 'Schedule review call',       description: 'Book a time with our office to go over your return.',    priority: 'normal' },
+  ],
+  bookkeeping: [
+    { title: 'Upload bank statements',     description: 'Upload monthly bank statements for all business accounts.', priority: 'urgent' },
+    { title: 'Upload credit card statements', description: 'Upload statements for all business credit cards.',    priority: 'urgent' },
+    { title: 'Upload receipts',            description: 'Upload receipts for business expenses.',                 priority: 'normal' },
+    { title: 'Sign engagement letter',     description: 'Review and sign the engagement letter sent to your email.', priority: 'urgent' },
+  ],
+  payroll: [
+    { title: 'Provide employee list',      description: 'Send us names, SSNs, pay rates, and start dates for all employees.', priority: 'urgent' },
+    { title: 'Upload direct deposit forms', description: 'Collect and upload employee direct deposit authorization forms.', priority: 'urgent' },
+    { title: 'Provide federal EIN',        description: 'Confirm your Employer Identification Number for payroll filings.', priority: 'normal' },
+    { title: 'Sign payroll agreement',     description: 'Review and sign the payroll services agreement.',        priority: 'urgent' },
+  ],
+};
+
+// ── ADD CLIENT / ONBOARDING MODAL ───────────────────────────
 function openAddClientModal() {
   ensureModalStyles();
   const bd = document.createElement('div');
   bd.className = 'modal-backdrop';
   bd.id = 'add-client-backdrop';
-  bd.innerHTML = "\n    <div class=\"modal\" role=\"dialog\" aria-modal=\"true\" aria-labelledby=\"acm-title\">\n      <div class=\"modal-header\">\n        <h3 id=\"acm-title\">Add New Client</h3>\n        <button class=\"modal-close\" onclick=\"closeModal('add-client-backdrop')\" aria-label=\"Close\">×</button>\n      </div>\n      <div class=\"modal-body\">\n        <div class=\"form-row\">\n          <div class=\"form-group\">\n            <label for=\"acm-name\">Full Name / Business Name *</label>\n            <input id=\"acm-name\" type=\"text\" placeholder=\"e.g. John Smith or Acme LLC\" autocomplete=\"off\">\n          </div>\n        </div>\n        <div class=\"form-row\">\n          <div class=\"form-group\">\n            <label for=\"acm-entity\">Entity Type *</label>\n            <select id=\"acm-entity\">\n              <option value=\"\">— Select —</option>\n              <option value=\"Individual\">Individual</option>\n              <option value=\"LLC\">LLC</option>\n              <option value=\"Partnership\">Partnership</option>\n              <option value=\"S-Corp\">S-Corp</option>\n              <option value=\"C-Corp\">C-Corp</option>\n              <option value=\"Non-Profit\">Non-Profit</option>\n            </select>\n          </div>\n          <div class=\"form-group\">\n            <label for=\"acm-status\">Status</label>\n            <select id=\"acm-status\">\n              <option value=\"active\">Active</option>\n              <option value=\"inactive\">Inactive</option>\n              <option value=\"prospect\">Prospect</option>\n            </select>\n          </div>\n        </div>\n        <div class=\"form-row\">\n          <div class=\"form-group\">\n            <label for=\"acm-email\">Email *</label>\n            <input id=\"acm-email\" type=\"email\" placeholder=\"client@example.com\" autocomplete=\"off\">\n          </div>\n          <div class=\"form-group\">\n            <label for=\"acm-phone\">Phone</label>\n            <input id=\"acm-phone\" type=\"tel\" placeholder=\"(305) 555-0100\" autocomplete=\"off\">\n          </div>\n        </div>\n        <div class=\"form-group\">\n          <label for=\"acm-notes\">Notes</label>\n          <textarea id=\"acm-notes\" placeholder=\"Any additional notes…\"></textarea>\n        </div>\n        <div class=\"toggle-row\">\n          <input type=\"checkbox\" id=\"acm-gig\" style=\"width:auto;accent-color:var(--green)\">\n          <label for=\"acm-gig\">Gig / rideshare worker (links RouteWorth data)</label>\n        </div>\n        <div class=\"modal-error\" id=\"acm-error\"></div>\n      </div>\n      <div class=\"modal-footer\">\n        <button class=\"btn btn-secondary\" onclick=\"closeModal('add-client-backdrop')\">Cancel</button>\n        <button class=\"btn btn-primary\" id=\"acm-save\" onclick=\"saveNewClient()\">Save Client</button>\n      </div>\n    </div>\n  ";
+  bd.innerHTML = `
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="acm-title" style="max-width:580px">
+      <div class="modal-header">
+        <h3 id="acm-title">🚀 Onboard New Client</h3>
+        <button class="modal-close" onclick="closeModal('add-client-backdrop')" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+
+        <div style="background:var(--bg);border-radius:8px;padding:14px;margin-bottom:20px;border:1px solid var(--border)">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;margin-bottom:12px">STEP 1 — CLIENT INFORMATION</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="acm-name">Full Name / Business Name *</label>
+              <input id="acm-name" type="text" placeholder="e.g. John Smith or Acme LLC" autocomplete="off">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="acm-entity">Entity Type *</label>
+              <select id="acm-entity">
+                <option value="">— Select —</option>
+                <option value="Individual">Individual</option>
+                <option value="LLC">LLC</option>
+                <option value="Partnership">Partnership</option>
+                <option value="S-Corp">S-Corp</option>
+                <option value="C-Corp">C-Corp</option>
+                <option value="Non-Profit">Non-Profit</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="acm-state">State</label>
+              <input id="acm-state" type="text" placeholder="FL" maxlength="2" style="text-transform:uppercase">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="acm-email">Email *</label>
+              <input id="acm-email" type="email" placeholder="client@example.com" autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label for="acm-phone">Phone</label>
+              <input id="acm-phone" type="tel" placeholder="(305) 555-0100" autocomplete="off">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="acm-notes">Internal Notes</label>
+            <textarea id="acm-notes" placeholder="Any notes for the team…" style="height:60px"></textarea>
+          </div>
+          <div class="toggle-row">
+            <input type="checkbox" id="acm-gig" style="width:auto;accent-color:var(--green)">
+            <label for="acm-gig">Gig / rideshare worker (links RouteWorth data)</label>
+          </div>
+        </div>
+
+        <div style="background:var(--bg);border-radius:8px;padding:14px;margin-bottom:20px;border:1px solid var(--border)">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;margin-bottom:12px">STEP 2 — SERVICES</div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;border:1.5px solid var(--border);cursor:pointer;font-size:13px;font-weight:500" id="svc-tax-label">
+              <input type="checkbox" id="acm-svc-tax" checked style="width:auto;accent-color:var(--gold)" onchange="acmUpdateServices()">
+              🏛 Tax Returns
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;border:1.5px solid var(--border);cursor:pointer;font-size:13px;font-weight:500" id="svc-bk-label">
+              <input type="checkbox" id="acm-svc-bookkeeping" style="width:auto;accent-color:var(--gold)" onchange="acmUpdateServices()">
+              📒 Bookkeeping
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;border:1.5px solid var(--border);cursor:pointer;font-size:13px;font-weight:500" id="svc-pr-label">
+              <input type="checkbox" id="acm-svc-payroll" style="width:auto;accent-color:var(--gold)" onchange="acmUpdateServices()">
+              💼 Payroll
+            </label>
+          </div>
+        </div>
+
+        <div style="background:var(--bg);border-radius:8px;padding:14px;margin-bottom:20px;border:1px solid var(--border)">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;margin-bottom:4px">STEP 3 — ONBOARDING TASKS</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px">These tasks will be assigned to the client automatically. Uncheck any you don't need.</div>
+          <div id="acm-tasks-preview"></div>
+        </div>
+
+        <div style="background:var(--bg);border-radius:8px;padding:14px;border:1px solid var(--border)">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em;margin-bottom:12px">STEP 4 — PORTAL ACCESS</div>
+          <div class="toggle-row" style="margin-bottom:0">
+            <input type="checkbox" id="acm-portal" checked style="width:auto;accent-color:var(--green)">
+            <label for="acm-portal">Create client portal login and send welcome email</label>
+          </div>
+        </div>
+
+        <div class="modal-error" id="acm-error" style="margin-top:14px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal('add-client-backdrop')" style="background:var(--surface);color:var(--text);border:1.5px solid var(--border)">Cancel</button>
+        <button class="btn btn-primary" id="acm-save" onclick="saveNewClient()">🚀 Create Client &amp; Assign Tasks</button>
+      </div>
+    </div>
+  `;
   document.body.appendChild(bd);
-  bd.addEventListener('click', e => {
-    if (e.target === bd) closeModal('add-client-backdrop');
-  });
+  bd.addEventListener('click', e => { if (e.target === bd) closeModal('add-client-backdrop'); });
   document.getElementById('acm-name').focus();
+  acmUpdateServices();
 }
-async function saveNewClient() {
-  const name = document.getElementById('acm-name').value.trim();
-  const entity = document.getElementById('acm-entity').value;
-  const email = document.getElementById('acm-email').value.trim();
-  const phone = document.getElementById('acm-phone').value.trim();
-  const status = document.getElementById('acm-status').value;
-  const gig = document.getElementById('acm-gig').checked;
-  const notes = document.getElementById('acm-notes').value.trim();
-  const errEl = document.getElementById('acm-error');
-  const btn = document.getElementById('acm-save');
-  errEl.textContent = '';
-  if (!name) {
-    errEl.textContent = 'Full name is required.';
-    return;
-  }
-  if (!entity) {
-    errEl.textContent = 'Please select an entity type.';
-    return;
-  }
-  if (!email) {
-    errEl.textContent = 'Email is required.';
-    return;
-  }
-  btn.disabled = true;
-  btn.textContent = 'Saving…';
-  const {
-    error
-  } = await sb.from('clients').insert({
-    full_name: name,
-    entity_type: entity,
-    email,
-    phone: phone || null,
-    status,
-    gig_worker: gig,
-    notes: notes || null,
-    client_since: new Date().toISOString().slice(0, 10),
-    ytd_billed: 0
+
+function acmUpdateServices() {
+  const hasTax = document.getElementById('acm-svc-tax')?.checked;
+  const hasBk  = document.getElementById('acm-svc-bookkeeping')?.checked;
+  const hasPr  = document.getElementById('acm-svc-payroll')?.checked;
+  // Highlight selected service pills
+  [['svc-tax-label','acm-svc-tax'], ['svc-bk-label','acm-svc-bookkeeping'], ['svc-pr-label','acm-svc-payroll']].forEach(([lid, cid]) => {
+    const lbl = document.getElementById(lid);
+    if (lbl) lbl.style.borderColor = document.getElementById(cid)?.checked ? 'var(--gold)' : 'var(--border)';
   });
-  if (error) {
-    errEl.textContent = 'Error: ' + error.message;
-    btn.disabled = false;
-    btn.textContent = 'Save Client';
+  // Build task preview
+  const preview = document.getElementById('acm-tasks-preview');
+  if (!preview) return;
+  const tasks = [];
+  if (hasTax) tasks.push(...ONBOARDING_TASKS.tax);
+  if (hasBk)  tasks.push(...ONBOARDING_TASKS.bookkeeping);
+  if (hasPr)  tasks.push(...ONBOARDING_TASKS.payroll);
+  if (!tasks.length) {
+    preview.innerHTML = '<div style="font-size:12px;color:var(--muted)">Select at least one service above.</div>';
     return;
   }
+  preview.innerHTML = tasks.map((t, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
+      <input type="checkbox" id="acm-task-${i}" data-task-idx="${i}" checked style="width:auto;accent-color:var(--green);flex-shrink:0">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:500">${esc(t.title)}</div>
+        <div style="font-size:11px;color:var(--muted)">${esc(t.description)}</div>
+      </div>
+      <span style="font-size:10px;font-weight:600;color:${t.priority==='urgent'?'var(--red)':'var(--muted)'}">${t.priority==='urgent'?'🔴 Urgent':'Normal'}</span>
+    </div>`).join('');
+  // Store tasks list for save to reference
+  preview.dataset.tasks = JSON.stringify(tasks);
+}
+
+async function saveNewClient() {
+  const name   = document.getElementById('acm-name').value.trim();
+  const entity = document.getElementById('acm-entity').value;
+  const email  = document.getElementById('acm-email').value.trim();
+  const phone  = document.getElementById('acm-phone').value.trim();
+  const state  = document.getElementById('acm-state').value.trim().toUpperCase();
+  const notes  = document.getElementById('acm-notes').value.trim();
+  const gig    = document.getElementById('acm-gig').checked;
+  const portal = document.getElementById('acm-portal').checked;
+  const hasTax = document.getElementById('acm-svc-tax').checked;
+  const hasBk  = document.getElementById('acm-svc-bookkeeping').checked;
+  const hasPr  = document.getElementById('acm-svc-payroll').checked;
+  const errEl  = document.getElementById('acm-error');
+  const btn    = document.getElementById('acm-save');
+  errEl.textContent = '';
+
+  if (!name)   { errEl.textContent = 'Full name is required.';        return; }
+  if (!entity) { errEl.textContent = 'Please select an entity type.'; return; }
+  if (!email)  { errEl.textContent = 'Email is required.';            return; }
+  if (!hasTax && !hasBk && !hasPr) { errEl.textContent = 'Select at least one service.'; return; }
+
+  const svcs = [];
+  if (hasTax) svcs.push('tax');
+  if (hasBk)  svcs.push('bookkeeping');
+  if (hasPr)  svcs.push('payroll');
+
+  btn.disabled = true;
+  btn.textContent = 'Creating client…';
+
+  // 1. Insert client record
+  const { data: newClient, error: clientErr } = await sb.from('clients').insert({
+    full_name: name, entity_type: entity, email, phone: phone || null,
+    state: state || null, status: 'active', gig_worker: gig,
+    notes: notes || null, services: svcs,
+    client_since: new Date().toISOString().slice(0, 10), ytd_billed: 0
+  }).select().single();
+
+  if (clientErr) {
+    errEl.textContent = 'Error creating client: ' + clientErr.message;
+    btn.disabled = false; btn.textContent = '🚀 Create Client & Assign Tasks';
+    return;
+  }
+
+  // 2. Assign selected onboarding tasks
+  btn.textContent = 'Assigning tasks…';
+  const preview = document.getElementById('acm-tasks-preview');
+  const allTasks = JSON.parse(preview.dataset.tasks || '[]');
+  const selectedTasks = allTasks.filter((_, i) => document.getElementById(`acm-task-${i}`)?.checked);
+  if (selectedTasks.length) {
+    const taskRows = selectedTasks.map(t => ({
+      client_id: newClient.id, title: t.title,
+      description: t.description, priority: t.priority
+    }));
+    const { error: taskErr } = await sb.from('client_tasks').insert(taskRows);
+    if (taskErr) console.warn('Task insert error:', taskErr.message);
+  }
+
+  // 3. Optionally create portal login
+  if (portal) {
+    btn.textContent = 'Creating portal login…';
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      const token = session?.access_token;
+      if (token) {
+        const resp = await fetch(`${SUPA_URL}/functions/v1/create-client-login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`, 'apikey': SUPA_ANON },
+          body: JSON.stringify({ client_id: newClient.id, email })
+        });
+        const result = await resp.json();
+        if (!resp.ok) console.warn('Portal login warning:', result.error);
+      }
+    } catch (e) { console.warn('Portal login error:', e.message); }
+  }
+
   closeModal('add-client-backdrop');
-  // Refresh the clients screen if visible
-  const main = document.querySelector('#main');
-  if (main) navigateTo('clients');
+  navigateTo('clients');
 }
 
 // ── NEW JOURNAL ENTRY MODAL ─────────────────────────────────
