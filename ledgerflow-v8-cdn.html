@@ -415,13 +415,13 @@ tr:hover td { background: rgba(46,158,107,.04); }
         </button>
       </div>
 
-      <div class="nav-divider"></div>
-      <div class="nav-section">
+      <div class="nav-divider" id="nav-payrolltax-divider"></div>
+      <div class="nav-section" id="nav-payrolltax-section">
         <div class="nav-label">Payroll &amp; Tax</div>
-        <button class="nav-item" data-screen="payroll">
+        <button class="nav-item" data-screen="payroll" id="nav-payroll-btn">
           <span class="icon">💼</span> Payroll
         </button>
-        <button class="nav-item" data-screen="tax">
+        <button class="nav-item" data-screen="tax" id="nav-tax-btn">
           <span class="icon">🏛</span> Tax Returns
         </button>
       </div>
@@ -746,7 +746,7 @@ function showApp() {
   document.getElementById('nav-clients-btn').hidden = !STATE.isStaff;
   document.getElementById('nav-staff-only').hidden = !STATE.isStaff;
   document.getElementById('client-select-wrap').hidden = !STATE.isStaff;
-  // Client-specific nav: hide accounts from client portal
+  // Client-specific nav: hide accounts/clients from client portal
   document.getElementById('nav-accounts-btn').hidden = !STATE.isStaff;
 
   // Relabel "Dashboard" to "My Account" for client portal
@@ -759,9 +759,34 @@ function showApp() {
 
   // Client portal banner
   const banner = document.getElementById('client-portal-banner');
-  if (banner) {
-    banner.hidden = STATE.isStaff;
+  if (banner) banner.hidden = STATE.isStaff;
+
+  // Filter nav items by client services
+  if (!STATE.isStaff && STATE.clientRow) {
+    const svcs = STATE.clientRow.services || ['tax'];
+    const hasBookkeeping = svcs.includes('bookkeeping');
+    const hasPayroll = svcs.includes('payroll');
+    const hasTax = svcs.includes('tax');
+
+    // Journal Entries — only for bookkeeping or payroll clients
+    const journalBtn = document.getElementById('nav-journal-btn');
+    if (journalBtn) journalBtn.hidden = !hasBookkeeping && !hasPayroll;
+
+    // Payroll — only for payroll clients
+    const payrollBtn = document.getElementById('nav-payroll-btn');
+    if (payrollBtn) payrollBtn.hidden = !hasPayroll;
+
+    // Tax Returns — only for tax clients
+    const taxBtn = document.getElementById('nav-tax-btn');
+    if (taxBtn) taxBtn.hidden = !hasTax;
+
+    // Hide the whole Payroll & Tax section if neither applies
+    const ptSection = document.getElementById('nav-payrolltax-section');
+    const ptDivider = document.getElementById('nav-payrolltax-divider');
+    if (ptSection) ptSection.hidden = !hasPayroll && !hasTax;
+    if (ptDivider) ptDivider.hidden = !hasPayroll && !hasTax;
   }
+
   navigateTo('dashboard');
 }
 
@@ -1155,6 +1180,23 @@ function openClientDetail(c) {
             </select>
           </div>
           <div class="form-group" style="margin:0">
+            <label style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em">SERVICES (controls client portal menu)</label>
+            <div style="display:flex;gap:20px;padding:10px 0">
+              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px">
+                <input type="checkbox" id="edit-svc-tax" style="width:16px;height:16px" ${(c.services||['tax']).includes('tax')?'checked':''}>
+                🏛 Tax Returns
+              </label>
+              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px">
+                <input type="checkbox" id="edit-svc-bookkeeping" style="width:16px;height:16px" ${(c.services||[]).includes('bookkeeping')?'checked':''}>
+                📋 Bookkeeping
+              </label>
+              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px">
+                <input type="checkbox" id="edit-svc-payroll" style="width:16px;height:16px" ${(c.services||[]).includes('payroll')?'checked':''}>
+                💼 Payroll
+              </label>
+            </div>
+          </div>
+          <div class="form-group" style="margin:0">
             <label style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em">NOTES</label>
             <textarea id="edit-notes" rows="3" style="width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;box-sizing:border-box;resize:vertical">${esc(c.notes||'')}</textarea>
           </div>
@@ -1172,6 +1214,10 @@ function openClientDetail(c) {
       document.getElementById('edit-save-btn').addEventListener('click', async () => {
         const saveBtn = document.getElementById('edit-save-btn');
         const msg = document.getElementById('edit-msg');
+        const svcs = [];
+        if (document.getElementById('edit-svc-tax').checked)         svcs.push('tax');
+        if (document.getElementById('edit-svc-bookkeeping').checked)  svcs.push('bookkeeping');
+        if (document.getElementById('edit-svc-payroll').checked)      svcs.push('payroll');
         const updates = {
           full_name: document.getElementById('edit-name').value.trim(),
           email:     document.getElementById('edit-email').value.trim(),
@@ -1181,6 +1227,7 @@ function openClientDetail(c) {
           state:     document.getElementById('edit-state').value.trim().toUpperCase(),
           status:    document.getElementById('edit-status').value,
           notes:     document.getElementById('edit-notes').value.trim(),
+          services:  svcs.length ? svcs : ['tax'],
         };
         if (!updates.full_name) { msg.style.color='var(--red)'; msg.textContent='Name is required.'; return; }
         if (!updates.email)     { msg.style.color='var(--red)'; msg.textContent='Email is required.'; return; }
