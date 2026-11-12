@@ -1559,10 +1559,44 @@ async function renderClientPortalDashboard(container) {
       line_items: lineItems, subtotal, tax_rate: taxRate, tax_amount: taxAmt, total: subtotal + taxAmt,
       updated_at: new Date().toISOString()
     };
-    const { error } = existingId
-      ? await sb.from('client_invoices').update(payload).eq('id', existingId)
-      : await sb.from('client_invoices').insert(payload);
+    const { data: savedInv, error } = existingId
+      ? await sb.from('client_invoices').update(payload).eq('id', existingId).select().single()
+      : await sb.from('client_invoices').insert(payload).select().single();
     if (error) { errEl.textContent = error.message; return; }
+
+    // ── Accrual journal entry on NEW invoice (not draft) ──────────────
+    // Debit Accounts Receivable / Credit Sales Revenue
+    const isNewSentInvoice = !existingId && payload.status !== 'draft' && (parseFloat(payload.total) || 0) > 0;
+    if (isNewSentInvoice && savedInv) {
+      const { data: accts } = await sb.from('accounts')
+        .select('id, name, type, subtype').eq('client_id', c.id).eq('is_active', true);
+      const findAcct = (types, subtypes) => (accts || []).find(a =>
+        types.map(t=>t.toLowerCase()).includes((a.type||'').toLowerCase()) &&
+        (!subtypes || subtypes.some(s => (a.subtype||'').toLowerCase().includes(s) || (a.name||'').toLowerCase().includes(s)))
+      );
+      const arAcct = findAcct(['Asset','asset'], ['receivable', 'accounts receivable'])
+                  || findAcct(['Asset','asset'], null);
+      const revenueAcct = findAcct(['Income','income','Revenue','revenue'], ['service','sales','revenue','income'])
+                       || findAcct(['Income','income','Revenue','revenue'], null);
+      if (arAcct && revenueAcct) {
+        const amount = parseFloat(payload.total) || 0;
+        const entryDate = payload.issue_date || new Date().toISOString().slice(0,10);
+        const ref = `INV-${(payload.invoice_number || '').slice(-8).toUpperCase()}`;
+        const desc = `Invoice issued — ${payload.invoice_number || 'Invoice'}${payload.customer_name ? ' to ' + payload.customer_name : ''}`;
+        const { data: je } = await sb.from('journal_entries').insert({
+          client_id: c.id, entry_date: entryDate, reference: ref,
+          description: desc, status: 'posted'
+        }).select().single();
+        if (je) {
+          await sb.from('journal_lines').insert([
+            { journal_entry_id: je.id, account_id: arAcct.id,      debit: amount, credit: 0,      memo: `A/R — ${payload.customer_name || 'Customer'}` },
+            { journal_entry_id: je.id, account_id: revenueAcct.id, debit: 0,      credit: amount, memo: `Revenue — ${payload.invoice_number || 'Invoice'}` }
+          ]);
+          showToast(`✓ Invoice saved · Journal entry posted (A/R / ${revenueAcct.name})`, 'green');
+        }
+      }
+    }
+
     closeInvoiceModal();
     await loadInvoices();
   };
@@ -1580,7 +1614,8 @@ async function renderClientPortalDashboard(container) {
       .eq('id', invId);
     if (updErr) { alert('Error marking paid: ' + updErr.message); return; }
 
-    // 3. Auto journal entry — find Cash/AR account (debit) and Revenue account (credit)
+    // 3. Auto journal entry — accrual basis: Debit Cash / Credit A/R
+    // (Revenue was already recorded when the invoice was created)
     const { data: accts } = await sb.from('accounts')
       .select('id, name, type, subtype')
       .eq('client_id', c.id)
@@ -1591,32 +1626,34 @@ async function renderClientPortalDashboard(container) {
       (!subtypes || subtypes.some(s => (a.subtype||'').toLowerCase().includes(s) || (a.name||'').toLowerCase().includes(s)))
     );
 
-    // Prefer "Cash" account; fall back to any Asset
     const cashAcct = findAcct(['Asset','asset'], ['cash', 'checking', 'bank'])
                   || findAcct(['Asset','asset'], null);
-    // Prefer Sales/Service revenue; fall back to any Income account
-    const revenueAcct = findAcct(['Income','income','Revenue','revenue'], ['service', 'sales', 'revenue', 'income'])
-                     || findAcct(['Income','income','Revenue','revenue'], null);
+    const arAcct   = findAcct(['Asset','asset'], ['receivable', 'accounts receivable']);
 
-    if (!cashAcct || !revenueAcct) {
-      // Paid but no journal entry — warn but don't block
+    // If A/R account exists, do the proper accrual clearing entry (Cash / A/R)
+    // If not, fall back to Cash / Revenue (cash-basis style)
+    const { data: revenueAcct } = !arAcct
+      ? { data: findAcct(['Income','income','Revenue','revenue'], ['service','sales','revenue','income'])
+                || findAcct(['Income','income','Revenue','revenue'], null) }
+      : { data: null };
+
+    const creditAcct = arAcct || revenueAcct;
+
+    if (!cashAcct || !creditAcct) {
       await loadInvoices();
-      alert('Invoice marked paid ✓\n\nNote: Could not auto-post a journal entry because this client\'s chart of accounts is missing a Cash/Asset account or a Revenue account. Please post the entry manually in Journal Entries.');
+      alert('Invoice marked paid ✓\n\nNote: Could not auto-post a journal entry because this client\'s chart of accounts is missing a Cash or Accounts Receivable account. Please post the entry manually.');
       return;
     }
 
     const amount = parseFloat(inv.total || 0);
-    const entryDate = inv.paid_at ? inv.paid_at.slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const entryDate = new Date().toISOString().slice(0, 10);
     const ref = `INV-PAID-${(inv.invoice_number || invId).slice(-8).toUpperCase()}`;
     const desc = `Payment received — ${inv.invoice_number || 'Invoice'}${inv.customer_name ? ' from ' + inv.customer_name : ''}`;
+    const creditLabel = arAcct ? arAcct.name : (creditAcct.name || 'Revenue');
 
-    // Insert journal entry header
     const { data: je, error: jeErr } = await sb.from('journal_entries').insert({
-      client_id: c.id,
-      entry_date: entryDate,
-      reference: ref,
-      description: desc,
-      status: 'posted'
+      client_id: c.id, entry_date: entryDate, reference: ref,
+      description: desc, status: 'posted'
     }).select().single();
 
     if (jeErr || !je) {
@@ -1625,19 +1662,13 @@ async function renderClientPortalDashboard(container) {
       return;
     }
 
-    // Insert debit (Cash) and credit (Revenue) lines
     await sb.from('journal_lines').insert([
-      { journal_entry_id: je.id, account_id: cashAcct.id, debit: amount, credit: 0, memo: desc, sort_order: 1 },
-      { journal_entry_id: je.id, account_id: revenueAcct.id, debit: 0, credit: amount, memo: desc, sort_order: 2 }
+      { journal_entry_id: je.id, account_id: cashAcct.id,  debit: amount, credit: 0,      memo: desc, sort_order: 1 },
+      { journal_entry_id: je.id, account_id: creditAcct.id, debit: 0,     credit: amount, memo: desc, sort_order: 2 }
     ]);
 
     await loadInvoices();
-    // Show a brief success indicator
-    const msg = document.createElement('div');
-    msg.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.3)';
-    msg.textContent = `✓ Paid · Journal entry posted (${cashAcct.name} / ${revenueAcct.name})`;
-    document.body.appendChild(msg);
-    setTimeout(() => msg.remove(), 4000);
+    showToast(`✓ Paid · Journal entry posted (${cashAcct.name} / ${creditLabel})`, 'green');
   };
 
   window.deleteClientInvoice = async function(invId) {
@@ -2720,6 +2751,14 @@ function relTime(iso) {
 function esc(s) {
   if (s === null || s === undefined) return '';
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function showToast(msg, color = 'green') {
+  const el = document.createElement('div');
+  const bg = color === 'green' ? 'var(--green)' : color === 'red' ? 'var(--red)' : 'var(--gold)';
+  el.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:${bg};color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.3);white-space:nowrap`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
 }
 function activityIcon(action) {
   const icons = {
