@@ -1188,7 +1188,30 @@ async function renderClientPortalDashboard(container) {
       </div>`);
     return;
   }
-  container.innerHTML = pageShell('My Account', c.full_name, '', `
+
+  const isBusiness = (c.client_type || 'personal') === 'business';
+  const typeTag = isBusiness
+    ? `<span style="background:var(--gold);color:#000;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:10px">Business</span>`
+    : `<span style="background:var(--green);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:10px">Personal</span>`;
+
+  const businessSections = isBusiness ? `
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-h" style="display:flex;justify-content:space-between;align-items:center">
+        <span>💳 Billing</span>
+        <span style="font-size:12px;color:var(--muted)" id="billing-badge"></span>
+      </div>
+      <div class="card-body" id="billing-list"><span class="spinner"></span></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-h" style="display:flex;justify-content:space-between;align-items:center">
+        <span>🧾 My Invoices</span>
+        <button class="btn btn-primary" style="font-size:12px;padding:6px 14px" onclick="openNewInvoiceModal()">+ New Invoice</button>
+      </div>
+      <div class="card-body" id="invoices-list"><span class="spinner"></span></div>
+    </div>` : '';
+
+  container.innerHTML = pageShell('My Account', `${c.full_name}${typeTag}`, '', `
     <div class="card" style="margin-bottom:20px">
       <div class="card-h" style="display:flex;justify-content:space-between;align-items:center">
         <span>📋 To-Do List</span>
@@ -1210,11 +1233,24 @@ async function renderClientPortalDashboard(container) {
       <div class="card-body" id="docs-list"><span class="spinner"></span></div>
     </div>
 
+    ${businessSections}
+
     <div class="card">
       <div class="card-h">Your Firm</div>
       <div class="card-body">
         <div style="font-weight:600;font-size:15px">Manrique &amp; Associates LLC</div>
         <div style="font-size:13px;color:var(--muted);margin-top:4px">Questions about your account? Reply to any email from our office or visit manriqueassociates.com.</div>
+      </div>
+    </div>
+
+    <!-- Invoice modal -->
+    <div id="invoice-modal" hidden style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px">
+      <div style="background:var(--surface);border-radius:12px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)">
+          <div style="font-weight:700;font-size:16px" id="invoice-modal-title">New Invoice</div>
+          <button onclick="closeInvoiceModal()" style="font-size:20px;color:var(--muted);background:none;border:none;cursor:pointer">✕</button>
+        </div>
+        <div style="padding:24px" id="invoice-modal-body"></div>
       </div>
     </div>
   `);
@@ -1300,6 +1336,249 @@ async function renderClientPortalDashboard(container) {
     window.open(data.signedUrl, '_blank');
   };
 
+  // ── Load billing (business only) ──
+  async function loadBilling() {
+    const el = document.getElementById('billing-list');
+    const badge = document.getElementById('billing-badge');
+    if (!el) return;
+    const { data: bills } = await sb.from('client_billing')
+      .select('*').eq('client_id', c.id).order('created_at', { ascending: false });
+    if (!bills || !bills.length) {
+      el.innerHTML = '<div class="empty" style="padding:16px 0"><div class="empty-icon">💳</div>No charges yet.</div>';
+      if (badge) badge.textContent = '';
+      return;
+    }
+    const unpaid = bills.filter(b => b.status === 'unpaid');
+    const unpaidTotal = unpaid.reduce((s, b) => s + parseFloat(b.amount), 0);
+    if (badge) badge.textContent = unpaid.length ? `$${unpaidTotal.toFixed(2)} outstanding` : 'All paid ✓';
+    el.innerHTML = bills.map(b => {
+      const statusColor = { unpaid: 'var(--red)', paid: 'var(--green)', void: 'var(--muted)' }[b.status] || 'var(--muted)';
+      const statusLabel = { unpaid: 'Unpaid', paid: 'Paid', void: 'Void' }[b.status] || b.status;
+      const due = b.due_date ? `Due ${new Date(b.due_date + 'T12:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })}` : '';
+      return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:14px">${esc(b.description)}</div>
+          ${b.notes ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(b.notes)}</div>` : ''}
+          ${due ? `<div style="font-size:11px;color:var(--muted);margin-top:3px">${due}</div>` : ''}
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:700;font-size:15px">$${parseFloat(b.amount).toFixed(2)}</div>
+          <div style="font-size:11px;font-weight:600;color:${statusColor};margin-top:2px">${statusLabel}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Load client invoices (business only) ──
+  async function loadInvoices() {
+    const el = document.getElementById('invoices-list');
+    if (!el) return;
+    const { data: invs } = await sb.from('client_invoices')
+      .select('*').eq('client_id', c.id).order('created_at', { ascending: false });
+    if (!invs || !invs.length) {
+      el.innerHTML = '<div class="empty" style="padding:16px 0"><div class="empty-icon">🧾</div>No invoices yet. Create your first one above.</div>';
+      return;
+    }
+    el.innerHTML = invs.map(inv => {
+      const statusColor = { draft:'var(--muted)', sent:'var(--gold)', paid:'var(--green)', void:'var(--red)' }[inv.status] || 'var(--muted)';
+      const due = inv.due_date ? new Date(inv.due_date + 'T12:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '—';
+      return `<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:14px">${esc(inv.invoice_number)} · ${esc(inv.customer_name)}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">Due ${due} · <span style="font-weight:600;color:${statusColor}">${inv.status.toUpperCase()}</span></div>
+        </div>
+        <div style="font-weight:700;font-size:15px;margin-right:8px">$${parseFloat(inv.total).toFixed(2)}</div>
+        <div style="display:flex;gap:6px">
+          <button onclick="openEditInvoiceModal('${esc(inv.id)}')" style="border:1px solid var(--border);background:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--text)">Edit</button>
+          ${inv.status !== 'paid' && inv.status !== 'void'
+            ? `<button onclick="markInvoicePaid('${esc(inv.id)}')" style="border:1px solid var(--green);background:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--green)">Mark Paid</button>`
+            : ''}
+          <button onclick="deleteClientInvoice('${esc(inv.id)}')" style="border:1px solid var(--red);background:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--red)">Delete</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  if (isBusiness) {
+    await loadBilling();
+    await loadInvoices();
+  }
+
+  // Invoice modal helpers
+  window.closeInvoiceModal = function() {
+    document.getElementById('invoice-modal').hidden = true;
+  };
+
+  function invoiceFormHtml(inv) {
+    const items = inv?.line_items || [{ description: '', qty: 1, rate: '' }];
+    return `
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Invoice #</label>
+            <input id="inv-number" class="input" value="${esc(inv?.invoice_number || '')}" placeholder="INV-001">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Issue Date</label>
+            <input id="inv-issue-date" class="input" type="date" value="${inv?.issue_date || new Date().toISOString().slice(0,10)}">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Customer Name *</label>
+            <input id="inv-customer" class="input" value="${esc(inv?.customer_name || '')}" placeholder="Customer or company name">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Customer Email</label>
+            <input id="inv-email" class="input" type="email" value="${esc(inv?.customer_email || '')}" placeholder="customer@email.com">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">Due Date</label>
+          <input id="inv-due-date" class="input" type="date" value="${inv?.due_date || ''}">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">Line Items</label>
+          <div id="inv-line-items">
+            ${items.map((it, i) => `
+              <div class="inv-item-row" style="display:grid;grid-template-columns:1fr 60px 90px 28px;gap:6px;margin-bottom:6px">
+                <input class="input inv-desc" placeholder="Description" value="${esc(it.description || '')}">
+                <input class="input inv-qty" type="number" min="1" placeholder="Qty" value="${it.qty || 1}" style="text-align:center">
+                <input class="input inv-rate" type="number" min="0" step="0.01" placeholder="Rate $" value="${it.rate || ''}">
+                <button type="button" onclick="this.closest('.inv-item-row').remove();recalcInvoice()" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer">✕</button>
+              </div>`).join('')}
+          </div>
+          <button type="button" onclick="addInvoiceItem()" class="btn btn-secondary" style="font-size:12px;padding:4px 12px;margin-top:4px">+ Add Item</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end">
+          <div>
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Tax Rate (%)</label>
+            <input id="inv-tax-rate" class="input" type="number" min="0" max="100" step="0.1" value="${inv?.tax_rate || 0}" oninput="recalcInvoice()">
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:12px;color:var(--muted)">Subtotal: <span id="inv-subtotal">$0.00</span></div>
+            <div style="font-size:12px;color:var(--muted)">Tax: <span id="inv-tax-amt">$0.00</span></div>
+            <div style="font-size:16px;font-weight:700;margin-top:4px">Total: <span id="inv-total">$0.00</span></div>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Status</label>
+          <select id="inv-status" class="input">
+            ${['draft','sent','paid','void'].map(s => `<option value="${s}" ${(inv?.status||'draft')===s?'selected':''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Notes</label>
+          <textarea id="inv-notes" class="input" rows="2" placeholder="Payment terms, thank you note…">${esc(inv?.notes || '')}</textarea>
+        </div>
+        <div id="inv-err" style="color:var(--red);font-size:12px;min-height:14px"></div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button class="btn btn-secondary" onclick="closeInvoiceModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveInvoice('${inv?.id || ''}')">Save Invoice</button>
+        </div>
+      </div>`;
+  }
+
+  window.addInvoiceItem = function() {
+    const container = document.getElementById('inv-line-items');
+    const row = document.createElement('div');
+    row.className = 'inv-item-row';
+    row.style.cssText = 'display:grid;grid-template-columns:1fr 60px 90px 28px;gap:6px;margin-bottom:6px';
+    row.innerHTML = `
+      <input class="input inv-desc" placeholder="Description" value="">
+      <input class="input inv-qty" type="number" min="1" placeholder="Qty" value="1" style="text-align:center">
+      <input class="input inv-rate" type="number" min="0" step="0.01" placeholder="Rate $" value="">
+      <button type="button" onclick="this.closest('.inv-item-row').remove();recalcInvoice()" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer">✕</button>`;
+    container.appendChild(row);
+    recalcInvoice();
+  };
+
+  window.recalcInvoice = function() {
+    let subtotal = 0;
+    document.querySelectorAll('.inv-item-row').forEach(row => {
+      const qty = parseFloat(row.querySelector('.inv-qty')?.value) || 0;
+      const rate = parseFloat(row.querySelector('.inv-rate')?.value) || 0;
+      subtotal += qty * rate;
+    });
+    const taxRate = parseFloat(document.getElementById('inv-tax-rate')?.value) || 0;
+    const tax = subtotal * taxRate / 100;
+    const total = subtotal + tax;
+    const fmt = n => '$' + n.toFixed(2);
+    const sub = document.getElementById('inv-subtotal'); if (sub) sub.textContent = fmt(subtotal);
+    const taxEl = document.getElementById('inv-tax-amt'); if (taxEl) taxEl.textContent = fmt(tax);
+    const tot = document.getElementById('inv-total'); if (tot) tot.textContent = fmt(total);
+  };
+
+  window.openNewInvoiceModal = function() {
+    const modal = document.getElementById('invoice-modal');
+    document.getElementById('invoice-modal-title').textContent = 'New Invoice';
+    document.getElementById('invoice-modal-body').innerHTML = invoiceFormHtml(null);
+    modal.hidden = false;
+    // Auto-generate invoice number
+    sb.from('client_invoices').select('invoice_number').eq('client_id', c.id).order('created_at', { ascending: false }).limit(1).then(({ data }) => {
+      const last = data?.[0]?.invoice_number;
+      const num = last ? parseInt(last.replace(/\D/g,'')) + 1 : 1;
+      const el = document.getElementById('inv-number');
+      if (el && !el.value) el.value = `INV-${String(num).padStart(3,'0')}`;
+    });
+    setTimeout(recalcInvoice, 50);
+  };
+
+  window.openEditInvoiceModal = async function(invId) {
+    const { data: inv } = await sb.from('client_invoices').select('*').eq('id', invId).single();
+    if (!inv) return;
+    document.getElementById('invoice-modal-title').textContent = 'Edit Invoice';
+    document.getElementById('invoice-modal-body').innerHTML = invoiceFormHtml(inv);
+    document.getElementById('invoice-modal').hidden = false;
+    setTimeout(recalcInvoice, 50);
+  };
+
+  window.saveInvoice = async function(existingId) {
+    const errEl = document.getElementById('inv-err');
+    const customer = document.getElementById('inv-customer')?.value.trim();
+    if (!customer) { errEl.textContent = 'Customer name is required.'; return; }
+    const lineItems = [];
+    document.querySelectorAll('.inv-item-row').forEach(row => {
+      const desc = row.querySelector('.inv-desc')?.value.trim();
+      const qty = parseFloat(row.querySelector('.inv-qty')?.value) || 0;
+      const rate = parseFloat(row.querySelector('.inv-rate')?.value) || 0;
+      if (desc || rate) lineItems.push({ description: desc, qty, rate, amount: qty * rate });
+    });
+    const taxRate = parseFloat(document.getElementById('inv-tax-rate')?.value) || 0;
+    const subtotal = lineItems.reduce((s, it) => s + it.amount, 0);
+    const taxAmt = subtotal * taxRate / 100;
+    const payload = {
+      client_id: c.id,
+      invoice_number: document.getElementById('inv-number')?.value.trim() || `INV-${Date.now()}`,
+      customer_name: customer,
+      customer_email: document.getElementById('inv-email')?.value.trim() || null,
+      issue_date: document.getElementById('inv-issue-date')?.value || new Date().toISOString().slice(0,10),
+      due_date: document.getElementById('inv-due-date')?.value || null,
+      status: document.getElementById('inv-status')?.value || 'draft',
+      notes: document.getElementById('inv-notes')?.value.trim() || null,
+      line_items: lineItems, subtotal, tax_rate: taxRate, tax_amount: taxAmt, total: subtotal + taxAmt,
+      updated_at: new Date().toISOString()
+    };
+    const { error } = existingId
+      ? await sb.from('client_invoices').update(payload).eq('id', existingId)
+      : await sb.from('client_invoices').insert(payload);
+    if (error) { errEl.textContent = error.message; return; }
+    closeInvoiceModal();
+    await loadInvoices();
+  };
+
+  window.markInvoicePaid = async function(invId) {
+    if (!confirm('Mark this invoice as paid?')) return;
+    await sb.from('client_invoices').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', invId);
+    await loadInvoices();
+  };
+
+  window.deleteClientInvoice = async function(invId) {
+    if (!confirm('Delete this invoice? This cannot be undone.')) return;
+    await sb.from('client_invoices').delete().eq('id', invId);
+    await loadInvoices();
+  };
+
   // Upload files
   document.getElementById('doc-upload-input').addEventListener('change', async (e) => {
     const files = Array.from(e.target.files);
@@ -1370,7 +1649,7 @@ function openClientDetail(c) {
   bd.className = 'modal-backdrop';
   bd.id = 'cdet-backdrop';
   const info = (label, val) => val ? "\n    <div style=\"display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)\">\n      <span style=\"min-width:140px;font-size:12px;color:var(--muted)\">".concat(label, "</span>\n      <span style=\"font-size:13px;font-weight:500\">").concat(esc(val), "</span>\n    </div>") : '';
-  bd.innerHTML = "\n    <div class=\"modal\" role=\"dialog\" style=\"max-width:520px\">\n      <div class=\"modal-header\">\n        <h3>".concat(esc(c.full_name), "</h3>\n        <button class=\"modal-close\" onclick=\"closeModal('cdet-backdrop')\" aria-label=\"Close\">×</button>\n      </div>\n      <div class=\"modal-body\">\n        <div style=\"margin-bottom:16px\">\n          <span class=\"badge ").concat(c.status === 'active' ? 'badge-green' : 'badge-grey', "\" style=\"margin-right:8px\">").concat(esc(c.status || 'inactive'), "</span>\n          <span style=\"font-size:13px;color:var(--muted)\">").concat(esc(c.entity_type || ''), "</span>\n        </div>\n        ").concat(info('Email', c.email), "\n        ").concat(info('Phone', c.phone), "\n        ").concat(info('Address', c.address), "\n        ").concat(info('EIN / ITIN', c.ein), "\n        ").concat(info('State', c.state), "\n        ").concat(info('Notes', c.notes), "\n\n        <div style=\"margin-top:20px\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">QUICK ACTIONS</div>\n          <div style=\"display:flex;flex-wrap:wrap;gap:8px\">\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('journal')\">📒 Journal Entries</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('payroll')\">💼 Payroll</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('tax')\">🏛 Tax Returns</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\">📊 Dashboard</button>\n          </div>\n        </div>\n\n        <div style=\"margin-top:20px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">🔑 CLIENT PORTAL ACCESS</div>\n          ").concat(c.auth_user_id ? "<div style=\"display:flex;align-items:center;gap:8px\">\n                <span style=\"color:var(--green);font-size:16px\">✓</span>\n                <span style=\"font-size:13px;font-weight:500\">Portal access linked</span>\n              </div>\n              <div style=\"font-size:12px;color:var(--muted);margin-top:4px\">Client email: <strong>".concat(esc(c.email || ''), "</strong></div>\n              <button class=\"btn btn-secondary\" id=\"cdet-resend-btn\" style=\"margin-top:10px;font-size:12px;padding:6px 12px\">↺ Resend password email</button>\n              <div id=\"cdet-resend-msg\" style=\"font-size:12px;margin-top:6px;min-height:16px\"></div>") : "<div style=\"font-size:13px;color:var(--muted);margin-bottom:10px\">This client does not have portal access yet.</div>\n              <div style=\"display:flex;align-items:center;gap:8px\">\n                <input id=\"cdet-portal-email\" type=\"email\" placeholder=\"Client email\" value=\"".concat(esc(c.email || ''), "\" style=\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\">\n                <button class=\"btn btn-primary\" id=\"cdet-invite-btn\" style=\"white-space:nowrap;font-size:12px;padding:7px 14px\">Create Login</button>\n              </div>\n              <div id=\"cdet-invite-msg\" style=\"font-size:12px;margin-top:6px;min-height:16px\"></div>"), "\n        </div>\n\n        <div style=\"margin-top:20px\">\n          <div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:10px\">\n            <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em\">📋 TASKS</div>\n            <div style=\"display:flex;gap:6px\">\n              <button class=\"btn\" id=\"cdet-assign-year-btn\" style=\"font-size:11px;padding:4px 10px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">📅 Assign Year Tasks</button>\n              <button class=\"btn btn-primary\" id=\"cdet-add-task-btn\" style=\"font-size:11px;padding:4px 10px\">+ Add Task</button>\n            </div>\n          </div>\n\n          <div id=\"cdet-year-task-panel\" style=\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:14px;margin-bottom:12px\">\n            <div style=\"font-size:12px;font-weight:600;margin-bottom:8px\">Select services to assign tasks for:</div>\n            <div style=\"display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px\">\n              <label style=\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\"><input type=\"checkbox\" id=\"yt-svc-tax\" style=\"width:auto;accent-color:var(--gold)\" onchange=\"ytUpdatePreview()\"> 🏛 Tax Returns</label>\n              <label style=\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\"><input type=\"checkbox\" id=\"yt-svc-bookkeeping\" style=\"width:auto;accent-color:var(--gold)\" onchange=\"ytUpdatePreview()\"> 📒 Bookkeeping</label>\n              <label style=\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\"><input type=\"checkbox\" id=\"yt-svc-payroll\" style=\"width:auto;accent-color:var(--gold)\" onchange=\"ytUpdatePreview()\"> 💼 Payroll</label>\n            </div>\n            <div id=\"yt-tasks-preview\"></div>\n            <div style=\"display:flex;gap:8px;margin-top:10px\">\n              <button class=\"btn btn-primary\" id=\"yt-assign-btn\" style=\"font-size:12px;padding:6px 14px\">Assign Selected Tasks</button>\n              <button class=\"btn\" onclick=\"document.getElementById('cdet-year-task-panel').style.display='none';document.getElementById('cdet-assign-year-btn').style.display=''\" style=\"font-size:12px;padding:6px 14px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Cancel</button>\n            </div>\n            <div id=\"yt-err\" style=\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\"></div>\n          </div>\n\n          <div id=\"cdet-task-form\" style=\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:12px;margin-bottom:12px\">\n            <input id=\"cdet-task-title\" type=\"text\" placeholder=\"Task title\" style=\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\">\n            <textarea id=\"cdet-task-desc\" placeholder=\"Description (optional)\" rows=\"2\" style=\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;resize:vertical;margin-bottom:8px\"></textarea>\n            <div style=\"display:flex;gap:8px;align-items:center\">\n              <select id=\"cdet-task-priority\" style=\"padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px\">\n                <option value=\"normal\">Normal</option>\n                <option value=\"urgent\">🔴 Urgent</option>\n                <option value=\"low\">⚪ Low</option>\n              </select>\n              <input id=\"cdet-task-due\" type=\"date\" style=\"padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px\">\n              <button class=\"btn btn-primary\" id=\"cdet-task-save\" style=\"font-size:12px;padding:6px 12px\">Save</button>\n              <button class=\"btn\" id=\"cdet-task-cancel\" style=\"font-size:12px;padding:6px 12px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Cancel</button>\n            </div>\n            <div id=\"cdet-task-err\" style=\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\"></div>\n          </div>\n          <div id=\"cdet-tasks-list\"><span class=\"spinner\" style=\"width:14px;height:14px\"></span></div>\n        </div>\n\n        <div style=\"margin-top:20px\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">📁 CLIENT DOCUMENTS</div>\n          <div id=\"cdet-docs-list\"><span class=\"spinner\" style=\"width:14px;height:14px\"></span></div>\n        </div>\n\n      </div>\n      <div class=\"modal-footer\">\n        <button class=\"btn\" onclick=\"closeModal('cdet-backdrop')\" style=\"background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Close</button>\n        <button class=\"btn\" id=\"cdet-edit-btn\" style=\"margin-left:auto;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">✏️ Edit Info</button>\n        <button class=\"btn btn-primary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\">Select Client →</button>\n      </div>\n    </div>");
+  bd.innerHTML = "\n    <div class=\"modal\" role=\"dialog\" style=\"max-width:520px\">\n      <div class=\"modal-header\">\n        <h3>".concat(esc(c.full_name), "</h3>\n        <button class=\"modal-close\" onclick=\"closeModal('cdet-backdrop')\" aria-label=\"Close\">×</button>\n      </div>\n      <div class=\"modal-body\">\n        <div style=\"margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap\">\n          <span class=\"badge ").concat(c.status === 'active' ? 'badge-green' : 'badge-grey', "\">").concat(esc(c.status || 'inactive'), "</span>\n          <span style=\"font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;").concat((c.client_type || 'personal') === 'business' ? 'background:rgba(234,179,8,.15);color:var(--gold)' : 'background:rgba(34,197,94,.12);color:var(--green)', "\">").concat((c.client_type || 'personal') === 'business' ? '🏢 Business' : '👤 Personal', "</span>\n          <span style=\"font-size:13px;color:var(--muted)\">").concat(esc(c.entity_type || ''), "</span>\n        </div>\n        ").concat(info('Email', c.email), "\n        ").concat(info('Phone', c.phone), "\n        ").concat(info('Address', c.address), "\n        ").concat(info('EIN / ITIN', c.ein), "\n        ").concat(info('State', c.state), "\n        ").concat(info('Notes', c.notes), "\n\n        <div style=\"margin-top:20px\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">QUICK ACTIONS</div>\n          <div style=\"display:flex;flex-wrap:wrap;gap:8px\">\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('journal')\">📒 Journal Entries</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('payroll')\">💼 Payroll</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('tax')\">🏛 Tax Returns</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\">📊 Dashboard</button>\n          </div>\n        </div>\n\n        <div style=\"margin-top:20px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">🔑 CLIENT PORTAL ACCESS</div>\n          ").concat(c.auth_user_id ? "<div style=\"display:flex;align-items:center;gap:8px\">\n                <span style=\"color:var(--green);font-size:16px\">✓</span>\n                <span style=\"font-size:13px;font-weight:500\">Portal access linked</span>\n              </div>\n              <div style=\"font-size:12px;color:var(--muted);margin-top:4px\">Client email: <strong>".concat(esc(c.email || ''), "</strong></div>\n              <button class=\"btn btn-secondary\" id=\"cdet-resend-btn\" style=\"margin-top:10px;font-size:12px;padding:6px 12px\">↺ Resend password email</button>\n              <div id=\"cdet-resend-msg\" style=\"font-size:12px;margin-top:6px;min-height:16px\"></div>") : "<div style=\"font-size:13px;color:var(--muted);margin-bottom:10px\">This client does not have portal access yet.</div>\n              <div style=\"display:flex;align-items:center;gap:8px\">\n                <input id=\"cdet-portal-email\" type=\"email\" placeholder=\"Client email\" value=\"".concat(esc(c.email || ''), "\" style=\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\">\n                <button class=\"btn btn-primary\" id=\"cdet-invite-btn\" style=\"white-space:nowrap;font-size:12px;padding:7px 14px\">Create Login</button>\n              </div>\n              <div id=\"cdet-invite-msg\" style=\"font-size:12px;margin-top:6px;min-height:16px\"></div>"), "\n        </div>\n\n        <div style=\"margin-top:20px\">\n          <div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:10px\">\n            <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em\">📋 TASKS</div>\n            <div style=\"display:flex;gap:6px\">\n              <button class=\"btn\" id=\"cdet-assign-year-btn\" style=\"font-size:11px;padding:4px 10px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">📅 Assign Year Tasks</button>\n              <button class=\"btn btn-primary\" id=\"cdet-add-task-btn\" style=\"font-size:11px;padding:4px 10px\">+ Add Task</button>\n            </div>\n          </div>\n\n          <div id=\"cdet-year-task-panel\" style=\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:14px;margin-bottom:12px\">\n            <div style=\"font-size:12px;font-weight:600;margin-bottom:8px\">Select services to assign tasks for:</div>\n            <div style=\"display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px\">\n              <label style=\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\"><input type=\"checkbox\" id=\"yt-svc-tax\" style=\"width:auto;accent-color:var(--gold)\" onchange=\"ytUpdatePreview()\"> 🏛 Tax Returns</label>\n              <label style=\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\"><input type=\"checkbox\" id=\"yt-svc-bookkeeping\" style=\"width:auto;accent-color:var(--gold)\" onchange=\"ytUpdatePreview()\"> 📒 Bookkeeping</label>\n              <label style=\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\"><input type=\"checkbox\" id=\"yt-svc-payroll\" style=\"width:auto;accent-color:var(--gold)\" onchange=\"ytUpdatePreview()\"> 💼 Payroll</label>\n            </div>\n            <div id=\"yt-tasks-preview\"></div>\n            <div style=\"display:flex;gap:8px;margin-top:10px\">\n              <button class=\"btn btn-primary\" id=\"yt-assign-btn\" style=\"font-size:12px;padding:6px 14px\">Assign Selected Tasks</button>\n              <button class=\"btn\" onclick=\"document.getElementById('cdet-year-task-panel').style.display='none';document.getElementById('cdet-assign-year-btn').style.display=''\" style=\"font-size:12px;padding:6px 14px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Cancel</button>\n            </div>\n            <div id=\"yt-err\" style=\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\"></div>\n          </div>\n\n          <div id=\"cdet-task-form\" style=\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:12px;margin-bottom:12px\">\n            <input id=\"cdet-task-title\" type=\"text\" placeholder=\"Task title\" style=\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\">\n            <textarea id=\"cdet-task-desc\" placeholder=\"Description (optional)\" rows=\"2\" style=\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;resize:vertical;margin-bottom:8px\"></textarea>\n            <div style=\"display:flex;gap:8px;align-items:center\">\n              <select id=\"cdet-task-priority\" style=\"padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px\">\n                <option value=\"normal\">Normal</option>\n                <option value=\"urgent\">🔴 Urgent</option>\n                <option value=\"low\">⚪ Low</option>\n              </select>\n              <input id=\"cdet-task-due\" type=\"date\" style=\"padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px\">\n              <button class=\"btn btn-primary\" id=\"cdet-task-save\" style=\"font-size:12px;padding:6px 12px\">Save</button>\n              <button class=\"btn\" id=\"cdet-task-cancel\" style=\"font-size:12px;padding:6px 12px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Cancel</button>\n            </div>\n            <div id=\"cdet-task-err\" style=\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\"></div>\n          </div>\n          <div id=\"cdet-tasks-list\"><span class=\"spinner\" style=\"width:14px;height:14px\"></span></div>\n        </div>\n\n        <div style=\"margin-top:20px\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">📁 CLIENT DOCUMENTS</div>\n          <div id=\"cdet-docs-list\"><span class=\"spinner\" style=\"width:14px;height:14px\"></span></div>\n        </div>\n\n        <div style=\"margin-top:20px\">\n          <div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:10px\">\n            <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em\">💳 BILLING</div>\n            <button class=\"btn btn-primary\" id=\"cdet-add-bill-btn\" style=\"font-size:11px;padding:4px 10px\">+ Add Charge</button>\n          </div>\n          <div id=\"cdet-bill-form\" style=\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:12px;margin-bottom:12px\">\n            <input id=\"cdet-bill-desc\" type=\"text\" placeholder=\"Description (e.g. Tax prep 2024)\" style=\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\">\n            <div style=\"display:flex;gap:8px;margin-bottom:8px\">\n              <input id=\"cdet-bill-amount\" type=\"number\" min=\"0\" step=\"0.01\" placeholder=\"Amount $\" style=\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\">\n              <input id=\"cdet-bill-due\" type=\"date\" style=\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\">\n              <select id=\"cdet-bill-status\" style=\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\">\n                <option value=\"unpaid\">Unpaid</option>\n                <option value=\"paid\">Paid</option>\n                <option value=\"void\">Void</option>\n              </select>\n            </div>\n            <input id=\"cdet-bill-notes\" type=\"text\" placeholder=\"Notes (optional)\" style=\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\">\n            <div style=\"display:flex;gap:8px\">\n              <button class=\"btn btn-primary\" id=\"cdet-bill-save\" style=\"font-size:12px;padding:6px 12px\">Save Charge</button>\n              <button class=\"btn\" id=\"cdet-bill-cancel\" style=\"font-size:12px;padding:6px 12px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Cancel</button>\n            </div>\n            <div id=\"cdet-bill-err\" style=\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\"></div>\n          </div>\n          <div id=\"cdet-billing-list\"><span class=\"spinner\" style=\"width:14px;height:14px\"></span></div>\n        </div>\n\n      </div>\n      <div class=\"modal-footer\">\n        <button class=\"btn\" onclick=\"closeModal('cdet-backdrop')\" style=\"background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Close</button>\n        <button class=\"btn\" id=\"cdet-edit-btn\" style=\"margin-left:auto;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">✏️ Edit Info</button>\n        <button class=\"btn btn-primary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\">Select Client →</button>\n      </div>\n    </div>");
   document.body.appendChild(bd);
   bd.addEventListener('click', e => {
     if (e.target === bd) closeModal('cdet-backdrop');
@@ -1569,6 +1848,86 @@ function openClientDetail(c) {
   }
   loadAdminDocs();
 
+  // ── Admin billing section ──
+  async function loadAdminBilling() {
+    const el = document.getElementById('cdet-billing-list');
+    if (!el) return;
+    const { data: bills } = await sb.from('client_billing')
+      .select('*').eq('client_id', c.id).order('created_at', { ascending: false });
+    if (!bills || !bills.length) {
+      el.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:8px 0">No charges yet.</div>';
+      return;
+    }
+    el.innerHTML = bills.map(b => {
+      const statusColor = { unpaid:'var(--red)', paid:'var(--green)', void:'var(--muted)' }[b.status] || 'var(--muted)';
+      const due = b.due_date ? ` · Due ${new Date(b.due_date + 'T12:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })}` : '';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:500">${esc(b.description)}</div>
+          ${b.notes ? `<div style="font-size:11px;color:var(--muted)">${esc(b.notes)}</div>` : ''}
+          <div style="font-size:11px;color:var(--muted)">$${parseFloat(b.amount).toFixed(2)}${due} · <span style="font-weight:600;color:${statusColor}">${b.status.toUpperCase()}</span></div>
+        </div>
+        <div style="display:flex;gap:5px;flex-shrink:0">
+          ${b.status === 'unpaid' ? `<button onclick="markBillPaid('${esc(b.id)}')" style="border:1px solid var(--green);background:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--green)">Mark Paid</button>` : ''}
+          <button onclick="voidBill('${esc(b.id)}')" style="border:1px solid var(--border);background:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--muted)">Void</button>
+          <button onclick="deleteBill('${esc(b.id)}')" style="border:1px solid var(--red);background:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--red)">🗑</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  loadAdminBilling();
+
+  const addBillBtn = document.getElementById('cdet-add-bill-btn');
+  const billForm = document.getElementById('cdet-bill-form');
+  if (addBillBtn && billForm) {
+    addBillBtn.addEventListener('click', () => { billForm.style.display = 'block'; addBillBtn.style.display = 'none'; });
+    document.getElementById('cdet-bill-cancel').addEventListener('click', () => { billForm.style.display = 'none'; addBillBtn.style.display = ''; });
+    document.getElementById('cdet-bill-save').addEventListener('click', async () => {
+      const errEl = document.getElementById('cdet-bill-err');
+      const desc = document.getElementById('cdet-bill-desc').value.trim();
+      const amount = parseFloat(document.getElementById('cdet-bill-amount').value);
+      if (!desc) { errEl.textContent = 'Description is required.'; return; }
+      if (!amount || amount <= 0) { errEl.textContent = 'Enter a valid amount.'; return; }
+      errEl.textContent = '';
+      document.getElementById('cdet-bill-save').disabled = true;
+      document.getElementById('cdet-bill-save').textContent = 'Saving…';
+      const { error } = await sb.from('client_billing').insert({
+        client_id: c.id,
+        description: desc,
+        amount,
+        due_date: document.getElementById('cdet-bill-due').value || null,
+        status: document.getElementById('cdet-bill-status').value,
+        notes: document.getElementById('cdet-bill-notes').value.trim() || null
+      });
+      document.getElementById('cdet-bill-save').disabled = false;
+      document.getElementById('cdet-bill-save').textContent = 'Save Charge';
+      if (error) { errEl.textContent = error.message; return; }
+      document.getElementById('cdet-bill-desc').value = '';
+      document.getElementById('cdet-bill-amount').value = '';
+      document.getElementById('cdet-bill-due').value = '';
+      document.getElementById('cdet-bill-notes').value = '';
+      document.getElementById('cdet-bill-status').value = 'unpaid';
+      billForm.style.display = 'none';
+      addBillBtn.style.display = '';
+      loadAdminBilling();
+    });
+  }
+
+  window.markBillPaid = async function(billId) {
+    await sb.from('client_billing').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', billId);
+    loadAdminBilling();
+  };
+  window.voidBill = async function(billId) {
+    if (!confirm('Mark this charge as void?')) return;
+    await sb.from('client_billing').update({ status: 'void' }).eq('id', billId);
+    loadAdminBilling();
+  };
+  window.deleteBill = async function(billId) {
+    if (!confirm('Delete this charge? This cannot be undone.')) return;
+    await sb.from('client_billing').delete().eq('id', billId);
+    loadAdminBilling();
+  };
+
   window.viewAdminDoc = async function(path, name) {
     const { data, error } = await sb.storage.from('client-documents').createSignedUrl(path, 300);
     if (error) { alert('Could not open file: ' + error.message); return; }
@@ -1734,12 +2093,21 @@ function openClientDetail(c) {
               <input id="edit-state" type="text" value="${esc(c.state||'')}" maxlength="2" style="width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;box-sizing:border-box;text-transform:uppercase">
             </div>
           </div>
-          <div class="form-group" style="margin:0">
-            <label style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em">STATUS</label>
-            <select id="edit-status" style="width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px">
-              <option value="active" ${c.status==='active'?'selected':''}>Active</option>
-              <option value="inactive" ${c.status==='inactive'?'selected':''}>Inactive</option>
-            </select>
+          <div style="display:flex;gap:12px">
+            <div class="form-group" style="margin:0;flex:1">
+              <label style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em">STATUS</label>
+              <select id="edit-status" style="width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px">
+                <option value="active" ${c.status==='active'?'selected':''}>Active</option>
+                <option value="inactive" ${c.status==='inactive'?'selected':''}>Inactive</option>
+              </select>
+            </div>
+            <div class="form-group" style="margin:0;flex:1">
+              <label style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em">CLIENT TYPE</label>
+              <select id="edit-client-type" style="width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px">
+                <option value="personal" ${(c.client_type||'personal')==='personal'?'selected':''}>👤 Personal</option>
+                <option value="business" ${c.client_type==='business'?'selected':''}>🏢 Business</option>
+              </select>
+            </div>
           </div>
           <div class="form-group" style="margin:0">
             <label style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em">SERVICES (controls client portal menu)</label>
@@ -1787,9 +2155,10 @@ function openClientDetail(c) {
           address:   document.getElementById('edit-address').value.trim(),
           ein:       document.getElementById('edit-ein').value.trim(),
           state:     document.getElementById('edit-state').value.trim().toUpperCase(),
-          status:    document.getElementById('edit-status').value,
-          notes:     document.getElementById('edit-notes').value.trim(),
-          services:  svcs.length ? svcs : ['tax'],
+          status:      document.getElementById('edit-status').value,
+          client_type: document.getElementById('edit-client-type').value,
+          notes:       document.getElementById('edit-notes').value.trim(),
+          services:    svcs.length ? svcs : ['tax'],
         };
         if (!updates.full_name) { msg.style.color='var(--red)'; msg.textContent='Name is required.'; return; }
         if (!updates.email)     { msg.style.color='var(--red)'; msg.textContent='Email is required.'; return; }
