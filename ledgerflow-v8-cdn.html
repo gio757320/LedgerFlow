@@ -2307,20 +2307,59 @@ function updateClientDropdown() {
 // ── CHART OF ACCOUNTS ──────────────────────────────────────
 async function renderAccounts(container) {
   container.innerHTML = pageShell('Chart of Accounts', STATE.isStaff ? selectedClientName() : '', "\n    <button class=\"btn btn-secondary\">+ Add Account</button>\n  ", '<div class="loading-block"><span class="spinner"></span> Loading accounts…</div>');
-  const q = applyClientFilter(sb.from('accounts').select('*').order('account_number'));
-  const {
-    data,
-    error
-  } = await q;
+
+  // Fetch accounts and journal lines in parallel
+  const acctQ = applyClientFilter(sb.from('accounts').select('*').order('account_number'));
+
+  // For lines: filter by client via the journal_entries join
+  // If a client is selected (staff view or client portal), filter accordingly
+  const cf = clientFilter();
+  let linesQ;
+  if (cf) {
+    // Filter journal_lines by joining journal_entries where client_id matches
+    linesQ = sb.from('journal_lines')
+      .select('account_id, debit, credit, journal_entries!inner(client_id)')
+      .eq('journal_entries.client_id', cf.value);
+  } else {
+    // Staff with no client selected: get all lines
+    linesQ = sb.from('journal_lines')
+      .select('account_id, debit, credit');
+  }
+
+  const [{ data, error }, { data: lines, error: linesErr }] = await Promise.all([acctQ, linesQ]);
+
   const main = container.querySelector('#main');
   if (error) {
     main.innerHTML = "<div class=\"alert alert-red\">".concat(esc(error.message), "</div>");
     return;
   }
+
+  // Build balance map: account_id → balance
+  // Asset/Expense: debit − credit (increases with debits)
+  // Liability/Equity/Income: credit − debit (increases with credits)
+  const debitNormal = new Set(['asset', 'expense']);
+  const totals = {}; // account_id → { dr: number, cr: number }
+  for (const l of (lines || [])) {
+    if (!totals[l.account_id]) totals[l.account_id] = { dr: 0, cr: 0 };
+    totals[l.account_id].dr += parseFloat(l.debit) || 0;
+    totals[l.account_id].cr += parseFloat(l.credit) || 0;
+  }
+  const getBalance = (a) => {
+    const t = totals[a.id] || { dr: 0, cr: 0 };
+    return debitNormal.has((a.type || '').toLowerCase())
+      ? t.dr - t.cr
+      : t.cr - t.dr;
+  };
+
   const types = [...new Set(data.map(a => a.type))];
   main.innerHTML = types.map(t => {
     const rows = data.filter(a => a.type === t);
-    return "\n      <div class=\"card\" style=\"margin-bottom:16px\">\n        <div class=\"acct-type\">".concat(esc(t), "</div>\n        <table>\n          <thead><tr><th>Number</th><th>Name</th><th>Sub-type</th><th style=\"text-align:right\">Balance</th></tr></thead>\n          <tbody>").concat(rows.map(a => "\n            <tr>\n              <td style=\"font-family:monospace;font-size:12px\">".concat(esc(a.account_number), "</td>\n              <td style=\"font-weight:500\">").concat(esc(a.name), "</td>\n              <td style=\"font-size:12px;color:var(--muted)\">").concat(esc(a.subtype || ''), "</td>\n              <td style=\"text-align:right;font-variant-numeric:tabular-nums\">").concat(fmt(0), "</td>\n            </tr>\n          ")).join(''), "</tbody>\n        </table>\n      </div>\n    ");
+    const typeTotal = rows.reduce((s, a) => s + getBalance(a), 0);
+    return "\n      <div class=\"card\" style=\"margin-bottom:16px\">\n        <div class=\"acct-type\" style=\"display:flex;justify-content:space-between;align-items:center\">\n          <span>".concat(esc(t), "</span>\n          <span style=\"font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--muted)\">Total: ").concat(fmt(typeTotal), "</span>\n        </div>\n        <table>\n          <thead><tr><th>Number</th><th>Name</th><th>Sub-type</th><th style=\"text-align:right\">Balance</th></tr></thead>\n          <tbody>").concat(rows.map(a => {
+      const bal = getBalance(a);
+      const hasActivity = totals[a.id];
+      return "\n            <tr>\n              <td style=\"font-family:monospace;font-size:12px\">".concat(esc(a.account_number), "</td>\n              <td style=\"font-weight:500\">").concat(esc(a.name), "</td>\n              <td style=\"font-size:12px;color:var(--muted)\">").concat(esc(a.subtype || ''), "</td>\n              <td style=\"text-align:right;font-variant-numeric:tabular-nums;").concat(hasActivity ? 'font-weight:600' : 'color:var(--muted)', "\">").concat(fmt(bal), "</td>\n            </tr>\n          ");
+    }).join(''), "</tbody>\n        </table>\n      </div>\n    ");
   }).join('');
 }
 
