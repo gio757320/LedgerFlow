@@ -413,6 +413,10 @@ tr:hover td { background: rgba(46,158,107,.04); }
         <button class="nav-item" data-screen="journal" id="nav-journal-btn">
           <span class="icon">📋</span> Journal Entries
         </button>
+        <button class="nav-item" data-screen="messages" id="nav-messages-btn">
+          <span class="icon">💬</span> Messages
+          <span class="badge" id="nav-messages-badge" hidden style="margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px"></span>
+        </button>
       </div>
 
       <div class="nav-divider" id="nav-payrolltax-divider"></div>
@@ -719,6 +723,7 @@ async function onSignedIn(user) {
   showApp();
 }
 function onSignedOut() {
+  if (window._notifInterval) { clearInterval(window._notifInterval); window._notifInterval = null; }
   STATE = {
     user: null,
     staffRow: null,
@@ -788,6 +793,11 @@ function showApp() {
   }
 
   navigateTo('dashboard');
+
+  // Start notification badge polling (every 60 seconds)
+  if (window._notifInterval) clearInterval(window._notifInterval);
+  refreshNotificationBadges();
+  window._notifInterval = setInterval(refreshNotificationBadges, 60000);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -825,8 +835,252 @@ function renderScreen(screen) {
     case 'routeworth':
       renderRouteWorth(container);
       break;
+    case 'messages':
+      STATE.isStaff ? renderAdminMessages(container) : renderClientMessages(container);
+      break;
     default:
       container.innerHTML = '<div class="loading-block">Screen not found.</div>';
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  MESSAGES — ADMIN SIDE
+// ════════════════════════════════════════════════════════════
+async function renderAdminMessages(container) {
+  container.innerHTML = pageShell('Messages', 'Client Conversations', '', `
+    <div class="two-col" style="align-items:flex-start">
+      <div class="card" style="min-height:400px">
+        <div class="card-h">Conversations</div>
+        <div class="card-body" id="msg-conv-list"><span class="spinner"></span></div>
+      </div>
+      <div class="card" style="min-height:400px" id="msg-thread-card">
+        <div class="card-h" id="msg-thread-title">Select a client</div>
+        <div class="card-body" id="msg-thread-body" style="display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px">
+          Choose a conversation on the left
+        </div>
+      </div>
+    </div>
+  `);
+
+  // Load conversation list (one entry per client that has messages OR all clients)
+  const { data: clients } = await sb.from('clients').select('id,full_name,status').eq('status','active').order('full_name');
+  const { data: msgs } = await sb.from('client_messages').select('client_id,body,created_at,read_by_staff,sender_role').order('created_at', { ascending: false });
+
+  const listEl = document.getElementById('msg-conv-list');
+  if (!listEl) return;
+
+  // Build unread count per client
+  const unreadMap = {};
+  const lastMsgMap = {};
+  (msgs || []).forEach(m => {
+    if (!lastMsgMap[m.client_id]) lastMsgMap[m.client_id] = m;
+    if (!m.read_by_staff && m.sender_role === 'client') {
+      unreadMap[m.client_id] = (unreadMap[m.client_id] || 0) + 1;
+    }
+  });
+
+  // Sort clients: unread first, then those with messages, then rest
+  const sorted = (clients || []).sort((a, b) => {
+    const au = unreadMap[a.id] || 0, bu = unreadMap[b.id] || 0;
+    if (au !== bu) return bu - au;
+    const al = lastMsgMap[a.id], bl = lastMsgMap[b.id];
+    if (al && !bl) return -1;
+    if (!al && bl) return 1;
+    if (al && bl) return new Date(bl.created_at) - new Date(al.created_at);
+    return 0;
+  });
+
+  listEl.innerHTML = sorted.map(cl => {
+    const unread = unreadMap[cl.id] || 0;
+    const last = lastMsgMap[cl.id];
+    const preview = last ? esc(last.body.slice(0, 50)) + (last.body.length > 50 ? '…' : '') : '<span style="color:var(--muted)">No messages yet</span>';
+    const timeStr = last ? new Date(last.created_at).toLocaleDateString('en-US', { month:'short', day:'numeric' }) : '';
+    return `<div onclick="openAdminThread('${esc(cl.id)}','${esc(cl.full_name)}')"
+      style="padding:12px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px;transition:background .15s"
+      onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''"
+      id="conv-row-${esc(cl.id)}">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="font-weight:${unread?'700':'500'};font-size:13px;flex:1">${esc(cl.full_name)}</div>
+        ${unread ? `<span style="background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">${unread}</span>` : ''}
+        <span style="font-size:11px;color:var(--muted)">${timeStr}</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:3px">${preview}</div>
+    </div>`;
+  }).join('');
+
+  // Update nav badge
+  const totalUnread = Object.values(unreadMap).reduce((s, v) => s + v, 0);
+  const badge = document.getElementById('nav-messages-badge');
+  if (badge) { badge.textContent = totalUnread || ''; badge.hidden = !totalUnread; }
+}
+
+window.openAdminThread = async function(clientId, clientName) {
+  const titleEl = document.getElementById('msg-thread-title');
+  const bodyEl  = document.getElementById('msg-thread-body');
+  if (!titleEl || !bodyEl) return;
+  titleEl.textContent = clientName;
+  bodyEl.innerHTML = '<span class="spinner"></span>';
+
+  // Mark all client messages as read
+  await sb.from('client_messages').update({ read_by_staff: true })
+    .eq('client_id', clientId).eq('sender_role', 'client').eq('read_by_staff', false);
+
+  async function loadThread() {
+    const { data: msgs } = await sb.from('client_messages')
+      .select('*').eq('client_id', clientId).order('created_at');
+
+    const { data: { user } } = await sb.auth.getUser();
+
+    bodyEl.innerHTML = `
+      <div id="msg-scroll" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-bottom:12px;min-height:200px;max-height:380px">
+        ${(msgs||[]).length === 0
+          ? '<div style="color:var(--muted);font-size:13px;text-align:center;padding:40px 0">No messages yet. Send the first one below.</div>'
+          : (msgs||[]).map(m => {
+              const isStaff = m.sender_role === 'staff';
+              const time = new Date(m.created_at).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+              return `<div style="display:flex;flex-direction:column;align-items:${isStaff?'flex-end':'flex-start'}">
+                <div style="max-width:80%;background:${isStaff?'var(--gold)':'var(--surface)'};color:${isStaff?'#000':'var(--text)'};padding:9px 13px;border-radius:${isStaff?'14px 14px 4px 14px':'14px 14px 14px 4px'};font-size:13px;line-height:1.5">
+                  ${esc(m.body)}
+                </div>
+                <div style="font-size:10px;color:var(--muted);margin-top:3px">${isStaff?'You · ':'Client · '}${time}</div>
+              </div>`;
+            }).join('')
+        }
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <textarea id="msg-compose" placeholder="Type a message…" rows="2"
+          style="flex:1;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;resize:none"></textarea>
+        <button class="btn btn-primary" onclick="sendAdminMessage('${esc(clientId)}','${esc(clientName)}')" style="align-self:flex-end;padding:8px 16px">Send</button>
+      </div>`;
+
+    // Scroll to bottom
+    const scroll = document.getElementById('msg-scroll');
+    if (scroll) scroll.scrollTop = scroll.scrollHeight;
+
+    // Refresh nav badge only (don't re-render the full messages screen)
+    refreshNotificationBadges();
+  }
+  await loadThread();
+};
+
+window.sendAdminMessage = async function(clientId, clientName) {
+  const ta = document.getElementById('msg-compose');
+  const body = ta?.value.trim();
+  if (!body) return;
+  ta.disabled = true;
+  const { data: { user } } = await sb.auth.getUser();
+  const { error } = await sb.from('client_messages').insert({
+    client_id: clientId, sender_role: 'staff', sender_id: user?.id,
+    body, read_by_client: false, read_by_staff: true
+  });
+  if (error) { alert('Error sending: ' + error.message); ta.disabled = false; return; }
+  ta.value = '';
+  ta.disabled = false;
+  openAdminThread(clientId, clientName);
+};
+
+// ════════════════════════════════════════════════════════════
+//  MESSAGES — CLIENT PORTAL
+// ════════════════════════════════════════════════════════════
+async function renderClientMessages(container) {
+  const c = STATE.clientRow;
+  if (!c) {
+    container.innerHTML = pageShell('Messages', '', '', '<div class="alert alert-red" style="margin:28px">Account not linked. Contact your firm.</div>');
+    return;
+  }
+  container.innerHTML = pageShell('Messages', 'Manrique & Associates', '', `
+    <div class="card" style="max-width:700px;margin:0 auto">
+      <div class="card-h">Messages</div>
+      <div class="card-body">
+        <div id="client-msg-scroll" style="display:flex;flex-direction:column;gap:10px;min-height:200px;max-height:420px;overflow-y:auto;padding-bottom:12px">
+          <span class="spinner"></span>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+          <textarea id="client-msg-compose" placeholder="Type a message to your accountant…" rows="2"
+            style="flex:1;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;resize:none"></textarea>
+          <button class="btn btn-primary" id="client-msg-send" style="align-self:flex-end;padding:8px 16px">Send</button>
+        </div>
+        <div id="client-msg-err" style="font-size:12px;color:var(--red);margin-top:6px;min-height:14px"></div>
+      </div>
+    </div>
+  `);
+
+  // Mark staff messages as read
+  await sb.from('client_messages').update({ read_by_client: true })
+    .eq('client_id', c.id).eq('sender_role', 'staff').eq('read_by_client', false);
+
+  async function loadClientThread() {
+    const { data: msgs } = await sb.from('client_messages')
+      .select('*').eq('client_id', c.id).order('created_at');
+    const scroll = document.getElementById('client-msg-scroll');
+    if (!scroll) return;
+    scroll.innerHTML = (msgs||[]).length === 0
+      ? '<div style="color:var(--muted);font-size:13px;text-align:center;padding:40px 0">No messages yet. Send us a message below!</div>'
+      : (msgs||[]).map(m => {
+          const isClient = m.sender_role === 'client';
+          const time = new Date(m.created_at).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' });
+          return `<div style="display:flex;flex-direction:column;align-items:${isClient?'flex-end':'flex-start'}">
+            <div style="max-width:80%;background:${isClient?'var(--gold)':'var(--surface)'};color:${isClient?'#000':'var(--text)'};padding:9px 13px;border-radius:${isClient?'14px 14px 4px 14px':'14px 14px 14px 4px'};font-size:13px;line-height:1.5">
+              ${esc(m.body)}
+            </div>
+            <div style="font-size:10px;color:var(--muted);margin-top:3px">${isClient?'You · ':'Manrique & Associates · '}${time}</div>
+          </div>`;
+        }).join('');
+    scroll.scrollTop = scroll.scrollHeight;
+    // Update nav badge (unread from staff)
+    const unread = (msgs||[]).filter(m => m.sender_role==='staff' && !m.read_by_client).length;
+    const badge = document.getElementById('nav-messages-badge');
+    if (badge) { badge.textContent = unread||''; badge.hidden = !unread; }
+  }
+  await loadClientThread();
+
+  document.getElementById('client-msg-send')?.addEventListener('click', async () => {
+    const ta = document.getElementById('client-msg-compose');
+    const errEl = document.getElementById('client-msg-err');
+    const body = ta?.value.trim();
+    if (!body) return;
+    ta.disabled = true;
+    const { data: { user } } = await sb.auth.getUser();
+    const { error } = await sb.from('client_messages').insert({
+      client_id: c.id, sender_role: 'client', sender_id: user?.id,
+      body, read_by_staff: false, read_by_client: true
+    });
+    if (error) { errEl.textContent = 'Error: ' + error.message; ta.disabled = false; return; }
+    ta.value = '';
+    ta.disabled = false;
+    errEl.textContent = '';
+    await loadClientThread();
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+//  NOTIFICATIONS — poll unread counts for nav badges
+// ════════════════════════════════════════════════════════════
+async function refreshNotificationBadges() {
+  if (!STATE.isSignedIn) return;
+  if (STATE.isStaff) {
+    // Unread messages from clients
+    const { count: msgCount } = await sb.from('client_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('sender_role', 'client').eq('read_by_staff', false);
+    const badge = document.getElementById('nav-messages-badge');
+    if (badge) { badge.textContent = msgCount || ''; badge.hidden = !msgCount; }
+
+    // Unread documents (not yet reviewed)
+    const { count: docCount } = await sb.from('client_documents')
+      .select('id', { count: 'exact', head: true }).eq('reviewed', false);
+    // Show on dashboard Quick Links if present
+    const docBadge = document.getElementById('dash-unreviewed-docs');
+    const docTxt = document.getElementById('dash-unreviewed-docs-txt');
+    if (docBadge) docBadge.hidden = !docCount;
+    if (docTxt) docTxt.textContent = `${docCount || 0} document${(docCount||0)>1?'s':''} awaiting review`;
+  } else if (STATE.clientRow) {
+    // Unread messages from staff for client
+    const { count: msgCount } = await sb.from('client_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('client_id', STATE.clientRow.id).eq('sender_role', 'staff').eq('read_by_client', false);
+    const badge = document.getElementById('nav-messages-badge');
+    if (badge) { badge.textContent = msgCount || ''; badge.hidden = !msgCount; }
   }
 }
 
@@ -871,7 +1125,7 @@ async function renderDashboard(container) {
     await renderClientPortalDashboard(container);
     return;
   }
-  container.innerHTML = pageShell('Dashboard', selectedClientName(), '', "\n    <div id=\"dash-kpi-row\">\n      <div class=\"stat-card stat-green\"><div class=\"stat-label\">Clients</div><div class=\"stat-val\" id=\"d-clients\">—</div><div class=\"stat-sub\">Active</div></div>\n      <div class=\"stat-card stat-gold\"><div class=\"stat-label\">Journal Entries</div><div class=\"stat-val\" id=\"d-je\">—</div><div class=\"stat-sub\">Total posted</div></div>\n      <div class=\"stat-card stat-blue\"><div class=\"stat-label\">Tax Returns</div><div class=\"stat-val\" id=\"d-tax\">—</div><div class=\"stat-sub\">This season</div></div>\n      <div class=\"stat-card stat-red\"><div class=\"stat-label\">RouteWorth Pkgs</div><div class=\"stat-val\" id=\"d-rw\">—</div><div class=\"stat-sub\">Received</div></div>\n    </div>\n    <div class=\"two-col\">\n      <div class=\"card\"><div class=\"card-h\">Recent Activity</div><div class=\"card-body\" id=\"d-activity\">Loading…</div></div>\n      <div class=\"card\"><div class=\"card-h\">Quick Links</div><div class=\"card-body\">\n        <div style=\"display:flex;flex-direction:column;gap:10px\">\n          <button class=\"btn btn-secondary\" style=\"background:var(--bg);color:var(--text);justify-content:flex-start\" onclick=\"navigateTo('journal')\">➕ New Journal Entry</button>\n          <button class=\"btn btn-secondary\" style=\"background:var(--bg);color:var(--text);justify-content:flex-start\" onclick=\"navigateTo('tax')\">🏛 View Tax Returns</button>\n          <button class=\"btn btn-secondary\" style=\"background:var(--bg);color:var(--text);justify-content:flex-start\" onclick=\"navigateTo('routeworth')\">🚗 RouteWorth Packages</button>\n          <button class=\"btn btn-secondary\" style=\"background:var(--bg);color:var(--text);justify-content:flex-start\" onclick=\"navigateTo('accounts')\">📒 Chart of Accounts</button>\n        </div>\n      </div></div>\n    </div>\n  ");
+  container.innerHTML = pageShell('Dashboard', selectedClientName(), '', "\n    <div id=\"dash-kpi-row\">\n      <div class=\"stat-card stat-green\"><div class=\"stat-label\">Clients</div><div class=\"stat-val\" id=\"d-clients\">—</div><div class=\"stat-sub\">Active</div></div>\n      <div class=\"stat-card stat-gold\"><div class=\"stat-label\">Journal Entries</div><div class=\"stat-val\" id=\"d-je\">—</div><div class=\"stat-sub\">Total posted</div></div>\n      <div class=\"stat-card stat-blue\"><div class=\"stat-label\">Tax Returns</div><div class=\"stat-val\" id=\"d-tax\">—</div><div class=\"stat-sub\">This season</div></div>\n      <div class=\"stat-card stat-red\"><div class=\"stat-label\">RouteWorth Pkgs</div><div class=\"stat-val\" id=\"d-rw\">—</div><div class=\"stat-sub\">Received</div></div>\n    </div>\n    <div class=\"two-col\">\n      <div class=\"card\"><div class=\"card-h\">Recent Activity</div><div class=\"card-body\" id=\"d-activity\">Loading…</div></div>\n      <div class=\"card\"><div class=\"card-h\">Quick Links</div><div class=\"card-body\">\n        <div id=\"dash-unreviewed-docs\" hidden style=\"background:var(--gold);color:#000;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600;margin-bottom:12px;cursor:pointer\" onclick=\"navigateTo('clients')\">📄 <span id=\"dash-unreviewed-docs-txt\"></span> — click to review</div>\n        <div style=\"display:flex;flex-direction:column;gap:10px\">\n          <button class=\"btn btn-secondary\" style=\"background:var(--bg);color:var(--text);justify-content:flex-start\" onclick=\"navigateTo('journal')\">➕ New Journal Entry</button>\n          <button class=\"btn btn-secondary\" style=\"background:var(--bg);color:var(--text);justify-content:flex-start\" onclick=\"navigateTo('tax')\">🏛 View Tax Returns</button>\n          <button class=\"btn btn-secondary\" style=\"background:var(--bg);color:var(--text);justify-content:flex-start\" onclick=\"navigateTo('routeworth')\">🚗 RouteWorth Packages</button>\n          <button class=\"btn btn-secondary\" style=\"background:var(--bg);color:var(--text);justify-content:flex-start\" onclick=\"navigateTo('accounts')\">📒 Chart of Accounts</button>\n          <button class=\"btn btn-secondary\" style=\"background:var(--bg);color:var(--text);justify-content:flex-start\" onclick=\"navigateTo('messages')\">💬 Messages</button>\n        </div>\n      </div></div>\n    </div>\n  ");
 
   // Load counts — filter by selected client when one is chosen
   const cid = STATE.selectedClientId;
