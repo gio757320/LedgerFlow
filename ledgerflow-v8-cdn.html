@@ -1390,6 +1390,7 @@ async function renderClientPortalDashboard(container) {
         <div style="font-weight:700;font-size:15px;margin-right:8px">$${parseFloat(inv.total).toFixed(2)}</div>
         <div style="display:flex;gap:6px">
           <button onclick="openEditInvoiceModal('${esc(inv.id)}')" style="border:1px solid var(--border);background:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--text)">Edit</button>
+          <button onclick="downloadInvoicePdf('${esc(inv.id)}')" style="border:1px solid var(--gold);background:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--gold)">⬇ PDF</button>
           ${inv.status !== 'paid' && inv.status !== 'void'
             ? `<button onclick="markInvoicePaid('${esc(inv.id)}')" style="border:1px solid var(--green);background:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--green)">Mark Paid</button>`
             : ''}
@@ -1675,6 +1676,142 @@ async function renderClientPortalDashboard(container) {
     if (!confirm('Delete this invoice? This cannot be undone.')) return;
     await sb.from('client_invoices').delete().eq('id', invId);
     await loadInvoices();
+  };
+
+  window.downloadInvoicePdf = async function(invId) {
+    const { data: inv } = await sb.from('client_invoices').select('*').eq('id', invId).single();
+    if (!inv) { showToast('Could not load invoice', 'red'); return; }
+
+    const businessName = c.full_name || 'Your Business';
+    const businessEmail = c.email || '';
+    const businessPhone = c.phone || '';
+    const businessAddress = c.address || '';
+
+    const statusColor = { draft:'#888', sent:'#d97706', paid:'#16a34a', void:'#dc2626' }[inv.status] || '#888';
+    const lineItems = Array.isArray(inv.line_items) ? inv.line_items : [];
+    const fmtMoney = n => '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtDate = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }) : '—';
+
+    const lineRows = lineItems.map(it => `
+      <tr>
+        <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0">${it.description || ''}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;text-align:center">${it.qty || 1}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;text-align:right">${fmtMoney(it.rate)}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:600">${fmtMoney(it.amount)}</td>
+      </tr>`).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Invoice ${esc(inv.invoice_number)}</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1a1a2e; background:#fff; padding:48px; font-size:14px; line-height:1.5; }
+    .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:48px; }
+    .firm-name { font-size:26px; font-weight:800; color:#1a1a2e; letter-spacing:-0.5px; }
+    .firm-name span { color:#d4a843; }
+    .firm-details { font-size:12px; color:#666; margin-top:6px; line-height:1.6; }
+    .invoice-meta { text-align:right; }
+    .invoice-label { font-size:11px; font-weight:700; color:#888; letter-spacing:.08em; text-transform:uppercase; }
+    .invoice-number { font-size:28px; font-weight:800; color:#1a1a2e; margin:4px 0; }
+    .status-badge { display:inline-block; padding:3px 12px; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#fff; background:${statusColor}; margin-top:4px; }
+    .divider { border:none; border-top:2px solid #d4a843; margin:0 0 32px 0; }
+    .bill-section { display:flex; justify-content:space-between; margin-bottom:32px; }
+    .bill-block { }
+    .bill-label { font-size:11px; font-weight:700; color:#888; letter-spacing:.08em; text-transform:uppercase; margin-bottom:6px; }
+    .bill-name { font-size:16px; font-weight:700; color:#1a1a2e; }
+    .bill-detail { font-size:13px; color:#555; }
+    .dates { display:flex; gap:48px; }
+    .date-item { }
+    .date-label { font-size:11px; font-weight:700; color:#888; letter-spacing:.08em; text-transform:uppercase; margin-bottom:4px; }
+    .date-value { font-size:14px; font-weight:600; color:#1a1a2e; }
+    table { width:100%; border-collapse:collapse; margin-bottom:24px; }
+    thead tr { background:#1a1a2e; color:#fff; }
+    thead th { padding:12px; text-align:left; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+    thead th:last-child, thead th:nth-child(3) { text-align:right; }
+    thead th:nth-child(2) { text-align:center; }
+    tbody tr:last-child td { border-bottom:none; }
+    .totals { margin-left:auto; width:280px; }
+    .totals-row { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid #f0f0f0; font-size:14px; }
+    .totals-row.total { border-bottom:none; border-top:2px solid #1a1a2e; padding-top:12px; margin-top:4px; font-size:17px; font-weight:800; color:#1a1a2e; }
+    .notes { margin-top:40px; padding:16px; background:#f9f7f0; border-left:4px solid #d4a843; border-radius:4px; }
+    .notes-label { font-size:11px; font-weight:700; color:#888; letter-spacing:.08em; text-transform:uppercase; margin-bottom:6px; }
+    .footer { margin-top:56px; padding-top:20px; border-top:1px solid #eee; display:flex; justify-content:space-between; font-size:11px; color:#aaa; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="firm-name">Manrique <span>&</span> Associates <span style="font-size:14px;font-weight:400;color:#888">LLC</span></div>
+      <div class="firm-details">
+        ${businessName}<br>
+        ${businessEmail ? businessEmail + '<br>' : ''}
+        ${businessPhone ? businessPhone + '<br>' : ''}
+        ${businessAddress || ''}
+      </div>
+    </div>
+    <div class="invoice-meta">
+      <div class="invoice-label">Invoice</div>
+      <div class="invoice-number">${esc(inv.invoice_number)}</div>
+      <span class="status-badge">${inv.status}</span>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="bill-section">
+    <div class="bill-block">
+      <div class="bill-label">Bill To</div>
+      <div class="bill-name">${esc(inv.customer_name)}</div>
+      ${inv.customer_email ? `<div class="bill-detail">${esc(inv.customer_email)}</div>` : ''}
+    </div>
+    <div class="dates">
+      <div class="date-item">
+        <div class="date-label">Issue Date</div>
+        <div class="date-value">${fmtDate(inv.issue_date)}</div>
+      </div>
+      ${inv.due_date ? `<div class="date-item">
+        <div class="date-label">Due Date</div>
+        <div class="date-value">${fmtDate(inv.due_date)}</div>
+      </div>` : ''}
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th style="text-align:center">Qty</th>
+        <th style="text-align:right">Rate</th>
+        <th style="text-align:right">Amount</th>
+      </tr>
+    </thead>
+    <tbody>${lineRows}</tbody>
+  </table>
+
+  <div class="totals">
+    <div class="totals-row"><span>Subtotal</span><span>${fmtMoney(inv.subtotal)}</span></div>
+    ${parseFloat(inv.tax_rate) > 0 ? `<div class="totals-row"><span>Tax (${inv.tax_rate}%)</span><span>${fmtMoney(inv.tax_amount)}</span></div>` : ''}
+    <div class="totals-row total"><span>Total Due</span><span>${fmtMoney(inv.total)}</span></div>
+  </div>
+
+  ${inv.notes ? `<div class="notes"><div class="notes-label">Notes</div>${esc(inv.notes)}</div>` : ''}
+
+  <div class="footer">
+    <span>Thank you for your business!</span>
+    <span>Generated by LedgerFlow · Manrique & Associates LLC</span>
+  </div>
+</body>
+</html>`;
+
+    // Open in a new tab so the browser print dialog can save as PDF
+    const win = window.open('', '_blank');
+    if (!win) { showToast('Allow pop-ups to download PDF', 'gold'); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 600);
   };
 
   // Upload files
