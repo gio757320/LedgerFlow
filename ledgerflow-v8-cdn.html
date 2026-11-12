@@ -1574,8 +1574,8 @@ async function renderClientPortalDashboard(container) {
         types.map(t=>t.toLowerCase()).includes((a.type||'').toLowerCase()) &&
         (!subtypes || subtypes.some(s => (a.subtype||'').toLowerCase().includes(s) || (a.name||'').toLowerCase().includes(s)))
       );
-      const arAcct = findAcct(['Asset','asset'], ['receivable', 'accounts receivable'])
-                  || findAcct(['Asset','asset'], null);
+      const arAcct = findAcct(['Asset','asset'], ['receivable', 'accounts receivable', 'accounts_receivable'])
+                  || null;
       const revenueAcct = findAcct(['Income','income','Revenue','revenue'], ['service','sales','revenue','income'])
                        || findAcct(['Income','income','Revenue','revenue'], null);
       if (arAcct && revenueAcct) {
@@ -1628,7 +1628,7 @@ async function renderClientPortalDashboard(container) {
 
     const cashAcct = findAcct(['Asset','asset'], ['cash', 'checking', 'bank'])
                   || findAcct(['Asset','asset'], null);
-    const arAcct   = findAcct(['Asset','asset'], ['receivable', 'accounts receivable']);
+    const arAcct   = findAcct(['Asset','asset'], ['receivable', 'accounts receivable', 'accounts_receivable']);
 
     // If A/R account exists, do the proper accrual clearing entry (Cash / A/R)
     // If not, fall back to Cash / Revenue (cash-basis style)
