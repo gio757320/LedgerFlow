@@ -1587,14 +1587,16 @@ async function renderClientPortalDashboard(container) {
       .eq('is_active', true);
 
     const findAcct = (types, subtypes) => (accts || []).find(a =>
-      types.includes(a.type) && (!subtypes || subtypes.some(s => (a.subtype||'').toLowerCase().includes(s)))
+      types.map(t=>t.toLowerCase()).includes((a.type||'').toLowerCase()) &&
+      (!subtypes || subtypes.some(s => (a.subtype||'').toLowerCase().includes(s) || (a.name||'').toLowerCase().includes(s)))
     );
 
-    // Prefer "Cash" account; fall back to any asset; then Accounts Receivable
-    const cashAcct = findAcct(['asset'], ['cash', 'checking', 'bank'])
-                  || findAcct(['asset'], null);
-    const revenueAcct = findAcct(['revenue', 'income'], ['service', 'sales', 'revenue', 'income'])
-                     || findAcct(['revenue', 'income'], null);
+    // Prefer "Cash" account; fall back to any Asset
+    const cashAcct = findAcct(['Asset','asset'], ['cash', 'checking', 'bank'])
+                  || findAcct(['Asset','asset'], null);
+    // Prefer Sales/Service revenue; fall back to any Income account
+    const revenueAcct = findAcct(['Income','income','Revenue','revenue'], ['service', 'sales', 'revenue', 'income'])
+                     || findAcct(['Income','income','Revenue','revenue'], null);
 
     if (!cashAcct || !revenueAcct) {
       // Paid but no journal entry — warn but don't block
