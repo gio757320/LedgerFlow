@@ -1568,9 +1568,74 @@ async function renderClientPortalDashboard(container) {
   };
 
   window.markInvoicePaid = async function(invId) {
-    if (!confirm('Mark this invoice as paid?')) return;
-    await sb.from('client_invoices').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', invId);
+    if (!confirm('Mark this invoice as paid? A revenue journal entry will be posted automatically.')) return;
+
+    // 1. Fetch the invoice
+    const { data: inv, error: invErr } = await sb.from('client_invoices').select('*').eq('id', invId).single();
+    if (invErr || !inv) { alert('Could not load invoice: ' + (invErr?.message || 'not found')); return; }
+
+    // 2. Mark paid
+    const { error: updErr } = await sb.from('client_invoices')
+      .update({ status: 'paid', paid_at: new Date().toISOString() })
+      .eq('id', invId);
+    if (updErr) { alert('Error marking paid: ' + updErr.message); return; }
+
+    // 3. Auto journal entry — find Cash/AR account (debit) and Revenue account (credit)
+    const { data: accts } = await sb.from('accounts')
+      .select('id, name, type, subtype')
+      .eq('client_id', c.id)
+      .eq('is_active', true);
+
+    const findAcct = (types, subtypes) => (accts || []).find(a =>
+      types.includes(a.type) && (!subtypes || subtypes.some(s => (a.subtype||'').toLowerCase().includes(s)))
+    );
+
+    // Prefer "Cash" account; fall back to any asset; then Accounts Receivable
+    const cashAcct = findAcct(['asset'], ['cash', 'checking', 'bank'])
+                  || findAcct(['asset'], null);
+    const revenueAcct = findAcct(['revenue', 'income'], ['service', 'sales', 'revenue', 'income'])
+                     || findAcct(['revenue', 'income'], null);
+
+    if (!cashAcct || !revenueAcct) {
+      // Paid but no journal entry — warn but don't block
+      await loadInvoices();
+      alert('Invoice marked paid ✓\n\nNote: Could not auto-post a journal entry because this client\'s chart of accounts is missing a Cash/Asset account or a Revenue account. Please post the entry manually in Journal Entries.');
+      return;
+    }
+
+    const amount = parseFloat(inv.total || 0);
+    const entryDate = inv.paid_at ? inv.paid_at.slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const ref = `INV-PAID-${(inv.invoice_number || invId).slice(-8).toUpperCase()}`;
+    const desc = `Payment received — ${inv.invoice_number || 'Invoice'}${inv.customer_name ? ' from ' + inv.customer_name : ''}`;
+
+    // Insert journal entry header
+    const { data: je, error: jeErr } = await sb.from('journal_entries').insert({
+      client_id: c.id,
+      entry_date: entryDate,
+      reference: ref,
+      description: desc,
+      status: 'posted'
+    }).select().single();
+
+    if (jeErr || !je) {
+      await loadInvoices();
+      alert('Invoice marked paid ✓\n\nNote: Could not auto-post journal entry: ' + (jeErr?.message || 'unknown error') + '. Please post manually.');
+      return;
+    }
+
+    // Insert debit (Cash) and credit (Revenue) lines
+    await sb.from('journal_lines').insert([
+      { journal_entry_id: je.id, account_id: cashAcct.id, debit: amount, credit: 0, memo: desc, sort_order: 1 },
+      { journal_entry_id: je.id, account_id: revenueAcct.id, debit: 0, credit: amount, memo: desc, sort_order: 2 }
+    ]);
+
     await loadInvoices();
+    // Show a brief success indicator
+    const msg = document.createElement('div');
+    msg.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.3)';
+    msg.textContent = `✓ Paid · Journal entry posted (${cashAcct.name} / ${revenueAcct.name})`;
+    document.body.appendChild(msg);
+    setTimeout(() => msg.remove(), 4000);
   };
 
   window.deleteClientInvoice = async function(invId) {
