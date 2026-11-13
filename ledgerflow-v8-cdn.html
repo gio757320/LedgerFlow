@@ -413,6 +413,9 @@ tr:hover td { background: rgba(46,158,107,.04); }
         <button class="nav-item" data-screen="journal" id="nav-journal-btn">
           <span class="icon">📋</span> Journal Entries
         </button>
+        <button class="nav-item" data-screen="expenses" id="nav-expenses-btn">
+          <span class="icon">🧾</span> Expenses
+        </button>
         <button class="nav-item" data-screen="messages" id="nav-messages-btn">
           <span class="icon">💬</span> Messages
           <span class="badge" id="nav-messages-badge" hidden style="margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px"></span>
@@ -773,6 +776,10 @@ function showApp() {
     const hasPayroll = svcs.includes('payroll');
     const hasTax = svcs.includes('tax');
 
+    // Expenses — visible to all clients (everyone has expenses)
+    const expensesBtn = document.getElementById('nav-expenses-btn');
+    if (expensesBtn) expensesBtn.hidden = false;
+
     // Journal Entries — only for bookkeeping or payroll clients
     const journalBtn = document.getElementById('nav-journal-btn');
     if (journalBtn) journalBtn.hidden = !hasBookkeeping && !hasPayroll;
@@ -819,6 +826,9 @@ function renderScreen(screen) {
       break;
     case 'accounts':
       renderAccounts(container);
+      break;
+    case 'expenses':
+      renderExpenses(container);
       break;
     case 'journal':
       renderJournal(container);
@@ -2579,6 +2589,288 @@ async function renderAccounts(container) {
       return "\n            <tr>\n              <td style=\"font-family:monospace;font-size:12px\">".concat(esc(a.account_number), "</td>\n              <td style=\"font-weight:500\">").concat(esc(a.name), "</td>\n              <td style=\"font-size:12px;color:var(--muted)\">").concat(esc(a.subtype || ''), "</td>\n              <td style=\"text-align:right;font-variant-numeric:tabular-nums;").concat(hasActivity ? 'font-weight:600' : 'color:var(--muted)', "\">").concat(fmt(bal), "</td>\n            </tr>\n          ");
     }).join(''), "</tbody>\n        </table>\n      </div>\n    ");
   }).join('');
+}
+
+// ════════════════════════════════════════════════════════════
+//  EXPENSES
+// ════════════════════════════════════════════════════════════
+async function renderExpenses(container) {
+  const clientName = STATE.isStaff ? selectedClientName() : (STATE.clientRow?.full_name || '');
+  const clientId   = STATE.isStaff ? STATE.selectedClientId : STATE.clientRow?.id;
+
+  const addBtn = STATE.isStaff
+    ? `<button class="btn btn-secondary" onclick="openExpenseModal()">+ Add Expense</button>`
+    : `<button class="btn btn-secondary" onclick="openExpenseModal()">+ Log Expense</button>`;
+
+  container.innerHTML = pageShell('Expenses', clientName, addBtn,
+    '<div class="loading-block"><span class="spinner"></span> Loading expenses…</div>');
+
+  if (!clientId) {
+    document.querySelector('#screen-container .card-body, #screen-container main')?.innerHTML
+      || (container.innerHTML = pageShell('Expenses', '', '', '<div class="alert alert-red" style="margin:28px">Please select a client first.</div>'));
+    return;
+  }
+
+  // Load expenses + accounts for this client
+  const [{ data: expenses, error }, { data: accounts }] = await Promise.all([
+    sb.from('expenses').select('*').eq('client_id', clientId).order('expense_date', { ascending: false }).order('created_at', { ascending: false }),
+    sb.from('accounts').select('id,account_number,name,type').eq('client_id', clientId).eq('type','Expense').eq('is_active',true).order('account_number')
+  ]);
+
+  const main = container.querySelector('[data-main], .card-body') || container;
+  const mainEl = container.querySelector('[data-page-main]') || container;
+
+  // Store accounts globally for modal use
+  window._expenseAccounts = accounts || [];
+
+  if (error) {
+    container.innerHTML = pageShell('Expenses', clientName, addBtn,
+      `<div class="alert alert-red" style="margin:28px">${esc(error.message)}</div>`);
+    return;
+  }
+
+  // ── Summary tiles ──
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const thisYear  = String(now.getFullYear());
+  const monthTotal = (expenses||[]).filter(e => e.expense_date?.startsWith(thisMonth)).reduce((s,e) => s + parseFloat(e.amount||0), 0);
+  const yearTotal  = (expenses||[]).filter(e => e.expense_date?.startsWith(thisYear)).reduce((s,e) => s + parseFloat(e.amount||0), 0);
+  const pending    = (expenses||[]).filter(e => e.status === 'pending').length;
+
+  // ── Category totals (top 5 this year) ──
+  const catMap = {};
+  (expenses||[]).filter(e => e.expense_date?.startsWith(thisYear)).forEach(e => {
+    const k = e.category || 'Uncategorized';
+    catMap[k] = (catMap[k]||0) + parseFloat(e.amount||0);
+  });
+  const topCats = Object.entries(catMap).sort((a,b) => b[1]-a[1]).slice(0,5);
+
+  const statusColor = { pending:'var(--gold)', reviewed:'var(--navy)', approved:'var(--green)' };
+  const methodIcon  = { cash:'💵', credit_card:'💳', debit_card:'💳', check:'📝', other:'🔁' };
+
+  const listHtml = !expenses?.length
+    ? `<div class="empty" style="padding:40px 20px"><div class="empty-icon">🧾</div>No expenses logged yet.</div>`
+    : `<table class="data-table">
+        <thead><tr>
+          <th>Date</th><th>Merchant / Vendor</th><th>Category</th>
+          <th>Method</th><th style="text-align:right">Amount</th>
+          <th>Status</th><th></th>
+        </tr></thead>
+        <tbody>
+        ${expenses.map(e => `
+          <tr>
+            <td style="font-size:12px;white-space:nowrap">${esc(e.expense_date||'')}</td>
+            <td style="font-weight:500">${esc(e.merchant||'')}${e.notes ? `<div style="font-size:11px;color:var(--muted)">${esc(e.notes)}</div>` : ''}</td>
+            <td style="font-size:12px;color:var(--muted)">${esc(e.category||'—')}</td>
+            <td style="font-size:13px">${methodIcon[e.payment_method]||''} ${esc(e.payment_method?.replace('_',' ')||'—')}</td>
+            <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">$${parseFloat(e.amount||0).toFixed(2)}</td>
+            <td><span style="font-size:11px;font-weight:700;color:${statusColor[e.status]||'var(--muted)'}">${esc(e.status||'')}</span>
+                ${e.entered_by_role==='client'?'<span style="font-size:10px;color:var(--muted);margin-left:4px">(client)</span>':''}</td>
+            <td style="white-space:nowrap">
+              ${STATE.isStaff ? `<button onclick="openExpenseModal(${JSON.stringify(e).replace(/"/g,'&quot;')})" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 6px" title="Edit">✏️</button>
+              <button onclick="deleteExpense('${esc(e.id)}')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 6px;color:var(--red)" title="Delete">🗑</button>` : ''}
+              ${e.receipt_url ? `<a href="${esc(e.receipt_url)}" target="_blank" style="font-size:12px;color:var(--green)">📎</a>` : ''}
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+
+  container.innerHTML = pageShell('Expenses', clientName, addBtn, `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px">
+      <div class="card"><div class="card-body" style="padding:16px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em">THIS MONTH</div>
+        <div style="font-size:28px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums">$${monthTotal.toFixed(2)}</div>
+      </div></div>
+      <div class="card"><div class="card-body" style="padding:16px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em">YEAR TO DATE</div>
+        <div style="font-size:28px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums">$${yearTotal.toFixed(2)}</div>
+      </div></div>
+      <div class="card"><div class="card-body" style="padding:16px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em">PENDING REVIEW</div>
+        <div style="font-size:28px;font-weight:700;margin-top:4px;color:${pending?'var(--gold)':'var(--text)'}">${pending}</div>
+      </div></div>
+    </div>
+
+    ${topCats.length ? `<div class="card" style="margin-bottom:24px"><div class="card-h">Top Categories (${thisYear})</div><div class="card-body">
+      ${topCats.map(([cat,amt]) => {
+        const pct = yearTotal ? Math.round(amt/yearTotal*100) : 0;
+        return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="min-width:140px;font-size:13px;font-weight:500">${esc(cat)}</div>
+          <div style="flex:1;background:var(--border);border-radius:4px;height:8px;overflow:hidden">
+            <div style="width:${pct}%;background:var(--green);height:100%;border-radius:4px"></div>
+          </div>
+          <div style="font-size:13px;font-variant-numeric:tabular-nums;font-weight:600;min-width:70px;text-align:right">$${amt.toFixed(2)}</div>
+          <div style="font-size:11px;color:var(--muted);min-width:30px">${pct}%</div>
+        </div>`;
+      }).join('')}
+    </div></div>` : ''}
+
+    <div class="card"><div class="card-h" style="display:flex;align-items:center;justify-content:space-between">
+      <span>All Expenses</span>
+      ${STATE.isStaff && expenses?.some(e=>e.status==='pending') ? `<button class="btn btn-secondary" style="font-size:11px;padding:4px 10px" onclick="markAllReviewed('${clientId}')">✓ Mark All Reviewed</button>` : ''}
+    </div><div class="card-body" style="padding:0;overflow-x:auto">${listHtml}</div></div>
+  `);
+}
+
+async function deleteExpense(id) {
+  if (!confirm('Delete this expense?')) return;
+  const { error } = await sb.from('expenses').delete().eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  renderExpenses(document.getElementById('screen-container'));
+}
+
+async function markAllReviewed(clientId) {
+  const { error } = await sb.from('expenses').update({ status: 'reviewed' }).eq('client_id', clientId).eq('status','pending');
+  if (error) { alert('Error: ' + error.message); return; }
+  renderExpenses(document.getElementById('screen-container'));
+}
+
+function openExpenseModal(expense) {
+  const clientId = STATE.isStaff ? STATE.selectedClientId : STATE.clientRow?.id;
+  if (!clientId) { alert('Please select a client first.'); return; }
+
+  const isEdit  = !!expense?.id;
+  const accounts = window._expenseAccounts || [];
+  const today    = new Date().toISOString().slice(0,10);
+
+  // Build account options
+  const acctOptions = accounts.map(a =>
+    `<option value="${esc(a.id)}" data-name="${esc(a.name)}" ${expense?.account_id===a.id?'selected':''}>${esc(a.account_number)} — ${esc(a.name)}</option>`
+  ).join('');
+
+  const bd = document.createElement('div');
+  bd.className = 'modal-backdrop';
+  bd.id = 'exp-modal-backdrop';
+  bd.innerHTML = `
+    <div class="modal" role="dialog" style="max-width:520px">
+      <div class="modal-header">
+        <h3>${isEdit ? '✏️ Edit Expense' : '🧾 Log Expense'}</h3>
+        <button class="modal-close" onclick="closeModal('exp-modal-backdrop')" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="exp-date">Date *</label>
+            <input id="exp-date" type="date" value="${esc(expense?.expense_date||today)}">
+          </div>
+          <div class="form-group">
+            <label for="exp-amount">Amount ($) *</label>
+            <input id="exp-amount" type="number" min="0" step="0.01" placeholder="0.00" value="${expense?.amount||''}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="exp-merchant">Merchant / Vendor *</label>
+          <input id="exp-merchant" type="text" placeholder="e.g. Office Depot, Shell, Amazon" value="${esc(expense?.merchant||'')}">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="exp-account">Category (COA)</label>
+            <select id="exp-account">
+              <option value="">— Select account —</option>
+              ${acctOptions}
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="exp-category">Category Label</label>
+            <input id="exp-category" type="text" placeholder="Auto-filled from COA, or type freely" value="${esc(expense?.category||'')}">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="exp-method">Payment Method</label>
+            <select id="exp-method">
+              <option value="">— Select —</option>
+              <option value="credit_card"  ${expense?.payment_method==='credit_card'?'selected':''}>💳 Credit Card</option>
+              <option value="debit_card"   ${expense?.payment_method==='debit_card'?'selected':''}>💳 Debit Card</option>
+              <option value="cash"         ${expense?.payment_method==='cash'?'selected':''}>💵 Cash</option>
+              <option value="check"        ${expense?.payment_method==='check'?'selected':''}>📝 Check</option>
+              <option value="other"        ${expense?.payment_method==='other'?'selected':''}>🔁 Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="exp-ref">Reference # <span style="font-weight:400;color:var(--muted)">(check #, last-4)</span></label>
+            <input id="exp-ref" type="text" placeholder="Optional" value="${esc(expense?.reference||'')}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="exp-notes">Notes</label>
+          <textarea id="exp-notes" placeholder="Purpose, project name, etc." style="height:60px">${esc(expense?.notes||'')}</textarea>
+        </div>
+        ${STATE.isStaff ? `<div class="form-group">
+          <label for="exp-status">Status</label>
+          <select id="exp-status">
+            <option value="pending"  ${(expense?.status||'pending')==='pending'?'selected':''}>⏳ Pending</option>
+            <option value="reviewed" ${expense?.status==='reviewed'?'selected':''}>👁 Reviewed</option>
+            <option value="approved" ${expense?.status==='approved'?'selected':''}>✅ Approved</option>
+          </select>
+        </div>` : ''}
+        <div class="modal-error" id="exp-error" style="margin-top:8px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal('exp-modal-backdrop')" style="background:var(--surface);color:var(--text);border:1.5px solid var(--border)">Cancel</button>
+        <button class="btn btn-primary" id="exp-save-btn" onclick="saveExpense('${clientId}',${isEdit?`'${esc(expense.id)}'`:'null'})">
+          ${isEdit ? '💾 Save Changes' : '🧾 Save Expense'}
+        </button>
+      </div>
+    </div>`;
+
+  // Auto-fill category label when COA account is selected
+  bd.querySelector('#exp-account').addEventListener('change', function() {
+    const opt = this.options[this.selectedIndex];
+    const name = opt?.dataset?.name || '';
+    if (name) document.getElementById('exp-category').value = name;
+  });
+
+  document.body.appendChild(bd);
+  bd.addEventListener('click', e => { if (e.target === bd) closeModal('exp-modal-backdrop'); });
+  document.getElementById('exp-date').focus();
+}
+
+async function saveExpense(clientId, expenseId) {
+  const errEl  = document.getElementById('exp-error');
+  const btn    = document.getElementById('exp-save-btn');
+  errEl.textContent = '';
+
+  const date     = document.getElementById('exp-date').value;
+  const merchant = document.getElementById('exp-merchant').value.trim();
+  const amount   = parseFloat(document.getElementById('exp-amount').value);
+  const accountId = document.getElementById('exp-account').value || null;
+  const category  = document.getElementById('exp-category').value.trim() || null;
+  const method    = document.getElementById('exp-method').value || null;
+  const ref       = document.getElementById('exp-ref').value.trim() || null;
+  const notes     = document.getElementById('exp-notes').value.trim() || null;
+  const status    = document.getElementById('exp-status')?.value || 'pending';
+
+  if (!date)     { errEl.textContent = 'Date is required.'; return; }
+  if (!merchant) { errEl.textContent = 'Merchant name is required.'; return; }
+  if (isNaN(amount) || amount < 0) { errEl.textContent = 'Enter a valid amount.'; return; }
+
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  const payload = {
+    client_id: clientId, expense_date: date, merchant, amount,
+    account_id: accountId, category, payment_method: method,
+    reference: ref, notes, status,
+    entered_by_role: STATE.isStaff ? 'staff' : 'client'
+  };
+
+  let error;
+  if (expenseId) {
+    ({ error } = await sb.from('expenses').update(payload).eq('id', expenseId));
+  } else {
+    const { data: { user } } = await sb.auth.getUser();
+    payload.entered_by = user?.id;
+    ({ error } = await sb.from('expenses').insert(payload));
+  }
+
+  if (error) {
+    errEl.textContent = 'Error: ' + error.message;
+    btn.disabled = false; btn.textContent = expenseId ? '💾 Save Changes' : '🧾 Save Expense';
+    return;
+  }
+
+  closeModal('exp-modal-backdrop');
+  renderExpenses(document.getElementById('screen-container'));
 }
 
 // ── JOURNAL ENTRIES ───────────────────────────────────────
