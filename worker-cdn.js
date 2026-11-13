@@ -3004,16 +3004,26 @@ async function saveExpense(clientId, expenseId) {
       btn.textContent = 'Posting journal entry…';
       const ref  = \`EXP-\${Date.now().toString().slice(-6)}\`;
       const desc = \`Expense: \${merchant}\${ref ? ' ('+ref+')' : ''}\`;
-      const { data: je } = await sb.from('journal_entries').insert({
+      const { data: je, error: jeErr } = await sb.from('journal_entries').insert({
         client_id: clientId, entry_date: date, reference: ref,
         description: desc, status: 'posted'
       }).select().single();
 
+      if (jeErr) {
+        errEl.textContent = 'Journal entry failed: ' + jeErr.message;
+        btn.disabled = false; btn.textContent = expenseId ? '💾 Save Changes' : '🧾 Save Expense';
+        return;
+      }
       if (je) {
-        await sb.from('journal_lines').insert([
+        const { error: linesErr } = await sb.from('journal_lines').insert([
           { journal_entry_id: je.id, account_id: expAcct.id,    debit: amount, credit: 0,      memo: desc, sort_order: 1 },
           { journal_entry_id: je.id, account_id: creditAcct.id, debit: 0,     credit: amount, memo: desc, sort_order: 2 }
         ]);
+        if (linesErr) {
+          errEl.textContent = 'Journal lines failed: ' + linesErr.message;
+          btn.disabled = false; btn.textContent = expenseId ? '💾 Save Changes' : '🧾 Save Expense';
+          return;
+        }
       }
     }
   }
