@@ -419,6 +419,12 @@ tr:hover td { background: rgba(46,158,107,.04); }
         <button class="nav-item" data-screen="invoices" id="nav-invoices-btn">
           <span class="icon">📄</span> My Invoices
         </button>
+        <button class="nav-item" data-screen="income" id="nav-income-btn">
+          <span class="icon">💰</span> Income
+        </button>
+        <button class="nav-item" data-screen="coa" id="nav-coa-btn">
+          <span class="icon">📋</span> Chart of Accounts
+        </button>
         <button class="nav-item" data-screen="messages" id="nav-messages-btn">
           <span class="icon">💬</span> Messages
           <span class="badge" id="nav-messages-badge" hidden style="margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px"></span>
@@ -760,6 +766,8 @@ function showApp() {
   // Client-specific nav: hide accounts/clients from client portal
   document.getElementById('nav-accounts-btn').hidden = !STATE.isStaff;
   document.getElementById('nav-invoices-btn').hidden = STATE.isStaff;
+  document.getElementById('nav-income-btn').hidden = STATE.isStaff;
+  document.getElementById('nav-coa-btn').hidden = false; // visible to both
 
   // Relabel "Dashboard" to "My Account" for client portal
   const dashLabel = document.getElementById('nav-dashboard-label');
@@ -784,9 +792,11 @@ function showApp() {
     const expensesBtn = document.getElementById('nav-expenses-btn');
     if (expensesBtn) expensesBtn.hidden = false;
 
-    // My Invoices — visible to all clients
+    // My Invoices, Income — client only
     const invoicesBtn = document.getElementById('nav-invoices-btn');
     if (invoicesBtn) invoicesBtn.hidden = false;
+    const incomeBtn = document.getElementById('nav-income-btn');
+    if (incomeBtn) incomeBtn.hidden = false;
 
     // Journal Entries — only for bookkeeping or payroll clients
     const journalBtn = document.getElementById('nav-journal-btn');
@@ -840,6 +850,12 @@ function renderScreen(screen) {
       break;
     case 'invoices':
       renderClientInvoices(container);
+      break;
+    case 'income':
+      renderIncome(container);
+      break;
+    case 'coa':
+      renderChartOfAccounts(container);
       break;
     case 'journal':
       renderJournal(container);
@@ -3222,6 +3238,445 @@ window.saveCIInvoice = async function(existingId) {
   renderClientInvoices(document.getElementById('screen-container'));
 };
 
+// ════════════════════════════════════════════════════════════
+//  INCOME / REVENUE SCREEN
+// ════════════════════════════════════════════════════════════
+const INCOME_CATEGORIES = [
+  'Service Revenue','Product Sales','Consulting','Rental Income',
+  'Commission','Interest Income','Other Income'
+];
+
+async function renderIncome(container) {
+  const clientId   = STATE.isStaff ? STATE.selectedClientId : STATE.clientRow?.id;
+  const clientName = STATE.isStaff ? selectedClientName() : (STATE.clientRow?.full_name || '');
+  const addBtn = \`<button class="btn btn-secondary" onclick="openIncomeModal()">+ Add Income</button>\`;
+
+  container.innerHTML = pageShell('Income', clientName, addBtn,
+    '<div class="loading-block"><span class="spinner"></span> Loading income…</div>');
+
+  if (!clientId) {
+    container.innerHTML = pageShell('Income','',addBtn,'<div class="alert alert-red" style="margin:28px">Please select a client first.</div>');
+    return;
+  }
+
+  // Load COA for account dropdown
+  const { data: accounts } = await sb.from('chart_of_accounts').select('id,account_name,account_type')
+    .eq('client_id', clientId).eq('is_active', true).order('account_name');
+
+  const { data: rawIncome, error } = await sb.from('income').select('*')
+    .eq('client_id', clientId).order('income_date', { ascending: false });
+
+  if (error) {
+    container.innerHTML = pageShell('Income', clientName, addBtn,
+      \`<div class="alert alert-red" style="margin:28px">\${esc(error.message)}</div>\`);
+    return;
+  }
+
+  // Generate signed URLs for receipts
+  let incomeRows = rawIncome || [];
+  if (incomeRows.length) {
+    incomeRows = await Promise.all(incomeRows.map(async r => {
+      if (!r.receipt_url || r.receipt_url.startsWith('http')) return r;
+      const { data } = await sb.storage.from('receipts').createSignedUrl(r.receipt_url, 300);
+      return { ...r, receipt_url: data?.signedUrl || null };
+    }));
+  }
+
+  // Summary
+  const now = new Date();
+  const thisYear = now.getFullYear();
+  const thisMonth = now.getMonth();
+  const total = incomeRows.reduce((s,r) => s + parseFloat(r.amount||0), 0);
+  const monthTotal = incomeRows.filter(r => {
+    const d = new Date(r.income_date);
+    return d.getFullYear()===thisYear && d.getMonth()===thisMonth;
+  }).reduce((s,r) => s + parseFloat(r.amount||0), 0);
+  const pending = incomeRows.filter(r => r.status==='pending').length;
+
+  const statusColor = { pending:'var(--gold)', reviewed:'var(--navy)', approved:'var(--green)' };
+
+  const listHtml = !incomeRows.length
+    ? \`<div class="empty" style="padding:40px 20px"><div class="empty-icon">💰</div>No income recorded yet. Add your first entry above.</div>\`
+    : \`<table class="data-table">
+        <thead><tr>
+          <th>Date</th><th>Source / Customer</th><th>Category</th>
+          <th style="text-align:right">Amount</th><th>Status</th><th></th>
+        </tr></thead>
+        <tbody>
+        \${incomeRows.map(r => \`<tr>
+          <td style="white-space:nowrap;font-size:12px">\${esc(r.income_date||'')}</td>
+          <td style="font-weight:500">\${esc(r.source||'')}</td>
+          <td style="font-size:12px;color:var(--muted)">\${esc(r.category||'')}</td>
+          <td style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums;color:var(--green)">$\${parseFloat(r.amount||0).toFixed(2)}</td>
+          <td><span style="font-size:11px;font-weight:700;color:\${statusColor[r.status]||'var(--muted)'}">● \${r.status}</span></td>
+          <td style="white-space:nowrap">
+            \${STATE.isStaff ? \`
+              <button onclick="openIncomeModal('\${esc(r.id)}')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 6px" title="Edit">✏️</button>
+              <button onclick="deleteIncome('\${esc(r.id)}')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 6px;color:var(--red)" title="Delete">🗑</button>\`
+            : (r.status==='pending'
+              ? \`<button onclick="openIncomeModal('\${esc(r.id)}')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 6px" title="Edit">✏️</button>\`
+              : \`<span style="font-size:11px;color:var(--muted)">locked</span>\`)}
+            \${r.receipt_url ? \`<a href="\${esc(r.receipt_url)}" target="_blank"><img src="\${esc(r.receipt_url)}" style="width:28px;height:28px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-left:4px;border:1px solid var(--border)" onerror="this.outerHTML='<a href=\\\\'\${esc(r.receipt_url)}\\\\' target=\\\\'_blank\\\\' style=\\\\'font-size:16px;text-decoration:none\\\\'>📎</a>'"></a>\` : ''}
+          </td>
+        </tr>\`).join('')}
+        </tbody>
+      </table>\`;
+
+  // Store accounts for modal
+  window._incomeAccounts = accounts || [];
+  window._incomeClientId = clientId;
+
+  container.innerHTML = pageShell('Income', clientName, addBtn, \`
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px">
+      <div class="card"><div class="card-body" style="padding:16px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em">TOTAL INCOME (ALL TIME)</div>
+        <div style="font-size:28px;font-weight:700;margin-top:4px;color:var(--green);font-variant-numeric:tabular-nums">$\${total.toFixed(2)}</div>
+      </div></div>
+      <div class="card"><div class="card-body" style="padding:16px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em">THIS MONTH</div>
+        <div style="font-size:28px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums">$\${monthTotal.toFixed(2)}</div>
+      </div></div>
+      <div class="card"><div class="card-body" style="padding:16px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em">PENDING REVIEW</div>
+        <div style="font-size:28px;font-weight:700;margin-top:4px;color:\${pending>0?'var(--gold)':'var(--text)'}">\${pending}</div>
+      </div></div>
+    </div>
+    <div class="card"><div class="card-h">All Income Entries</div>
+      <div class="card-body" style="padding:0;overflow-x:auto">\${listHtml}</div>
+    </div>
+
+    <!-- Income modal -->
+    <div id="income-modal" hidden style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px">
+      <div style="background:var(--surface);border-radius:12px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)">
+          <div style="font-weight:700;font-size:16px" id="income-modal-title">Add Income</div>
+          <button onclick="document.getElementById('income-modal').hidden=true" style="font-size:20px;color:var(--muted);background:none;border:none;cursor:pointer">✕</button>
+        </div>
+        <div style="padding:24px" id="income-modal-body"></div>
+      </div>
+    </div>
+  \`);
+}
+
+window.openIncomeModal = async function(id) {
+  let row = null;
+  if (id) {
+    const { data } = await sb.from('income').select('*').eq('id', id).single();
+    row = data;
+  }
+  document.getElementById('income-modal-title').textContent = id ? 'Edit Income' : 'Add Income';
+  document.getElementById('income-modal-body').innerHTML = incomeFormHtml(row);
+  document.getElementById('income-modal').hidden = false;
+};
+
+function incomeFormHtml(r) {
+  const accts = (window._incomeAccounts||[]).filter(a => ['Revenue','Asset'].includes(a.account_type));
+  return \`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Date *</label>
+        <input id="inc-date" class="input" type="date" value="\${esc(r?.income_date || new Date().toISOString().slice(0,10))}"></div>
+      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Amount *</label>
+        <input id="inc-amount" class="input" type="number" min="0.01" step="0.01" placeholder="0.00" value="\${r?.amount||''}"></div>
+    </div>
+    <div style="margin-bottom:12px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Source / Customer *</label>
+      <input id="inc-source" class="input" value="\${esc(r?.source||'')}" placeholder="Who paid you?"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Category *</label>
+        <select id="inc-category" class="input">
+          \${INCOME_CATEGORIES.map(c=>\`<option value="\${c}" \${(r?.category||'')==c?'selected':''}>\${c}</option>\`).join('')}
+        </select></div>
+      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Account</label>
+        <select id="inc-account" class="input">
+          <option value="">— None —</option>
+          \${accts.map(a=>\`<option value="\${a.id}" \${r?.account_id===a.id?'selected':''}>\${esc(a.account_name)}</option>\`).join('')}
+        </select></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Payment Method</label>
+        <select id="inc-payment" class="input">
+          <option value="">— Select —</option>
+          \${['Cash','Check','Credit Card','Debit Card','Bank Transfer','Zelle','Venmo','PayPal','Other']
+            .map(m=>\`<option value="\${m}" \${(r?.payment_method||'')==m?'selected':''}>\${m}</option>\`).join('')}
+        </select></div>
+      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Reference #</label>
+        <input id="inc-ref" class="input" value="\${esc(r?.reference||'')}" placeholder="Invoice #, check #…"></div>
+    </div>
+    \${STATE.isStaff ? \`<div style="margin-bottom:12px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Status</label>
+      <select id="inc-status" class="input">
+        <option value="pending"  \${(r?.status||'pending')==='pending'?'selected':''}>⏳ Pending</option>
+        <option value="reviewed" \${r?.status==='reviewed'?'selected':''}>🔍 Reviewed</option>
+        <option value="approved" \${r?.status==='approved'?'selected':''}>✅ Approved</option>
+      </select></div>\` : ''}
+    <div style="margin-bottom:12px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Notes</label>
+      <textarea id="inc-notes" class="input" style="height:60px;resize:none" placeholder="Additional details…">\${esc(r?.notes||'')}</textarea></div>
+    <div style="margin-bottom:16px">
+      <label for="inc-receipt-file" style="display:flex;align-items:center;gap:10px;padding:12px 16px;border:2px dashed var(--border);border-radius:8px;cursor:pointer;font-size:13px;color:var(--muted)" id="inc-receipt-label">
+        <span>📸</span>
+        <span id="inc-receipt-name">\${r?.receipt_url ? '📎 Receipt on file (upload new to replace)' : 'Tap to attach a photo or file…'}</span>
+      </label>
+      <input id="inc-receipt-file" type="file" accept="image/*,application/pdf" capture="environment" style="display:none"
+        onchange="document.getElementById('inc-receipt-name').textContent = this.files[0]?.name || 'No file chosen'">
+    </div>
+    <div id="inc-err" style="color:var(--red);font-size:13px;margin-bottom:8px"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="document.getElementById('income-modal').hidden=true">Cancel</button>
+      <button class="btn btn-primary" onclick="saveIncome('\${esc(r?.id||'')}')">💾 Save</button>
+    </div>\`;
+}
+
+window.saveIncome = async function(existingId) {
+  const errEl = document.getElementById('inc-err');
+  const date   = document.getElementById('inc-date')?.value;
+  const amount = parseFloat(document.getElementById('inc-amount')?.value);
+  const source = document.getElementById('inc-source')?.value.trim();
+  if (!date)   { errEl.textContent = 'Date is required.'; return; }
+  if (!amount || amount <= 0) { errEl.textContent = 'Amount must be greater than 0.'; return; }
+  if (!source) { errEl.textContent = 'Source / Customer is required.'; return; }
+
+  const clientId = window._incomeClientId;
+  const user = (await sb.auth.getUser()).data.user;
+
+  // Upload receipt if chosen
+  let receiptUrl = existingId
+    ? (await sb.from('income').select('receipt_url').eq('id',existingId).single()).data?.receipt_url || null
+    : null;
+  const receiptFile = document.getElementById('inc-receipt-file')?.files?.[0];
+  if (receiptFile) {
+    const ext  = receiptFile.name.split('.').pop().toLowerCase();
+    const path = \`\${user.id}/income/\${Date.now()}-\${Math.random().toString(36).slice(2)}.\${ext}\`;
+    const { error: upErr } = await sb.storage.from('receipts').upload(path, receiptFile, { upsert: false });
+    if (upErr) { errEl.textContent = 'Receipt upload failed: ' + upErr.message; return; }
+    receiptUrl = path;
+  }
+
+  const payload = {
+    client_id:      clientId,
+    income_date:    date,
+    source,
+    category:       document.getElementById('inc-category')?.value,
+    account_id:     document.getElementById('inc-account')?.value || null,
+    amount,
+    payment_method: document.getElementById('inc-payment')?.value || null,
+    reference:      document.getElementById('inc-ref')?.value.trim() || null,
+    notes:          document.getElementById('inc-notes')?.value.trim() || null,
+    receipt_url:    receiptUrl,
+    status:         STATE.isStaff ? (document.getElementById('inc-status')?.value || 'pending') : (existingId ? undefined : 'pending'),
+    entered_by_role: STATE.isStaff ? 'staff' : 'client',
+    entered_by:     user.id,
+    updated_at:     new Date().toISOString()
+  };
+  if (!existingId) delete payload.status; // let DB default apply for new client entries
+
+  const { error } = existingId
+    ? await sb.from('income').update(payload).eq('id', existingId)
+    : await sb.from('income').insert(payload);
+
+  if (error) { errEl.textContent = 'Error: ' + error.message; return; }
+  document.getElementById('income-modal').hidden = true;
+  renderIncome(document.getElementById('screen-container'));
+};
+
+window.deleteIncome = async function(id) {
+  if (!confirm('Delete this income entry?')) return;
+  await sb.from('income').delete().eq('id', id);
+  renderIncome(document.getElementById('screen-container'));
+};
+
+// ════════════════════════════════════════════════════════════
+//  CHART OF ACCOUNTS SCREEN
+// ════════════════════════════════════════════════════════════
+const COA_TYPES = ['Asset','Liability','Equity','Revenue','Expense','Cost of Goods Sold'];
+const COA_SUBTYPES = {
+  Asset:    ['Current Asset','Fixed Asset','Other Asset','Bank','Accounts Receivable'],
+  Liability:['Current Liability','Long-term Liability','Accounts Payable','Credit Card'],
+  Equity:   ['Owner\\'s Equity','Retained Earnings','Common Stock'],
+  Revenue:  ['Operating Revenue','Other Revenue'],
+  Expense:  ['Operating Expense','Payroll','Rent','Utilities','Other Expense'],
+  'Cost of Goods Sold': ['Direct Cost','Materials','Labor']
+};
+
+async function renderChartOfAccounts(container) {
+  const clientId   = STATE.isStaff ? STATE.selectedClientId : STATE.clientRow?.id;
+  const clientName = STATE.isStaff ? selectedClientName() : (STATE.clientRow?.full_name || '');
+  const addBtn = STATE.isStaff
+    ? \`<button class="btn btn-secondary" onclick="openCoaModal()">+ Add Account</button>\`
+    : '';
+
+  container.innerHTML = pageShell('Chart of Accounts', clientName, addBtn,
+    '<div class="loading-block"><span class="spinner"></span> Loading accounts…</div>');
+
+  if (!clientId) {
+    container.innerHTML = pageShell('Chart of Accounts','',addBtn,'<div class="alert alert-red" style="margin:28px">Please select a client first.</div>');
+    return;
+  }
+
+  const { data: accounts, error } = await sb.from('chart_of_accounts')
+    .select('*').eq('client_id', clientId).order('account_type').order('account_number');
+
+  if (error) {
+    container.innerHTML = pageShell('Chart of Accounts', clientName, addBtn,
+      \`<div class="alert alert-red" style="margin:28px">\${esc(error.message)}</div>\`);
+    return;
+  }
+
+  window._coaClientId = clientId;
+
+  // Group by type
+  const grouped = {};
+  COA_TYPES.forEach(t => { grouped[t] = []; });
+  (accounts||[]).forEach(a => { if (grouped[a.account_type]) grouped[a.account_type].push(a); });
+
+  const typeColor = {
+    Asset:'var(--green)', Liability:'var(--red)', Equity:'var(--navy)',
+    Revenue:'var(--gold)', Expense:'var(--red)', 'Cost of Goods Sold':'var(--muted)'
+  };
+
+  const sections = COA_TYPES.map(type => {
+    const rows = grouped[type];
+    if (!rows.length && !STATE.isStaff) return '';
+    return \`
+      <div style="margin-bottom:20px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:\${typeColor[type]||'var(--muted)'};padding:0 20px 8px;text-transform:uppercase">\${type}</div>
+        \${!rows.length ? \`<div style="padding:8px 20px;font-size:13px;color:var(--muted);font-style:italic">No accounts yet\${STATE.isStaff?' — click + Add Account to create one':''}</div>\` :
+        \`<table class="data-table">
+          <thead><tr><th>#</th><th>Account Name</th><th>Subtype</th><th>Description</th><th>Status</th>\${STATE.isStaff?'<th></th>':''}</tr></thead>
+          <tbody>
+          \${rows.map(a=>\`<tr>
+            <td style="font-family:monospace;font-size:12px;color:var(--muted)">\${esc(a.account_number||'—')}</td>
+            <td style="font-weight:600">\${esc(a.account_name)}</td>
+            <td style="font-size:12px;color:var(--muted)">\${esc(a.account_subtype||'—')}</td>
+            <td style="font-size:12px;color:var(--muted)">\${esc(a.description||'')}</td>
+            <td><span style="font-size:11px;font-weight:600;color:\${a.is_active?'var(--green)':'var(--muted)'}">● \${a.is_active?'Active':'Inactive'}</span></td>
+            \${STATE.isStaff?\`<td style="white-space:nowrap">
+              <button onclick="openCoaModal('\${esc(a.id)}')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 6px">✏️</button>
+              <button onclick="toggleCoaActive('\${esc(a.id)}',\${!a.is_active})" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px 6px;color:var(--muted)" title="\${a.is_active?'Deactivate':'Activate'}">\${a.is_active?'🔒':'🔓'}</button>
+            </td>\`:''}
+          </tr>\`).join('')}
+          </tbody>
+        </table>\`}
+      </div>\`;
+  }).join('');
+
+  const totalActive = (accounts||[]).filter(a=>a.is_active).length;
+
+  container.innerHTML = pageShell('Chart of Accounts', clientName, addBtn, \`
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px">
+      \${COA_TYPES.slice(0,3).map(t=>{
+        const count = grouped[t].length;
+        return \`<div class="card"><div class="card-body" style="padding:16px">
+          <div style="font-size:11px;font-weight:600;color:\${typeColor[t]};letter-spacing:.06em;text-transform:uppercase">\${t}</div>
+          <div style="font-size:28px;font-weight:700;margin-top:4px">\${count}</div>
+          <div style="font-size:11px;color:var(--muted)">account\${count!==1?'s':''}</div>
+        </div></div>\`;
+      }).join('')}
+    </div>
+    <div class="card">
+      <div class="card-h" style="display:flex;justify-content:space-between;align-items:center">
+        <span>All Accounts</span>
+        <span style="font-size:12px;font-weight:400;color:var(--muted)">\${totalActive} active of \${(accounts||[]).length} total</span>
+      </div>
+      <div class="card-body" style="padding:0">\${sections || '<div style="padding:24px;text-align:center;color:var(--muted)">No accounts set up yet.</div>'}</div>
+    </div>
+
+    <!-- COA modal (staff only) -->
+    <div id="coa-modal" hidden style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px">
+      <div style="background:var(--surface);border-radius:12px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)">
+          <div style="font-weight:700;font-size:16px" id="coa-modal-title">New Account</div>
+          <button onclick="document.getElementById('coa-modal').hidden=true" style="font-size:20px;color:var(--muted);background:none;border:none;cursor:pointer">✕</button>
+        </div>
+        <div style="padding:24px" id="coa-modal-body"></div>
+      </div>
+    </div>
+  \`);
+}
+
+window.openCoaModal = async function(id) {
+  let row = null;
+  if (id) {
+    const { data } = await sb.from('chart_of_accounts').select('*').eq('id', id).single();
+    row = data;
+  }
+  document.getElementById('coa-modal-title').textContent = id ? 'Edit Account' : 'New Account';
+  document.getElementById('coa-modal-body').innerHTML = coaFormHtml(row);
+  document.getElementById('coa-modal').hidden = false;
+};
+
+function coaFormHtml(r) {
+  const selType = r?.account_type || COA_TYPES[0];
+  const subtypes = COA_SUBTYPES[selType] || [];
+  return \`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Account Number</label>
+        <input id="coa-num" class="input" value="\${esc(r?.account_number||'')}" placeholder="e.g. 1000"></div>
+      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Account Type *</label>
+        <select id="coa-type" class="input" onchange="updateCoaSubtypes()">
+          \${COA_TYPES.map(t=>\`<option value="\${t}" \${selType===t?'selected':''}>\${t}</option>\`).join('')}
+        </select></div>
+    </div>
+    <div style="margin-bottom:12px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Account Name *</label>
+      <input id="coa-name" class="input" value="\${esc(r?.account_name||'')}" placeholder="e.g. Checking Account"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Subtype</label>
+        <select id="coa-subtype" class="input">
+          <option value="">— None —</option>
+          \${subtypes.map(s=>\`<option value="\${s}" \${(r?.account_subtype||'')==s?'selected':''}>\${s}</option>\`).join('')}
+        </select></div>
+      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Status</label>
+        <select id="coa-active" class="input">
+          <option value="true"  \${(r?.is_active!==false)?'selected':''}>✅ Active</option>
+          <option value="false" \${r?.is_active===false?'selected':''}>🔒 Inactive</option>
+        </select></div>
+    </div>
+    <div style="margin-bottom:16px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Description</label>
+      <textarea id="coa-desc" class="input" style="height:60px;resize:none" placeholder="Optional notes about this account">\${esc(r?.description||'')}</textarea></div>
+    <div id="coa-err" style="color:var(--red);font-size:13px;margin-bottom:8px"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="document.getElementById('coa-modal').hidden=true">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCoaAccount('\${esc(r?.id||'')}')">💾 Save Account</button>
+    </div>\`;
+}
+
+window.updateCoaSubtypes = function() {
+  const type = document.getElementById('coa-type')?.value;
+  const sel  = document.getElementById('coa-subtype');
+  if (!sel) return;
+  const subtypes = COA_SUBTYPES[type] || [];
+  sel.innerHTML = '<option value="">— None —</option>' +
+    subtypes.map(s=>\`<option value="\${s}">\${s}</option>\`).join('');
+};
+
+window.saveCoaAccount = async function(existingId) {
+  const errEl = document.getElementById('coa-err');
+  const name  = document.getElementById('coa-name')?.value.trim();
+  const type  = document.getElementById('coa-type')?.value;
+  if (!name) { errEl.textContent = 'Account name is required.'; return; }
+
+  const payload = {
+    client_id:       window._coaClientId,
+    account_number:  document.getElementById('coa-num')?.value.trim() || null,
+    account_name:    name,
+    account_type:    type,
+    account_subtype: document.getElementById('coa-subtype')?.value || null,
+    description:     document.getElementById('coa-desc')?.value.trim() || null,
+    is_active:       document.getElementById('coa-active')?.value === 'true',
+    updated_at:      new Date().toISOString()
+  };
+
+  const { error } = existingId
+    ? await sb.from('chart_of_accounts').update(payload).eq('id', existingId)
+    : await sb.from('chart_of_accounts').insert(payload);
+
+  if (error) { errEl.textContent = 'Error: ' + error.message; return; }
+  document.getElementById('coa-modal').hidden = true;
+  renderChartOfAccounts(document.getElementById('screen-container'));
+};
+
+window.toggleCoaActive = async function(id, newState) {
+  await sb.from('chart_of_accounts').update({ is_active: newState }).eq('id', id);
+  renderChartOfAccounts(document.getElementById('screen-container'));
+};
+
 // ── JOURNAL ENTRIES ───────────────────────────────────────
 async function renderJournal(container) {
   var _STATE$clientRow2;
@@ -4696,15 +5151,11 @@ async function savePayRun(status) {
 
 export default {
   async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-    if (url.pathname === '/' || url.pathname === '') {
-      return new Response(HTML, {
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Cache-Control': 'no-cache'
-        }
-      });
-    }
-    return new Response('Not found', { status: 404 });
+    return new Response(HTML, {
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-cache'
+      }
+    });
   }
 };
