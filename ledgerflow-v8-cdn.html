@@ -2612,10 +2612,22 @@ async function renderExpenses(container) {
   }
 
   // Load expenses + accounts for this client
-  const [{ data: expenses, error }, { data: accounts }] = await Promise.all([
+  const [{ data: rawExpenses, error }, { data: accounts }] = await Promise.all([
     sb.from('expenses').select('*').eq('client_id', clientId).order('expense_date', { ascending: false }).order('created_at', { ascending: false }),
     sb.from('accounts').select('id,account_number,name,type').eq('client_id', clientId).eq('type','Expense').eq('is_active',true).order('account_number')
   ]);
+
+  // Generate signed URLs for receipts (bucket is private)
+  let expenses = rawExpenses;
+  if (rawExpenses?.length) {
+    expenses = await Promise.all(rawExpenses.map(async e => {
+      if (!e.receipt_url) return e;
+      // If it's already a full URL (old data), keep it; otherwise generate signed URL from path
+      if (e.receipt_url.startsWith('http')) return e;
+      const { data } = await sb.storage.from('receipts').createSignedUrl(e.receipt_url, 300);
+      return { ...e, receipt_url: data?.signedUrl || null };
+    }));
+  }
 
   const main = container.querySelector('[data-main], .card-body') || container;
   const mainEl = container.querySelector('[data-page-main]') || container;
@@ -2668,8 +2680,9 @@ async function renderExpenses(container) {
                 ${e.entered_by_role==='client'?'<span style="font-size:10px;color:var(--muted);margin-left:4px">(client)</span>':''}</td>
             <td style="white-space:nowrap">
               ${STATE.isStaff ? `<button onclick="openExpenseModal(${JSON.stringify(e).replace(/"/g,'&quot;')})" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 6px" title="Edit">✏️</button>
-              <button onclick="deleteExpense('${esc(e.id)}')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 6px;color:var(--red)" title="Delete">🗑</button>` : ''}
-              ${e.receipt_url ? `<a href="${esc(e.receipt_url)}" target="_blank" style="font-size:12px;color:var(--green)">📎</a>` : ''}
+              <button onclick="deleteExpense('${esc(e.id)}')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 6px;color:var(--red)" title="Delete">🗑</button>`
+              : (e.status === 'pending' ? `<button onclick="openExpenseModal(${JSON.stringify(e).replace(/"/g,'&quot;')})" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 6px" title="Edit">✏️</button>` : '<span style="font-size:11px;color:var(--muted)">locked</span>')}
+              ${e.receipt_url ? `<a href="${esc(e.receipt_url)}" target="_blank" title="View receipt"><img src="${esc(e.receipt_url)}" style="width:28px;height:28px;object-fit:cover;border-radius:4px;border:1px solid var(--border);vertical-align:middle;margin-left:4px" onerror="this.replaceWith(Object.assign(document.createElement('a'),{href:'${esc(e.receipt_url)}',target:'_blank',textContent:'📎',style:'font-size:14px;margin-left:4px'}))"></a>` : ''}
             </td>
           </tr>`).join('')}
         </tbody>
@@ -2796,6 +2809,21 @@ function openExpenseModal(expense) {
           <label for="exp-notes">Notes</label>
           <textarea id="exp-notes" placeholder="Purpose, project name, etc." style="height:60px">${esc(expense?.notes||'')}</textarea>
         </div>
+        <div class="form-group">
+          <label>Receipt Photo / File <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+          ${expense?.receipt_url ? `<div style="margin-bottom:8px;display:flex;align-items:center;gap:10px">
+            <img src="${esc(expense.receipt_url)}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid var(--border)" onerror="this.style.display='none'">
+            <div>
+              <a href="${esc(expense.receipt_url)}" target="_blank" style="font-size:12px">View current receipt</a>
+              <div style="font-size:11px;color:var(--muted)">Upload a new file to replace it</div>
+            </div>
+          </div>` : ''}
+          <label for="exp-receipt-file" style="display:flex;align-items:center;gap:8px;padding:10px 14px;border:2px dashed var(--border);border-radius:8px;cursor:pointer;background:var(--bg);transition:border-color .2s" id="exp-receipt-label">
+            <span style="font-size:20px">📸</span>
+            <span id="exp-receipt-name" style="font-size:13px;color:var(--muted)">Tap to take a photo or choose a file…</span>
+          </label>
+          <input id="exp-receipt-file" type="file" accept="image/*,application/pdf" capture="environment" style="display:none">
+        </div>
         ${STATE.isStaff ? `<div class="form-group">
           <label for="exp-status">Status</label>
           <select id="exp-status">
@@ -2822,6 +2850,33 @@ function openExpenseModal(expense) {
   });
 
   document.body.appendChild(bd);
+
+  // Receipt file preview
+  document.getElementById('exp-receipt-file').addEventListener('change', function() {
+    const file = this.files[0];
+    const nameEl = document.getElementById('exp-receipt-name');
+    const label  = document.getElementById('exp-receipt-label');
+    if (!file) return;
+    nameEl.textContent = file.name;
+    nameEl.style.color = 'var(--green)';
+    label.style.borderColor = 'var(--green)';
+    // Show image preview if it's an image
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        let prev = document.getElementById('exp-receipt-preview');
+        if (!prev) {
+          prev = document.createElement('img');
+          prev.id = 'exp-receipt-preview';
+          prev.style.cssText = 'width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--border);margin-top:8px;display:block';
+          label.after(prev);
+        }
+        prev.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
   bd.addEventListener('click', e => { if (e.target === bd) closeModal('exp-modal-backdrop'); });
   document.getElementById('exp-date').focus();
 }
@@ -2847,12 +2902,35 @@ async function saveExpense(clientId, expenseId) {
 
   btn.disabled = true; btn.textContent = 'Saving…';
 
+  // Upload receipt if one was selected
+  let receiptUrl = null;
+  const receiptFile = document.getElementById('exp-receipt-file')?.files?.[0];
+  if (receiptFile) {
+    btn.textContent = 'Uploading receipt…';
+    const { data: { user } } = await sb.auth.getUser();
+    const ext  = receiptFile.name.split('.').pop().toLowerCase();
+    const path = `${user.id}/expenses/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+    const { error: upErr } = await sb.storage.from('receipts').upload(path, receiptFile, { upsert: false });
+    if (upErr) {
+      errEl.textContent = 'Receipt upload failed: ' + upErr.message;
+      btn.disabled = false; btn.textContent = expenseId ? '💾 Save Changes' : '🧾 Save Expense';
+      return;
+    }
+    const { data: urlData } = sb.storage.from('receipts').getPublicUrl(path);
+    // Use signed URL approach — store the path and generate signed URLs on view
+    receiptUrl = path; // store path; we'll generate signed URL for display
+    // Actually store the full public URL for simplicity (bucket is private so we store path)
+    receiptUrl = path;
+    btn.textContent = 'Saving…';
+  }
+
   const payload = {
     client_id: clientId, expense_date: date, merchant, amount,
     account_id: accountId, category, payment_method: method,
     reference: ref, notes, status,
     entered_by_role: STATE.isStaff ? 'staff' : 'client'
   };
+  if (receiptUrl) payload.receipt_url = receiptUrl;
 
   let error;
   if (expenseId) {
