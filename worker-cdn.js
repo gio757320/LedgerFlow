@@ -2560,7 +2560,7 @@ function updateClientDropdown() {
 
 // ── CHART OF ACCOUNTS ──────────────────────────────────────
 async function renderAccounts(container) {
-  if (STATE.isStaff && !STATE.selectedClient) {
+  if (STATE.isStaff && !STATE.selectedClientId) {
     container.innerHTML = pageShell('Chart of Accounts', '', '', '<div class="alert alert-red" style="margin:28px">Please select a client first.</div>');
     return;
   }
@@ -3724,7 +3724,7 @@ window.toggleCoaActive = async function(id, newState) {
 // ── JOURNAL ENTRIES ───────────────────────────────────────
 async function renderJournal(container) {
   var _STATE$clientRow2;
-  if (STATE.isStaff && !STATE.selectedClient) {
+  if (STATE.isStaff && !STATE.selectedClientId) {
     container.innerHTML = pageShell('Journal Entries', '', '', '<div class="alert alert-red" style="margin:28px">Please select a client first.</div>');
     return;
   }
@@ -3877,7 +3877,7 @@ async function updateJE(jeId, status) {
 // ── PAYROLL ───────────────────────────────────────────────
 async function renderPayroll(container) {
   var _STATE$clientRow3;
-  if (STATE.isStaff && !STATE.selectedClient) {
+  if (STATE.isStaff && !STATE.selectedClientId) {
     container.innerHTML = pageShell('Payroll', '', '', '<div class="alert alert-red" style="margin:28px">Please select a client first.</div>');
     return;
   }
@@ -3941,7 +3941,7 @@ async function loadPayrollTab(tab) {
 // ── TAX RETURNS ───────────────────────────────────────────
 async function renderTax(container) {
   var _STATE$clientRow4;
-  if (STATE.isStaff && !STATE.selectedClient) {
+  if (STATE.isStaff && !STATE.selectedClientId) {
     container.innerHTML = pageShell('Tax Returns', '', '', '<div class="alert alert-red" style="margin:28px">Please select a client first.</div>');
     return;
   }
