@@ -2560,6 +2560,10 @@ function updateClientDropdown() {
 
 // ── CHART OF ACCOUNTS ──────────────────────────────────────
 async function renderAccounts(container) {
+  if (STATE.isStaff && !STATE.selectedClient) {
+    container.innerHTML = pageShell('Chart of Accounts', '', '', '<div class="alert alert-red" style="margin:28px">Please select a client first.</div>');
+    return;
+  }
   container.innerHTML = pageShell('Chart of Accounts', STATE.isStaff ? selectedClientName() : '', "\n    <button class=\"btn btn-secondary\">+ Add Account</button>\n  ", '<div class="loading-block"><span class="spinner"></span> Loading accounts…</div>');
 
   // Fetch accounts and journal lines in parallel
@@ -3720,6 +3724,10 @@ window.toggleCoaActive = async function(id, newState) {
 // ── JOURNAL ENTRIES ───────────────────────────────────────
 async function renderJournal(container) {
   var _STATE$clientRow2;
+  if (STATE.isStaff && !STATE.selectedClient) {
+    container.innerHTML = pageShell('Journal Entries', '', '', '<div class="alert alert-red" style="margin:28px">Please select a client first.</div>');
+    return;
+  }
   container.innerHTML = pageShell('Journal Entries', STATE.isStaff ? selectedClientName() : ((_STATE$clientRow2 = STATE.clientRow) === null || _STATE$clientRow2 === void 0 ? void 0 : _STATE$clientRow2.full_name) || '', STATE.isStaff ? "\n    <button class=\"btn btn-secondary\" onclick=\"openJEModal()\">+ New Entry</button>\n  " : '', '<div class="loading-block"><span class="spinner"></span> Loading…</div>');
 
   // join accounts + client name
@@ -3869,6 +3877,10 @@ async function updateJE(jeId, status) {
 // ── PAYROLL ───────────────────────────────────────────────
 async function renderPayroll(container) {
   var _STATE$clientRow3;
+  if (STATE.isStaff && !STATE.selectedClient) {
+    container.innerHTML = pageShell('Payroll', '', '', '<div class="alert alert-red" style="margin:28px">Please select a client first.</div>');
+    return;
+  }
   const isClient = !STATE.isStaff;
   const subtitle = isClient ? ((_STATE$clientRow3 = STATE.clientRow) === null || _STATE$clientRow3 === void 0 ? void 0 : _STATE$clientRow3.full_name) || '' : selectedClientName();
   const tabs = isClient ? "<button class=\"tab-btn active\" data-tab=\"pay-runs\">Pay History</button>\n       <button class=\"tab-btn\" data-tab=\"tax-filings\">Tax Filings</button>" : "<button class=\"tab-btn active\" data-tab=\"employees\">Employees</button>\n       <button class=\"tab-btn\" data-tab=\"pay-runs\">Pay Runs</button>\n       <button class=\"tab-btn\" data-tab=\"tax-filings\">Tax Filings</button>";
@@ -3929,6 +3941,10 @@ async function loadPayrollTab(tab) {
 // ── TAX RETURNS ───────────────────────────────────────────
 async function renderTax(container) {
   var _STATE$clientRow4;
+  if (STATE.isStaff && !STATE.selectedClient) {
+    container.innerHTML = pageShell('Tax Returns', '', '', '<div class="alert alert-red" style="margin:28px">Please select a client first.</div>');
+    return;
+  }
   container.innerHTML = pageShell('Tax Returns', STATE.isStaff ? selectedClientName() : ((_STATE$clientRow4 = STATE.clientRow) === null || _STATE$clientRow4 === void 0 ? void 0 : _STATE$clientRow4.full_name) || '', STATE.isStaff ? "\n    <button class=\"btn btn-secondary\">+ New Return</button>\n  " : '', '<div class="loading-block"><span class="spinner"></span> Loading…</div>');
   const q = applyClientFilter(sb.from('tax_returns').select('*').order('tax_year', {
     ascending: false
