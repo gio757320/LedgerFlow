@@ -416,6 +416,9 @@ tr:hover td { background: rgba(46,158,107,.04); }
         <button class="nav-item" data-screen="expenses" id="nav-expenses-btn">
           <span class="icon">🧾</span> Expenses
         </button>
+        <button class="nav-item" data-screen="invoices" id="nav-invoices-btn">
+          <span class="icon">📄</span> My Invoices
+        </button>
         <button class="nav-item" data-screen="messages" id="nav-messages-btn">
           <span class="icon">💬</span> Messages
           <span class="badge" id="nav-messages-badge" hidden style="margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px"></span>
@@ -756,6 +759,7 @@ function showApp() {
   document.getElementById('client-select-wrap').hidden = !STATE.isStaff;
   // Client-specific nav: hide accounts/clients from client portal
   document.getElementById('nav-accounts-btn').hidden = !STATE.isStaff;
+  document.getElementById('nav-invoices-btn').hidden = STATE.isStaff;
 
   // Relabel "Dashboard" to "My Account" for client portal
   const dashLabel = document.getElementById('nav-dashboard-label');
@@ -779,6 +783,10 @@ function showApp() {
     // Expenses — visible to all clients (everyone has expenses)
     const expensesBtn = document.getElementById('nav-expenses-btn');
     if (expensesBtn) expensesBtn.hidden = false;
+
+    // My Invoices — visible to all clients
+    const invoicesBtn = document.getElementById('nav-invoices-btn');
+    if (invoicesBtn) invoicesBtn.hidden = false;
 
     // Journal Entries — only for bookkeeping or payroll clients
     const journalBtn = document.getElementById('nav-journal-btn');
@@ -829,6 +837,9 @@ function renderScreen(screen) {
       break;
     case 'expenses':
       renderExpenses(container);
+      break;
+    case 'invoices':
+      renderClientInvoices(container);
       break;
     case 'journal':
       renderJournal(container);
@@ -2950,6 +2961,266 @@ async function saveExpense(clientId, expenseId) {
   closeModal('exp-modal-backdrop');
   renderExpenses(document.getElementById('screen-container'));
 }
+
+// ════════════════════════════════════════════════════════════
+//  CLIENT INVOICES SCREEN
+// ════════════════════════════════════════════════════════════
+async function renderClientInvoices(container) {
+  const clientId   = STATE.isStaff ? STATE.selectedClientId : STATE.clientRow?.id;
+  const clientName = STATE.isStaff ? selectedClientName() : (STATE.clientRow?.full_name || '');
+
+  const addBtn = `<button class="btn btn-secondary" onclick="openClientNewInvoiceModal()">+ New Invoice</button>`;
+
+  container.innerHTML = pageShell('My Invoices', clientName, addBtn,
+    '<div class="loading-block"><span class="spinner"></span> Loading invoices…</div>');
+
+  if (!clientId) {
+    container.innerHTML = pageShell('My Invoices', '', '', '<div class="alert alert-red" style="margin:28px">Please select a client first.</div>');
+    return;
+  }
+
+  const { data: invs, error } = await sb
+    .from('client_invoices')
+    .select('*')
+    .eq('client_id', clientId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    container.innerHTML = pageShell('My Invoices', clientName, addBtn,
+      `<div class="alert alert-red" style="margin:28px">${esc(error.message)}</div>`);
+    return;
+  }
+
+  // ── Summary tiles ──
+  const total      = (invs||[]).reduce((s,i) => s + parseFloat(i.total||0), 0);
+  const paid       = (invs||[]).filter(i => i.status === 'paid').reduce((s,i) => s + parseFloat(i.total||0), 0);
+  const outstanding= (invs||[]).filter(i => i.status !== 'paid').reduce((s,i) => s + parseFloat(i.total||0), 0);
+  const overdueCount = (invs||[]).filter(i => i.status !== 'paid' && i.due_date && new Date(i.due_date) < new Date()).length;
+
+  const statusColor = { paid:'var(--green)', sent:'var(--navy)', draft:'var(--muted)', overdue:'var(--red)' };
+  const statusIcon  = { paid:'✅', sent:'📤', draft:'📝', overdue:'⚠️' };
+
+  const getStatus = inv => {
+    if (inv.status === 'paid') return 'paid';
+    if (inv.due_date && new Date(inv.due_date) < new Date()) return 'overdue';
+    return inv.status || 'draft';
+  };
+
+  const listHtml = !invs?.length
+    ? `<div class="empty" style="padding:40px 20px"><div class="empty-icon">📄</div>No invoices yet. Create your first one above.</div>`
+    : `<table class="data-table">
+        <thead><tr>
+          <th>Invoice #</th><th>Customer</th><th>Date</th><th>Due Date</th>
+          <th style="text-align:right">Total</th><th>Status</th><th></th>
+        </tr></thead>
+        <tbody>
+        ${invs.map(inv => {
+          const st = getStatus(inv);
+          return `<tr>
+            <td style="font-weight:600;font-family:monospace;font-size:13px">${esc(inv.invoice_number||'—')}</td>
+            <td style="font-weight:500">${esc(inv.customer_name||'—')}</td>
+            <td style="font-size:12px;white-space:nowrap">${esc(inv.invoice_date||'')}</td>
+            <td style="font-size:12px;white-space:nowrap;color:${st==='overdue'?'var(--red)':'inherit'}">${esc(inv.due_date||'—')}</td>
+            <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">$${parseFloat(inv.total||0).toFixed(2)}</td>
+            <td><span style="font-size:11px;font-weight:700;color:${statusColor[st]||'var(--muted)'};">${statusIcon[st]||''} ${st}</span></td>
+            <td style="white-space:nowrap">
+              <button onclick="openClientEditInvoiceModal('${esc(inv.id)}')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 6px" title="Edit">✏️</button>
+              ${inv.status !== 'paid' ? `<button onclick="markClientInvoicePaid('${esc(inv.id)}')" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px 6px;color:var(--green)" title="Mark paid">✅</button>` : ''}
+              <button onclick="deleteClientInvoiceFromScreen('${esc(inv.id)}')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 6px;color:var(--red)" title="Delete">🗑</button>
+            </td>
+          </tr>`;
+        }).join('')}
+        </tbody>
+      </table>`;
+
+  container.innerHTML = pageShell('My Invoices', clientName, addBtn, `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px">
+      <div class="card"><div class="card-body" style="padding:16px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em">TOTAL INVOICED</div>
+        <div style="font-size:28px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums">$${total.toFixed(2)}</div>
+      </div></div>
+      <div class="card"><div class="card-body" style="padding:16px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em">COLLECTED</div>
+        <div style="font-size:28px;font-weight:700;margin-top:4px;color:var(--green);font-variant-numeric:tabular-nums">$${paid.toFixed(2)}</div>
+      </div></div>
+      <div class="card"><div class="card-body" style="padding:16px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em">OUTSTANDING${overdueCount ? ` <span style="color:var(--red)">(${overdueCount} overdue)</span>` : ''}</div>
+        <div style="font-size:28px;font-weight:700;margin-top:4px;color:${outstanding>0?'var(--gold)':'var(--text)'};font-variant-numeric:tabular-nums">$${outstanding.toFixed(2)}</div>
+      </div></div>
+    </div>
+
+    <div class="card"><div class="card-h">All Invoices</div>
+      <div class="card-body" style="padding:0;overflow-x:auto">${listHtml}</div>
+    </div>
+
+    <!-- Invoice modal (reused) -->
+    <div id="ci-modal" hidden style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px">
+      <div style="background:var(--surface);border-radius:12px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)">
+          <div style="font-weight:700;font-size:16px" id="ci-modal-title">New Invoice</div>
+          <button onclick="document.getElementById('ci-modal').hidden=true" style="font-size:20px;color:var(--muted);background:none;border:none;cursor:pointer">✕</button>
+        </div>
+        <div style="padding:24px" id="ci-modal-body"></div>
+      </div>
+    </div>
+  `);
+}
+
+window.openClientNewInvoiceModal = async function() {
+  const clientId = STATE.isStaff ? STATE.selectedClientId : STATE.clientRow?.id;
+  const modal = document.getElementById('ci-modal');
+  document.getElementById('ci-modal-title').textContent = 'New Invoice';
+  // Auto-generate invoice number
+  const { data } = await sb.from('client_invoices').select('invoice_number').eq('client_id', clientId).order('created_at', { ascending: false }).limit(1);
+  let nextNum = 'INV-001';
+  if (data?.[0]?.invoice_number) {
+    const m = data[0].invoice_number.match(/(\d+)$/);
+    if (m) nextNum = data[0].invoice_number.replace(/\d+$/, String(parseInt(m[1])+1).padStart(3,'0'));
+  }
+  document.getElementById('ci-modal-body').innerHTML = clientInvoiceFormHtml(null, nextNum);
+  modal.hidden = false;
+};
+
+window.openClientEditInvoiceModal = async function(id) {
+  const { data: inv } = await sb.from('client_invoices').select('*').eq('id', id).single();
+  document.getElementById('ci-modal-title').textContent = 'Edit Invoice';
+  document.getElementById('ci-modal-body').innerHTML = clientInvoiceFormHtml(inv);
+  document.getElementById('ci-modal').hidden = false;
+};
+
+window.markClientInvoicePaid = async function(id) {
+  if (!confirm('Mark this invoice as paid?')) return;
+  await sb.from('client_invoices').update({ status: 'paid' }).eq('id', id);
+  renderClientInvoices(document.getElementById('screen-container'));
+};
+
+window.deleteClientInvoiceFromScreen = async function(id) {
+  if (!confirm('Delete this invoice? This cannot be undone.')) return;
+  await sb.from('client_invoices').delete().eq('id', id);
+  renderClientInvoices(document.getElementById('screen-container'));
+};
+
+function clientInvoiceFormHtml(inv, autoNum) {
+  const items = inv?.items || [{ description: '', qty: 1, rate: '', amount: '' }];
+  return `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Invoice #</label>
+        <input id="ci-number" class="input" value="${esc(inv?.invoice_number || autoNum || '')}" placeholder="INV-001"></div>
+      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Status</label>
+        <select id="ci-status" class="input">
+          <option value="draft"   ${(inv?.status||'draft')==='draft'?'selected':''}>📝 Draft</option>
+          <option value="sent"    ${inv?.status==='sent'?'selected':''}>📤 Sent</option>
+          <option value="paid"    ${inv?.status==='paid'?'selected':''}>✅ Paid</option>
+        </select></div>
+    </div>
+    <div style="margin-bottom:12px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Customer / Bill To *</label>
+      <input id="ci-customer" class="input" value="${esc(inv?.customer_name||'')}" placeholder="Customer or company name"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Invoice Date</label>
+        <input id="ci-date" class="input" type="date" value="${esc(inv?.invoice_date || new Date().toISOString().slice(0,10))}"></div>
+      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Due Date</label>
+        <input id="ci-due" class="input" type="date" value="${esc(inv?.due_date||'')}"></div>
+    </div>
+    <div style="font-weight:600;font-size:13px;margin-bottom:8px">Line Items</div>
+    <div id="ci-items">
+      ${items.map((it,i) => `
+        <div class="ci-item-row" style="display:grid;grid-template-columns:1fr 60px 90px 90px 28px;gap:6px;margin-bottom:6px;align-items:center">
+          <input class="input ci-desc" placeholder="Description" value="${esc(it.description||'')}" style="font-size:12px">
+          <input class="input ci-qty"  type="number" min="0" step="0.01" placeholder="Qty"  value="${it.qty||1}" oninput="recalcCIInvoice()" style="font-size:12px;text-align:center">
+          <input class="input ci-rate" type="number" min="0" step="0.01" placeholder="Rate" value="${it.rate||''}" oninput="recalcCIInvoice()" style="font-size:12px;text-align:right">
+          <input class="input ci-amt"  type="number" readonly placeholder="Amt"  value="${it.amount||''}" style="font-size:12px;text-align:right;background:var(--bg);color:var(--muted)">
+          <button type="button" onclick="this.closest('.ci-item-row').remove();recalcCIInvoice()" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer">✕</button>
+        </div>`).join('')}
+    </div>
+    <button type="button" onclick="addCIItem()" class="btn btn-secondary" style="font-size:12px;padding:4px 12px;margin-bottom:16px">+ Add Item</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Tax Rate (%)</label>
+        <input id="ci-tax" class="input" type="number" min="0" max="100" step="0.1" value="${inv?.tax_rate||0}" oninput="recalcCIInvoice()"></div>
+      <div style="text-align:right;padding-top:20px">
+        <div style="font-size:12px;color:var(--muted)">Subtotal: <span id="ci-subtotal">$0.00</span></div>
+        <div style="font-size:12px;color:var(--muted)">Tax: <span id="ci-tax-amt">$0.00</span></div>
+        <div style="font-size:16px;font-weight:700;margin-top:4px">Total: <span id="ci-total">$0.00</span></div>
+      </div>
+    </div>
+    <div style="margin-bottom:16px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Notes / Terms</label>
+      <textarea id="ci-notes" class="input" style="height:60px;resize:none" placeholder="Payment terms, thank-you note, etc.">${esc(inv?.notes||'')}</textarea></div>
+    <div id="ci-err" style="color:var(--red);font-size:13px;margin-bottom:8px"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-secondary" onclick="document.getElementById('ci-modal').hidden=true">Cancel</button>
+      <button class="btn btn-primary" onclick="saveCIInvoice('${esc(inv?.id||'')}')">💾 Save Invoice</button>
+    </div>
+    <script>setTimeout(recalcCIInvoice,50);<\/script>`;
+}
+
+window.addCIItem = function() {
+  const row = document.createElement('div');
+  row.className = 'ci-item-row';
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 60px 90px 90px 28px;gap:6px;margin-bottom:6px;align-items:center';
+  row.innerHTML = `<input class="input ci-desc" placeholder="Description" style="font-size:12px">
+    <input class="input ci-qty"  type="number" min="0" step="0.01" value="1" oninput="recalcCIInvoice()" style="font-size:12px;text-align:center">
+    <input class="input ci-rate" type="number" min="0" step="0.01" placeholder="Rate" oninput="recalcCIInvoice()" style="font-size:12px;text-align:right">
+    <input class="input ci-amt"  type="number" readonly style="font-size:12px;text-align:right;background:var(--bg);color:var(--muted)">
+    <button type="button" onclick="this.closest('.ci-item-row').remove();recalcCIInvoice()" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer">✕</button>`;
+  document.getElementById('ci-items').appendChild(row);
+};
+
+window.recalcCIInvoice = function() {
+  let subtotal = 0;
+  document.querySelectorAll('.ci-item-row').forEach(row => {
+    const qty  = parseFloat(row.querySelector('.ci-qty')?.value) || 0;
+    const rate = parseFloat(row.querySelector('.ci-rate')?.value) || 0;
+    const amt  = qty * rate;
+    const amtEl = row.querySelector('.ci-amt');
+    if (amtEl) amtEl.value = amt.toFixed(2);
+    subtotal += amt;
+  });
+  const taxRate = parseFloat(document.getElementById('ci-tax')?.value) || 0;
+  const taxAmt  = subtotal * taxRate / 100;
+  const total   = subtotal + taxAmt;
+  const s = document.getElementById('ci-subtotal'); if (s) s.textContent = '$'+subtotal.toFixed(2);
+  const t = document.getElementById('ci-tax-amt');  if (t) t.textContent = '$'+taxAmt.toFixed(2);
+  const tt= document.getElementById('ci-total');    if (tt) tt.textContent = '$'+total.toFixed(2);
+};
+
+window.saveCIInvoice = async function(existingId) {
+  const errEl = document.getElementById('ci-err');
+  const customer = document.getElementById('ci-customer')?.value.trim();
+  if (!customer) { errEl.textContent = 'Customer name is required.'; return; }
+
+  const clientId = STATE.isStaff ? STATE.selectedClientId : STATE.clientRow?.id;
+  const items = Array.from(document.querySelectorAll('.ci-item-row')).map(row => ({
+    description: row.querySelector('.ci-desc')?.value.trim() || '',
+    qty:  parseFloat(row.querySelector('.ci-qty')?.value)  || 0,
+    rate: parseFloat(row.querySelector('.ci-rate')?.value) || 0,
+    amount: parseFloat(row.querySelector('.ci-amt')?.value) || 0
+  }));
+
+  const taxRate  = parseFloat(document.getElementById('ci-tax')?.value) || 0;
+  const subtotal = items.reduce((s,i) => s + i.amount, 0);
+  const total    = subtotal + subtotal * taxRate / 100;
+
+  const payload = {
+    client_id: clientId,
+    invoice_number: document.getElementById('ci-number')?.value.trim(),
+    customer_name:  customer,
+    invoice_date:   document.getElementById('ci-date')?.value || null,
+    due_date:       document.getElementById('ci-due')?.value  || null,
+    status:         document.getElementById('ci-status')?.value || 'draft',
+    tax_rate:       taxRate,
+    subtotal,
+    total,
+    notes:          document.getElementById('ci-notes')?.value.trim() || null,
+    items
+  };
+
+  const { error } = existingId
+    ? await sb.from('client_invoices').update(payload).eq('id', existingId)
+    : await sb.from('client_invoices').insert(payload);
+
+  if (error) { errEl.textContent = 'Error: ' + error.message; return; }
+  document.getElementById('ci-modal').hidden = true;
+  renderClientInvoices(document.getElementById('screen-container'));
+};
 
 // ── JOURNAL ENTRIES ───────────────────────────────────────
 async function renderJournal(container) {
