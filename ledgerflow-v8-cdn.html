@@ -422,9 +422,6 @@ tr:hover td { background: rgba(46,158,107,.04); }
         <button class="nav-item" data-screen="income" id="nav-income-btn">
           <span class="icon">💰</span> Income
         </button>
-        <button class="nav-item" data-screen="coa" id="nav-coa-btn">
-          <span class="icon">📋</span> Chart of Accounts
-        </button>
         <button class="nav-item" data-screen="messages" id="nav-messages-btn">
           <span class="icon">💬</span> Messages
           <span class="badge" id="nav-messages-badge" hidden style="margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px"></span>
@@ -767,7 +764,7 @@ function showApp() {
   document.getElementById('nav-accounts-btn').hidden = !STATE.isStaff;
   document.getElementById('nav-invoices-btn').hidden = STATE.isStaff;
   document.getElementById('nav-income-btn').hidden = STATE.isStaff;
-  document.getElementById('nav-coa-btn').hidden = false; // visible to both
+  // nav-accounts-btn is always visible (chart of accounts — shared screen)
 
   // Relabel "Dashboard" to "My Account" for client portal
   const dashLabel = document.getElementById('nav-dashboard-label');
