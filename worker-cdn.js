@@ -1651,26 +1651,27 @@ async function renderClientPortalDashboard(container) {
 
     // 3. Auto journal entry — accrual basis: Debit Cash / Credit A/R
     // (Revenue was already recorded when the invoice was created)
-    const { data: accts } = await sb.from('chart_of_accounts')
-      .select('id, account_name, account_type, account_subtype')
+    const { data: accts } = await sb.from('accounts')
+      .select('id, name, type, subtype')
       .eq('client_id', c.id)
       .eq('is_active', true);
 
     const findAcct = (types, subtypes) => (accts || []).find(a =>
-      types.map(t=>t.toLowerCase()).includes((a.account_type||'').toLowerCase()) &&
+      types.map(t=>t.toLowerCase()).includes((a.type||'').toLowerCase()) &&
       (!subtypes || subtypes.some(s =>
-        (a.account_subtype||'').toLowerCase().includes(s) ||
-        (a.account_name||'').toLowerCase().includes(s)))
+        (a.subtype||'').toLowerCase().includes(s) ||
+        (a.name||'').toLowerCase().includes(s)))
     );
 
-    const cashAcct = findAcct(['Asset'], ['cash', 'checking', 'bank'])
-                  || findAcct(['Asset'], null);
-    const arAcct   = findAcct(['Asset'], ['receivable', 'accounts receivable', 'accounts_receivable']);
+    const cashAcct = findAcct(['Asset','asset'], ['cash', 'checking', 'bank'])
+                  || findAcct(['Asset','asset'], null);
+    const arAcct   = findAcct(['Asset','asset'], ['receivable', 'accounts receivable', 'accounts_receivable']);
 
     // If A/R account exists, do the proper accrual clearing entry (Cash / A/R)
     // If not, fall back to Cash / Revenue (cash-basis style)
     const revenueAcct = !arAcct
-      ? findAcct(['Revenue'], ['service','sales','revenue','income']) || findAcct(['Revenue'], null)
+      ? findAcct(['Income','income','Revenue','revenue'], ['service','sales','revenue','income'])
+        || findAcct(['Income','income','Revenue','revenue'], null)
       : null;
 
     const creditAcct = arAcct || revenueAcct;
@@ -1685,7 +1686,7 @@ async function renderClientPortalDashboard(container) {
     const entryDate = new Date().toISOString().slice(0, 10);
     const ref = \`INV-PAID-\${(inv.invoice_number || invId).slice(-8).toUpperCase()}\`;
     const desc = \`Payment received — \${inv.invoice_number || 'Invoice'}\${inv.customer_name ? ' from ' + inv.customer_name : ''}\`;
-    const creditLabel = arAcct ? arAcct.account_name : (creditAcct.account_name || 'Revenue');
+    const creditLabel = arAcct ? arAcct.name : (creditAcct.name || 'Revenue');
 
     const { data: je, error: jeErr } = await sb.from('journal_entries').insert({
       client_id: c.id, entry_date: entryDate, reference: ref,
@@ -2974,21 +2975,21 @@ async function saveExpense(clientId, expenseId) {
 
   // Auto-post journal entry when expense is approved (and has an account linked)
   if (status === 'approved' && accountId && amount > 0) {
-    // Fetch the expense COA account name
-    const { data: expAcct } = await sb.from('chart_of_accounts')
-      .select('id, account_name, account_type, account_subtype')
+    // Fetch the expense account from the accounts table
+    const { data: expAcct } = await sb.from('accounts')
+      .select('id, name, type, subtype')
       .eq('id', accountId).single();
 
     // Find Cash / AP account for the credit side
-    const { data: allAccts } = await sb.from('chart_of_accounts')
-      .select('id, account_name, account_type, account_subtype')
+    const { data: allAccts } = await sb.from('accounts')
+      .select('id, name, type, subtype')
       .eq('client_id', clientId).eq('is_active', true);
 
     const findA = (types, keywords) => (allAccts || []).find(a =>
-      types.includes((a.account_type||'').toLowerCase()) &&
+      types.includes((a.type||'').toLowerCase()) &&
       (!keywords || keywords.some(k =>
-        (a.account_subtype||'').toLowerCase().includes(k) ||
-        (a.account_name||'').toLowerCase().includes(k)))
+        (a.subtype||'').toLowerCase().includes(k) ||
+        (a.name||'').toLowerCase().includes(k)))
     );
 
     const cashAcct = findA(['asset'], ['cash','checking','bank']) || findA(['asset'], null);
