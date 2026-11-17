@@ -3157,6 +3157,7 @@ window.openClientEditInvoiceModal = async function(id) {
   document.getElementById('ci-modal-title').textContent = 'Edit Invoice';
   document.getElementById('ci-modal-body').innerHTML = clientInvoiceFormHtml(inv);
   document.getElementById('ci-modal').hidden = false;
+  recalcCIInvoice(); // populate totals from existing line items
 };
 
 window.markClientInvoicePaid = async function(id) {
