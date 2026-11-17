@@ -3095,6 +3095,7 @@ async function renderClientInvoices(container) {
             <td><span style="font-size:11px;font-weight:700;color:${statusColor[st]||'var(--muted)'};">${statusIcon[st]||''} ${st}</span></td>
             <td style="white-space:nowrap">
               <button onclick="openClientEditInvoiceModal('${esc(inv.id)}')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 6px" title="Edit">✏️</button>
+              <button onclick="downloadInvoicePdf('${esc(inv.id)}')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 6px;color:var(--gold)" title="Download PDF">📄</button>
               ${inv.status !== 'paid' ? `<button onclick="markClientInvoicePaid('${esc(inv.id)}')" style="background:none;border:none;cursor:pointer;font-size:12px;padding:2px 6px;color:var(--green)" title="Mark paid">✅</button>` : ''}
               <button onclick="deleteClientInvoiceFromScreen('${esc(inv.id)}')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 6px;color:var(--red)" title="Delete">🗑</button>
             </td>
@@ -3188,7 +3189,7 @@ window.deleteClientInvoiceFromScreen = async function(id) {
 };
 
 function clientInvoiceFormHtml(inv, autoNum) {
-  const items = inv?.items || [{ description: '', qty: 1, rate: '', amount: '' }];
+  const items = inv?.line_items || [{ description: '', qty: 1, rate: '', amount: '' }];
   return `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
       <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Invoice #</label>
@@ -3308,7 +3309,7 @@ window.saveCIInvoice = async function(existingId) {
     total,
     notes:          document.getElementById('ci-notes')?.value.trim() || null,
     payment_method: document.getElementById('ci-payment-method')?.value || null,
-    items
+    line_items:     items
   };
 
   let savedError;
