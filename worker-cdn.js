@@ -3089,7 +3089,7 @@ async function renderClientInvoices(container) {
           return \`<tr>
             <td style="font-weight:600;font-family:monospace;font-size:13px">\${esc(inv.invoice_number||'—')}</td>
             <td style="font-weight:500">\${esc(inv.customer_name||'—')}</td>
-            <td style="font-size:12px;white-space:nowrap">\${esc(inv.invoice_date||'')}</td>
+            <td style="font-size:12px;white-space:nowrap">\${esc(inv.issue_date||'')}</td>
             <td style="font-size:12px;white-space:nowrap;color:\${st==='overdue'?'var(--red)':'inherit'}">\${esc(inv.due_date||'—')}</td>
             <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">$\${parseFloat(inv.total||0).toFixed(2)}</td>
             <td><span style="font-size:11px;font-weight:700;color:\${statusColor[st]||'var(--muted)'};">\${statusIcon[st]||''} \${st}</span></td>
@@ -3160,7 +3160,24 @@ window.openClientEditInvoiceModal = async function(id) {
 
 window.markClientInvoicePaid = async function(id) {
   if (!confirm('Mark this invoice as paid?')) return;
-  await sb.from('client_invoices').update({ status: 'paid' }).eq('id', id);
+  const paidAt = new Date().toISOString();
+  const { data: inv } = await sb.from('client_invoices').update({ status: 'paid', paid_at: paidAt })
+    .eq('id', id).select('*').single();
+  if (inv) {
+    // Auto-create income entry so it appears in the Income screen
+    await sb.from('income').insert({
+      client_id:    inv.client_id,
+      income_date:  paidAt.slice(0,10),
+      source:       inv.customer_name || 'Invoice ' + (inv.invoice_number || ''),
+      category:     'Service Revenue',
+      amount:       inv.total,
+      payment_method: inv.payment_method || null,
+      reference:    inv.invoice_number || null,
+      notes:        'Auto-recorded from Invoice ' + (inv.invoice_number || id),
+      status:       'pending',
+      entered_by_role: STATE.isStaff ? 'staff' : 'client'
+    });
+  }
   renderClientInvoices(document.getElementById('screen-container'));
 };
 
@@ -3187,7 +3204,7 @@ function clientInvoiceFormHtml(inv, autoNum) {
       <input id="ci-customer" class="input" value="\${esc(inv?.customer_name||'')}" placeholder="Customer or company name"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Invoice Date</label>
-        <input id="ci-date" class="input" type="date" value="\${esc(inv?.invoice_date || new Date().toISOString().slice(0,10))}"></div>
+        <input id="ci-date" class="input" type="date" value="\${esc(inv?.issue_date || new Date().toISOString().slice(0,10))}"></div>
       <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Due Date</label>
         <input id="ci-due" class="input" type="date" value="\${esc(inv?.due_date||'')}"></div>
     </div>
@@ -3214,6 +3231,16 @@ function clientInvoiceFormHtml(inv, autoNum) {
     </div>
     <div style="margin-bottom:16px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Notes / Terms</label>
       <textarea id="ci-notes" class="input" style="height:60px;resize:none" placeholder="Payment terms, thank-you note, etc.">\${esc(inv?.notes||'')}</textarea></div>
+    <div style="margin-bottom:16px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Payment Method</label>
+      <select id="ci-payment-method" class="input">
+        <option value=""          \${!inv?.payment_method?'selected':''}>— Not specified —</option>
+        <option value="cash"      \${inv?.payment_method==='cash'?'selected':''}>💵 Cash</option>
+        <option value="check"     \${inv?.payment_method==='check'?'selected':''}>📝 Check</option>
+        <option value="zelle"     \${inv?.payment_method==='zelle'?'selected':''}>⚡ Zelle</option>
+        <option value="credit_card" \${inv?.payment_method==='credit_card'?'selected':''}>💳 Credit Card</option>
+        <option value="bank_transfer" \${inv?.payment_method==='bank_transfer'?'selected':''}>🏦 Bank Transfer</option>
+        <option value="other"     \${inv?.payment_method==='other'?'selected':''}>🔁 Other</option>
+      </select></div>
     <div id="ci-err" style="color:var(--red);font-size:13px;margin-bottom:8px"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn btn-secondary" onclick="document.getElementById('ci-modal').hidden=true">Cancel</button>
@@ -3273,21 +3300,43 @@ window.saveCIInvoice = async function(existingId) {
     client_id: clientId,
     invoice_number: document.getElementById('ci-number')?.value.trim(),
     customer_name:  customer,
-    invoice_date:   document.getElementById('ci-date')?.value || null,
+    issue_date:     document.getElementById('ci-date')?.value || null,
     due_date:       document.getElementById('ci-due')?.value  || null,
     status:         document.getElementById('ci-status')?.value || 'draft',
     tax_rate:       taxRate,
     subtotal,
     total,
     notes:          document.getElementById('ci-notes')?.value.trim() || null,
+    payment_method: document.getElementById('ci-payment-method')?.value || null,
     items
   };
 
-  const { error } = existingId
-    ? await sb.from('client_invoices').update(payload).eq('id', existingId)
-    : await sb.from('client_invoices').insert(payload);
+  let savedError;
+  if (existingId) {
+    // Check if status changed TO paid so we can auto-create income
+    const { data: prevInv } = await sb.from('client_invoices').select('status').eq('id', existingId).single();
+    const { error } = await sb.from('client_invoices').update(payload).eq('id', existingId);
+    savedError = error;
+    if (!error && payload.status === 'paid' && prevInv?.status !== 'paid') {
+      await sb.from('income').insert({
+        client_id:    payload.client_id,
+        income_date:  payload.issue_date || new Date().toISOString().slice(0,10),
+        source:       payload.customer_name || 'Invoice ' + (payload.invoice_number || ''),
+        category:     'Service Revenue',
+        amount:       payload.total,
+        payment_method: payload.payment_method || null,
+        reference:    payload.invoice_number || null,
+        notes:        'Auto-recorded from Invoice ' + (payload.invoice_number || existingId),
+        status:       'pending',
+        entered_by_role: STATE.isStaff ? 'staff' : 'client'
+      });
+    }
+  } else {
+    const { error } = await sb.from('client_invoices').insert(payload);
+    savedError = error;
+  }
 
-  if (error) { errEl.textContent = 'Error: ' + error.message; return; }
+  if (savedError) { errEl.textContent = 'Error: ' + savedError.message; return; }
   document.getElementById('ci-modal').hidden = true;
   renderClientInvoices(document.getElementById('screen-container'));
 };
@@ -3313,9 +3362,9 @@ async function renderIncome(container) {
     return;
   }
 
-  // Load COA for account dropdown
-  const { data: accounts } = await sb.from('chart_of_accounts').select('id,account_name,account_type')
-    .eq('client_id', clientId).eq('is_active', true).order('account_name');
+  // Load COA for account dropdown (use 'accounts' table which has real data)
+  const { data: accounts } = await sb.from('accounts').select('id,name,type')
+    .eq('client_id', clientId).eq('is_active', true).order('name');
 
   const { data: rawIncome, error } = await sb.from('income').select('*')
     .eq('client_id', clientId).order('income_date', { ascending: false });
@@ -3424,7 +3473,7 @@ window.openIncomeModal = async function(id) {
 };
 
 function incomeFormHtml(r) {
-  const accts = (window._incomeAccounts||[]).filter(a => ['Revenue','Asset'].includes(a.account_type));
+  const accts = (window._incomeAccounts||[]).filter(a => ['Revenue','Asset','Income'].includes(a.type || a.account_type));
   return \`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
       <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Date *</label>
@@ -3442,7 +3491,7 @@ function incomeFormHtml(r) {
       <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Account</label>
         <select id="inc-account" class="input">
           <option value="">— None —</option>
-          \${accts.map(a=>\`<option value="\${a.id}" \${r?.account_id===a.id?'selected':''}>\${esc(a.account_name)}</option>\`).join('')}
+          \${accts.map(a=>\`<option value="\${a.id}" \${r?.account_id===a.id?'selected':''}>\${esc(a.name||a.account_name)}</option>\`).join('')}
         </select></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
