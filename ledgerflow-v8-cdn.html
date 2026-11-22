@@ -4337,7 +4337,7 @@ async function renderStaffAccess(container) {
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:12px">
         <div>
           <h2 style="font-size:20px;font-weight:700;margin:0 0 4px">Staff &amp; Access</h2>
-          <p style="font-size:13px;color:var(--muted);margin:0">Manage who can access the firm portal and what they can do.</p>
+          <p style="font-size:13px;color:var(--muted);margin:0">Manage who can access the firm portal and what they can do. v2</p>
         </div>
         <button class="btn btn-primary" onclick="openAddStaffModal()">+ Add Staff Member</button>
       </div>
