@@ -4337,7 +4337,7 @@ async function renderStaffAccess(container) {
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:12px">
         <div>
           <h2 style="font-size:20px;font-weight:700;margin:0 0 4px">Staff &amp; Access</h2>
-          <p style="font-size:13px;color:var(--muted);margin:0">Manage who can access the firm portal and what they can do. v2</p>
+          <p style="font-size:13px;color:var(--muted);margin:0">Manage who can access the firm portal and what they can do.</p>
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn" onclick="openManageRegionsModal()" style="border:1.5px solid var(--border);background:none;color:var(--text);font-weight:600">🗺️ Manage Regions</button>
@@ -4723,9 +4723,9 @@ async function loadManageRegionsList() {
   if (error) { el.innerHTML = \`<div class="alert alert-red">\${esc(error.message)}</div>\`; return; }
   if (!data || !data.length) { el.innerHTML = '<div style="font-size:13px;color:var(--muted)">No regions yet.</div>'; return; }
   el.innerHTML = data.map((r, i) => \`
-    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+    <div id="region-row-\${esc(r.id)}" style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
       <span style="font-size:13px;font-weight:500;flex:1">📍 \${esc(r.name)}</span>
-      <span style="font-size:11px;color:var(--muted)">#\${r.sort_order}</span>
+      <button onclick="renameRegion('\${esc(r.id)}','\${esc(r.name)}')" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:2px 8px;border-radius:5px;border:1px solid rgba(79,99,210,.3)" title="Rename">✏️ Rename</button>
       <button onclick="deleteRegion('\${esc(r.id)}','\${esc(r.name)}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:2px 6px" title="Delete region">🗑</button>
     </div>\`).join('');
 }
@@ -4742,6 +4742,31 @@ window.addNewRegion = async function() {
   if (error) { if (errEl) errEl.textContent = 'Error: ' + error.message; return; }
   document.getElementById('mgr-new-region-name').value = '';
   showToast(\`Region "\${name}" added.\`, 'green');
+  loadManageRegionsList();
+};
+
+window.renameRegion = async function(id, currentName) {
+  const el = document.getElementById(\`region-row-\${id}\`);
+  if (!el) return;
+  // Replace the name span with an input + save/cancel
+  el.innerHTML = \`
+    <input id="rename-input-\${id}" type="text" value="\${esc(currentName)}"
+      style="flex:1;padding:4px 8px;border-radius:5px;border:1.5px solid var(--accent);font-size:13px;font-weight:500;background:var(--surface);color:var(--text)">
+    <button onclick="saveRegionRename('\${id}')"
+      style="padding:4px 12px;border-radius:5px;border:none;background:var(--accent);color:#fff;font-size:12px;font-weight:600;cursor:pointer">Save</button>
+    <button onclick="loadManageRegionsList()"
+      style="padding:4px 10px;border-radius:5px;border:1px solid var(--border);background:none;color:var(--text);font-size:12px;cursor:pointer">Cancel</button>
+  \`;
+  document.getElementById(\`rename-input-\${id}\`)?.focus();
+};
+
+window.saveRegionRename = async function(id) {
+  const input = document.getElementById(\`rename-input-\${id}\`);
+  const newName = input?.value?.trim();
+  if (!newName) { showToast('Region name cannot be empty.', 'red'); return; }
+  const { error } = await sb.from('regions').update({ name: newName }).eq('id', id);
+  if (error) { showToast('Error: ' + error.message, 'red'); return; }
+  showToast(\`Region renamed to "\${newName}".\`, 'green');
   loadManageRegionsList();
 };
 
