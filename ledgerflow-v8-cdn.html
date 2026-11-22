@@ -448,6 +448,9 @@ tr:hover td { background: rgba(46,158,107,.04); }
         <button class="nav-item" data-screen="routeworth">
           <span class="icon">🚗</span> RouteWorth Packages
         </button>
+        <button class="nav-item" data-screen="staff" id="nav-staff-btn">
+          <span class="icon">🔐</span> Staff &amp; Access
+        </button>
       </div>
 
       <!-- Client portal footer info -->
@@ -913,6 +916,7 @@ function showApp() {
   // Sidebar: staff-only sections
   document.getElementById('nav-clients-btn').hidden = !STATE.isStaff;
   document.getElementById('nav-staff-only').hidden = !STATE.isStaff;
+  document.getElementById('nav-staff-btn').hidden = !STATE.isAdmin;
   document.getElementById('client-select-wrap').hidden = !STATE.isStaff;
   // Client-specific nav: hide accounts/clients from client portal
   document.getElementById('nav-accounts-btn').hidden = !STATE.isStaff;
@@ -1022,6 +1026,9 @@ function renderScreen(screen) {
       break;
     case 'routeworth':
       renderRouteWorth(container);
+      break;
+    case 'staff':
+      renderStaffAccess(container);
       break;
     case 'messages':
       STATE.isStaff ? renderAdminMessages(container) : renderClientMessages(container);
@@ -4185,6 +4192,285 @@ async function renderTax(container) {
   }
   main.innerHTML = "\n    <div class=\"card\"><table>\n      <thead><tr><th>Year</th><th>Form</th><th>Filed Date</th><th style=\"text-align:right\">Refund</th><th style=\"text-align:right\">Balance Due</th><th>Status</th></tr></thead>\n      <tbody>".concat((data || []).map(r => "\n        <tr>\n          <td style=\"font-weight:600\">".concat(r.tax_year, "</td>\n          <td style=\"font-family:monospace;font-size:12px\">").concat(esc(r.form || '—'), "</td>\n          <td style=\"font-size:12px\">").concat(r.filed_date ? fmtDate(r.filed_date) : '—', "</td>\n          <td style=\"text-align:right;font-variant-numeric:tabular-nums;color:var(--green)\">").concat(r.refund_amount > 0 ? fmt(r.refund_amount) : '—', "</td>\n          <td style=\"text-align:right;font-variant-numeric:tabular-nums;color:var(--red)\">").concat(r.balance_due > 0 ? fmt(r.balance_due) : '—', "</td>\n          <td><span class=\"badge ").concat(r.status === 'filed' ? 'badge-green' : r.status === 'in_review' ? 'badge-blue' : r.status === 'draft' ? 'badge-gold' : 'badge-grey', "\">").concat(esc((r.status || '').replace('_', ' ')), "</span></td>\n        </tr>\n      ")).join(''), "</tbody>\n    </table></div>\n  ");
 }
+
+// ── STAFF & ACCESS (admin only) ───────────────────────────
+// ── STAFF PERMISSIONS CONFIG ─────────────────────────────
+const STAFF_PERMISSIONS = [
+  { key: 'clients',    label: 'Clients',           icon: '👥', adminOnly: false },
+  { key: 'bookkeeping',label: 'Bookkeeping',        icon: '📒', adminOnly: false },
+  { key: 'income',     label: 'Income',             icon: '💰', adminOnly: false },
+  { key: 'expenses',   label: 'Expenses',           icon: '🧾', adminOnly: false },
+  { key: 'invoices',   label: 'Invoices',           icon: '📄', adminOnly: false },
+  { key: 'payroll',    label: 'Payroll',            icon: '💼', adminOnly: false },
+  { key: 'taxes',      label: 'Tax Packages',       icon: '📋', adminOnly: false },
+  { key: 'reports',    label: 'Reports',            icon: '📊', adminOnly: false },
+  { key: 'routeworth', label: 'RouteWorth',         icon: '🚗', adminOnly: false },
+  { key: 'staff',      label: 'Staff & Access',     icon: '🔐', adminOnly: true  },
+];
+
+function permissionsForRole(role) {
+  // Admin gets everything; Staff gets everything except staff management
+  return STAFF_PERMISSIONS.reduce((acc, p) => {
+    acc[p.key] = role === 'admin' ? true : !p.adminOnly;
+    return acc;
+  }, {});
+}
+
+function permChips(role, compact) {
+  const perms = permissionsForRole(role);
+  return STAFF_PERMISSIONS.map(p => {
+    const on = perms[p.key];
+    const size = compact ? 'font-size:11px;padding:3px 8px' : 'font-size:12px;padding:4px 11px';
+    return `<span style="${size};border-radius:20px;font-weight:600;display:inline-flex;align-items:center;gap:4px;
+      background:${on ? 'rgba(46,158,107,.13)' : 'rgba(0,0,0,.06)'};
+      color:${on ? 'var(--green)' : 'var(--muted)'};
+      border:1px solid ${on ? 'rgba(46,158,107,.25)' : 'var(--border)'};
+      white-space:nowrap">
+      <span style="font-size:${compact?'10px':'11px'};opacity:${on?1:.5}">${p.icon}</span>${p.label}
+    </span>`;
+  }).join('');
+}
+
+function staffInitials(email) {
+  const name = email.split('@')[0].replace(/[._-]/g,' ');
+  const parts = name.split(' ').filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
+  return name.slice(0,2).toUpperCase();
+}
+
+function staffAvatarColor(email) {
+  const colors = ['#4f63d2','#2e9e6b','#c9963a','#8b5cf6','#ec4899','#0ea5e9','#f97316','#14b8a6'];
+  let hash = 0;
+  for (let i = 0; i < email.length; i++) hash = email.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
+}
+
+async function renderStaffAccess(container) {
+  if (!STATE.isAdmin) {
+    container.innerHTML = '<div class="alert alert-red" style="margin:28px">Admin access required.</div>';
+    return;
+  }
+  container.innerHTML = `
+    <div style="padding:28px 28px 48px;max-width:860px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:12px">
+        <div>
+          <h2 style="font-size:20px;font-weight:700;margin:0 0 4px">Staff &amp; Access</h2>
+          <p style="font-size:13px;color:var(--muted);margin:0">Manage who can access the firm portal and what they can do.</p>
+        </div>
+        <button class="btn btn-primary" onclick="openAddStaffModal()">+ Add Staff Member</button>
+      </div>
+
+      <!-- Tabs -->
+      <div style="display:flex;gap:0;margin:20px 0 0;border-bottom:2px solid var(--border)">
+        <button id="sa-tab-team" onclick="showStaffTab('team')"
+          style="padding:9px 20px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;
+          color:var(--accent);border-bottom:2px solid var(--accent);margin-bottom:-2px;transition:all .15s">
+          👥 Team Members
+        </button>
+        <button id="sa-tab-roles" onclick="showStaffTab('roles')"
+          style="padding:9px 20px;font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;
+          color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .15s">
+          🛡️ Roles &amp; Permissions
+        </button>
+      </div>
+
+      <!-- Team Members Pane -->
+      <div id="sa-pane-team" style="padding-top:20px">
+        <div id="staff-list-wrap">
+          <div style="color:var(--muted);font-size:13px;padding:20px 0">Loading…</div>
+        </div>
+        <p style="margin-top:16px;font-size:12px;color:var(--muted)">
+          🔐 All staff members are required to set up two-factor authentication (MFA) on first login.
+        </p>
+      </div>
+
+      <!-- Roles & Permissions Pane -->
+      <div id="sa-pane-roles" style="padding-top:20px;display:none">
+        ${renderRolesPane()}
+      </div>
+    </div>
+
+    <!-- Add Staff Modal -->
+    <div id="add-staff-modal" hidden style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:200;padding:16px">
+      <div style="background:var(--surface);border-radius:16px;padding:32px;width:100%;max-width:440px;box-shadow:0 12px 48px rgba(0,0,0,.4)">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+          <div style="width:40px;height:40px;border-radius:10px;background:rgba(79,99,210,.13);display:flex;align-items:center;justify-content:center;font-size:20px">🔐</div>
+          <div>
+            <h3 style="font-size:17px;font-weight:700;margin:0">Add Staff Member</h3>
+            <p style="font-size:12px;color:var(--muted);margin:2px 0 0">They'll be prompted to set up MFA on first login.</p>
+          </div>
+        </div>
+        <div style="height:1px;background:var(--border);margin:18px 0"></div>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase">Email address</label>
+        <input id="new-staff-email" type="email" placeholder="staff@example.com"
+          style="width:100%;padding:10px 12px;border-radius:9px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;margin-bottom:14px;box-sizing:border-box;transition:border-color .15s"
+          onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase">Role</label>
+        <select id="new-staff-role"
+          style="width:100%;padding:10px 12px;border-radius:9px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;margin-bottom:14px;box-sizing:border-box">
+          <option value="staff">Staff — can view and enter data for all clients</option>
+          <option value="admin">Admin — full access including staff management</option>
+        </select>
+        <div id="new-staff-role-preview" style="margin-bottom:14px;padding:12px;background:var(--bg);border-radius:9px;border:1px solid var(--border)">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;margin-bottom:8px">Access granted</div>
+          <div id="new-staff-chips" style="display:flex;flex-wrap:wrap;gap:5px"></div>
+        </div>
+        <div id="add-staff-err" style="color:var(--red);font-size:13px;min-height:18px;margin-bottom:14px"></div>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-primary" style="flex:1" onclick="submitAddStaff()">Add Staff Member</button>
+          <button class="btn" style="flex:1;border:1.5px solid var(--border)" onclick="closeAddStaffModal()">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+
+  // Wire role dropdown preview
+  const roleSelect = document.getElementById('new-staff-role');
+  if (roleSelect) {
+    roleSelect.addEventListener('change', updateAddStaffChips);
+    updateAddStaffChips();
+  }
+
+  loadStaffList();
+}
+
+function updateAddStaffChips() {
+  const role = document.getElementById('new-staff-role')?.value || 'staff';
+  const el = document.getElementById('new-staff-chips');
+  if (el) el.innerHTML = permChips(role, true);
+}
+
+function renderRolesPane() {
+  const roles = [
+    { key: 'admin', label: 'Admin', color: '#c9963a', bg: 'rgba(201,150,58,.1)', desc: 'Full access to all firm data plus staff management and system settings.' },
+    { key: 'staff', label: 'Staff', color: '#2e9e6b', bg: 'rgba(46,158,107,.1)',  desc: 'Can view clients, enter and review accounting data. Cannot manage staff or system settings.' },
+  ];
+  return roles.map(r => `
+    <div style="border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+        <div style="padding:4px 14px;border-radius:20px;font-size:13px;font-weight:700;background:${r.bg};color:${r.color}">${r.label}</div>
+        <p style="font-size:13px;color:var(--muted);margin:0">${r.desc}</p>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;margin-bottom:10px">Permissions</div>
+      <div style="display:flex;flex-wrap:wrap;gap:7px">${permChips(r.key, false)}</div>
+    </div>`).join('');
+}
+
+function showStaffTab(tab) {
+  ['team','roles'].forEach(t => {
+    const btn = document.getElementById('sa-tab-'+t);
+    const pane = document.getElementById('sa-pane-'+t);
+    if (!btn || !pane) return;
+    const active = t === tab;
+    btn.style.color = active ? 'var(--accent)' : 'var(--muted)';
+    btn.style.borderBottomColor = active ? 'var(--accent)' : 'transparent';
+    pane.style.display = active ? 'block' : 'none';
+  });
+}
+
+async function loadStaffList() {
+  const wrap = document.getElementById('staff-list-wrap');
+  if (!wrap) return;
+  const { data, error } = await sb.from('firm_staff').select('*').order('created_at');
+  if (error) { wrap.innerHTML = `<div style="color:var(--red)">${error.message}</div>`; return; }
+  if (!data || !data.length) { wrap.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:20px 0">No staff members yet. Add one above.</div>'; return; }
+
+  const cards = data.map(s => {
+    const isMe = s.email === STATE.user?.email;
+    const initials = staffInitials(s.email);
+    const avatarColor = staffAvatarColor(s.email);
+    const isAdmin = s.role === 'admin';
+    const chips = permChips(s.role, true);
+    return `
+      <div style="border:1px solid var(--border);border-radius:14px;padding:18px 20px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <div style="width:44px;height:44px;border-radius:50%;background:${avatarColor};color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0">${initials}</div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis">${esc(s.email)}</span>
+              ${isMe ? '<span style="font-size:11px;padding:2px 8px;border-radius:20px;background:var(--bg);border:1px solid var(--border);color:var(--muted)">You</span>' : ''}
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+              <span style="font-size:12px;font-weight:600;padding:2px 10px;border-radius:20px;
+                background:${isAdmin?'rgba(201,150,58,.13)':'rgba(46,158,107,.12)'};
+                color:${isAdmin?'var(--gold)':'var(--green)'}">
+                ${isAdmin?'Admin':'Staff'}
+              </span>
+              <span style="font-size:12px;color:var(--muted)">Added ${s.created_at ? new Date(s.created_at).toLocaleDateString() : '—'}</span>
+              ${!s.auth_user_id ? '<span style="font-size:11px;padding:2px 8px;border-radius:20px;background:rgba(201,150,58,.12);color:var(--gold);border:1px solid rgba(201,150,58,.2)">⏳ Pending signup</span>' : ''}
+            </div>
+          </div>
+          ${!isMe ? `
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <select onchange="changeStaffRole('${esc(s.id)}', this.value)"
+              style="padding:5px 10px;border-radius:7px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-weight:600;cursor:pointer">
+              <option value="staff" ${s.role==='staff'?'selected':''}>Staff</option>
+              <option value="admin" ${s.role==='admin'?'selected':''}>Admin</option>
+            </select>
+            <button onclick="removeStaff('${esc(s.id)}','${esc(s.email)}')"
+              style="padding:5px 12px;border-radius:7px;border:1.5px solid rgba(220,53,69,.35);background:none;color:var(--red);font-size:12px;font-weight:600;cursor:pointer">
+              Remove
+            </button>
+          </div>` : ''}
+        </div>
+        <!-- permission chips -->
+        <div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:7px">Access</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px">${chips}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  wrap.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">${cards}</div>`;
+}
+
+window.openAddStaffModal = function() {
+  document.getElementById('new-staff-email').value = '';
+  document.getElementById('add-staff-err').textContent = '';
+  document.getElementById('add-staff-modal').hidden = false;
+  updateAddStaffChips();
+  setTimeout(() => document.getElementById('new-staff-email').focus(), 50);
+};
+
+window.closeAddStaffModal = function() {
+  document.getElementById('add-staff-modal').hidden = true;
+};
+
+window.submitAddStaff = async function() {
+  const email = document.getElementById('new-staff-email').value.trim().toLowerCase();
+  const role  = document.getElementById('new-staff-role').value;
+  const errEl = document.getElementById('add-staff-err');
+  errEl.textContent = '';
+  if (!email || !email.includes('@')) { errEl.textContent = 'Please enter a valid email address.'; return; }
+
+  // Try to look up auth user by email (requires get_user_id_by_email RPC)
+  let authUserId = null;
+  try {
+    const { data: users } = await sb.rpc('get_user_id_by_email', { p_email: email });
+    authUserId = users?.[0]?.id || null;
+  } catch(_) { /* RPC may not exist yet — proceed with null */ }
+
+  const { error: insErr } = await sb.from('firm_staff').insert({ email, role, auth_user_id: authUserId });
+  if (insErr && insErr.code === '23505') { errEl.textContent = 'That email is already a staff member.'; return; }
+  if (insErr) { errEl.textContent = 'Error: ' + insErr.message; return; }
+
+  closeAddStaffModal();
+  loadStaffList();
+};
+
+window.changeStaffRole = async function(id, role) {
+  const { error } = await sb.from('firm_staff').update({ role }).eq('id', id);
+  if (error) { showToast('Error updating role: ' + error.message, 'red'); return; }
+  showToast('Role updated.', 'green');
+  loadStaffList();
+};
+
+window.removeStaff = async function(id, email) {
+  if (!confirm(`Remove ${email} from staff?\n\nThey will lose access to the portal immediately.`)) return;
+  const { error } = await sb.from('firm_staff').delete().eq('id', id);
+  if (error) { showToast('Error: ' + error.message, 'red'); return; }
+  showToast('Staff member removed.', 'green');
+  loadStaffList();
+};
 
 // ── REPORTS (staff only) ──────────────────────────────────
 async function renderReports(container) {
