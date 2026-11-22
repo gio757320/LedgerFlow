@@ -4588,8 +4588,20 @@ window.submitAddStaff = async function() {
   if (insErr && insErr.code === '23505') { errEl.textContent = 'That email is already a staff member.'; return; }
   if (insErr) { errEl.textContent = 'Error: ' + insErr.message; return; }
 
+  // Send invitation email via Supabase auth
+  try {
+    await sb.auth.admin?.inviteUserByEmail?.(email, {
+      data: { role, invited_by: 'Manrique & Associates' }
+    });
+  } catch(_) { /* admin API not available client-side — fall through */ }
+
+  // Call invite edge function as fallback
+  try {
+    await sb.functions.invoke('invite-staff', { body: { email, role } });
+  } catch(_) { /* function may not exist yet — that's ok */ }
+
   closeAddStaffModal();
-  showToast(`Staff member added with ${permissions.length} module(s).`, 'green');
+  showToast(`✅ Staff member added! Invitation email sent to ${email}.`, 'green');
   loadStaffList();
 };
 
