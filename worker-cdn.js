@@ -716,12 +716,14 @@ async function onSignedIn(user) {
   let staffErr = null;
 
   const r1 = await sb.from('firm_staff').select('*').eq('auth_user_id', user.id).maybeSingle();
+  console.log('[STAFF DEBUG] r1 by auth_user_id:', JSON.stringify(r1));
   if (r1.error) staffErr = r1.error.message;
   else staffRow = r1.data;
 
   // If not found by auth_user_id, try by email (pre-registered or not yet linked)
   if (!staffRow && user.email) {
     const r2 = await sb.from('firm_staff').select('*').eq('email', user.email.toLowerCase()).maybeSingle();
+    console.log('[STAFF DEBUG] r2 by email:', JSON.stringify(r2));
     if (!r2.error) {
       staffRow = r2.data;
       // Link auth_user_id if missing
@@ -732,6 +734,7 @@ async function onSignedIn(user) {
     }
   }
 
+  console.log('[STAFF DEBUG] final staffRow:', JSON.stringify(staffRow), 'user.id:', user.id, 'email:', user.email);
   STATE.staffRow = staffRow;
   STATE.isStaff = !!staffRow;
   STATE.isAdmin = staffRow?.role === 'admin';
