@@ -4339,7 +4339,10 @@ async function renderStaffAccess(container) {
           <h2 style="font-size:20px;font-weight:700;margin:0 0 4px">Staff &amp; Access</h2>
           <p style="font-size:13px;color:var(--muted);margin:0">Manage who can access the firm portal and what they can do. v2</p>
         </div>
-        <button class="btn btn-primary" onclick="openAddStaffModal()">+ Add Staff Member</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn" onclick="openManageRegionsModal()" style="border:1.5px solid var(--border);background:none;color:var(--text);font-weight:600">🗺️ Manage Regions</button>
+          <button class="btn btn-primary" onclick="openAddStaffModal()">+ Add Staff Member</button>
+        </div>
       </div>
 
       <!-- Tabs -->
