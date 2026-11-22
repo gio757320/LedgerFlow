@@ -711,16 +711,24 @@ function showPasswordResetForm() {
 async function onSignedIn(user) {
   STATE.user = user;
 
-  // Check if staff (look up by auth_user_id first, then by email for pre-registered accounts)
-  let { data: staffRow } = await sb.from('firm_staff').select('*').eq('auth_user_id', user.id).maybeSingle();
+  // Check if staff — try auth_user_id first, then email (covers both linked and pre-registered)
+  let staffRow = null;
+  let staffErr = null;
 
-  // Auto-linkage: if no row by auth_user_id, check for a pre-registered row by email
+  const r1 = await sb.from('firm_staff').select('*').eq('auth_user_id', user.id).maybeSingle();
+  if (r1.error) staffErr = r1.error.message;
+  else staffRow = r1.data;
+
+  // If not found by auth_user_id, try by email (pre-registered or not yet linked)
   if (!staffRow && user.email) {
-    const { data: preRow } = await sb.from('firm_staff').select('*').eq('email', user.email.toLowerCase()).is('auth_user_id', null).maybeSingle();
-    if (preRow) {
-      // Link their auth_user_id now that they've signed up
-      await sb.from('firm_staff').update({ auth_user_id: user.id }).eq('id', preRow.id);
-      staffRow = { ...preRow, auth_user_id: user.id };
+    const r2 = await sb.from('firm_staff').select('*').eq('email', user.email.toLowerCase()).maybeSingle();
+    if (!r2.error) {
+      staffRow = r2.data;
+      // Link auth_user_id if missing
+      if (staffRow && !staffRow.auth_user_id) {
+        await sb.from('firm_staff').update({ auth_user_id: user.id }).eq('id', staffRow.id);
+        staffRow = { ...staffRow, auth_user_id: user.id };
+      }
     }
   }
 
