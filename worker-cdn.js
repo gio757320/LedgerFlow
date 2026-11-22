@@ -4764,8 +4764,11 @@ window.saveRegionRename = async function(id) {
   const input = document.getElementById(\`rename-input-\${id}\`);
   const newName = input?.value?.trim();
   if (!newName) { showToast('Region name cannot be empty.', 'red'); return; }
-  const { error } = await sb.from('regions').update({ name: newName }).eq('id', id);
-  if (error) { showToast('Error: ' + error.message, 'red'); return; }
+  const btn = input?.nextElementSibling;
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  const { data, error } = await sb.from('regions').update({ name: newName }).eq('id', id).select();
+  if (error) { showToast('Error saving: ' + error.message, 'red'); if (btn) { btn.disabled = false; btn.textContent = 'Save'; } return; }
+  if (!data || data.length === 0) { showToast('Could not update — region not found or no permission.', 'red'); if (btn) { btn.disabled = false; btn.textContent = 'Save'; } return; }
   showToast(\`Region renamed to "\${newName}".\`, 'green');
   loadManageRegionsList();
 };
