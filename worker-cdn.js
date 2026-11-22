@@ -4516,6 +4516,10 @@ async function loadStaffList() {
               style="padding:5px 12px;border-radius:7px;border:1.5px solid rgba(79,99,210,.35);background:none;color:var(--accent);font-size:12px;font-weight:600;cursor:pointer">
               📍 Regions
             </button>
+            <button onclick="sendStaffInvite('\${esc(s.email)}')"
+              style="padding:5px 12px;border-radius:7px;border:1.5px solid rgba(46,158,107,.35);background:none;color:var(--green);font-size:12px;font-weight:600;cursor:pointer">
+              ✉️ Send Invite
+            </button>
             <button onclick="removeStaff('\${esc(s.id)}','\${esc(s.email)}')"
               style="padding:5px 12px;border-radius:7px;border:1.5px solid rgba(220,53,69,.35);background:none;color:var(--red);font-size:12px;font-weight:600;cursor:pointer">
               Remove
@@ -4603,6 +4607,17 @@ window.submitAddStaff = async function() {
   closeAddStaffModal();
   showToast(\`✅ Staff member added! Invitation email sent to \${email}.\`, 'green');
   loadStaffList();
+};
+
+window.sendStaffInvite = async function(email) {
+  showToast(\`Sending invite to \${email}…\`, 'blue');
+  try {
+    const { error } = await sb.functions.invoke('invite-staff', { body: { email } });
+    if (error) { showToast('Error: ' + (error.message || 'Could not send invite'), 'red'); return; }
+    showToast(\`✅ Invitation sent to \${email}!\`, 'green');
+  } catch(e) {
+    showToast('Error sending invite: ' + String(e), 'red');
+  }
 };
 
 // ── Edit Permissions Modal ──────────────────────────────────────────────────
