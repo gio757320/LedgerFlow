@@ -781,6 +781,20 @@ async function showMfaEnrollScreen() {
   const secret  = enrollData.totp.secret;
   const factorId = enrollData.id;
 
+  // Extract raw SVG from the data URI (data:image/svg+xml;base64,... or data:image/svg+xml,...)
+  let svgHtml = '';
+  try {
+    if (qrCode.startsWith('data:image/svg+xml;base64,')) {
+      svgHtml = atob(qrCode.slice('data:image/svg+xml;base64,'.length));
+    } else if (qrCode.startsWith('data:image/svg+xml,')) {
+      svgHtml = decodeURIComponent(qrCode.slice('data:image/svg+xml,'.length));
+    } else {
+      svgHtml = `<img src="${qrCode}" style="width:180px;height:180px">`;
+    }
+  } catch(e) {
+    svgHtml = `<img src="${qrCode}" style="width:180px;height:180px">`;
+  }
+
   let el = document.getElementById('mfa-screen');
   if (!el) { el = document.createElement('div'); el.id = 'mfa-screen'; document.body.appendChild(el); }
   el.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:1000;padding:16px';
@@ -789,7 +803,7 @@ async function showMfaEnrollScreen() {
       <div style="font-size:22px;font-weight:700;margin-bottom:6px">Set up two-factor authentication</div>
       <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Scan this QR code with <strong>Google Authenticator</strong>, <strong>Authy</strong>, or any authenticator app, then enter the 6-digit code to confirm.</div>
       <div style="text-align:center;margin-bottom:16px">
-        <img src="${qrCode}" style="width:180px;height:180px;border-radius:8px;border:2px solid var(--border)">
+        <div style="display:inline-block;width:180px;height:180px;border-radius:8px;border:2px solid var(--border);overflow:hidden;background:#fff">${svgHtml}</div>
       </div>
       <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:20px">
         Can't scan? Enter this code manually:<br>
