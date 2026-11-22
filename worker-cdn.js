@@ -711,13 +711,22 @@ function showPasswordResetForm() {
 async function onSignedIn(user) {
   STATE.user = user;
 
-  // Check if staff
-  const {
-    data: staffRow
-  } = await sb.from('staff').select('*').eq('auth_user_id', user.id).maybeSingle();
+  // Check if staff (look up by auth_user_id first, then by email for pre-registered accounts)
+  let { data: staffRow } = await sb.from('firm_staff').select('*').eq('auth_user_id', user.id).maybeSingle();
+
+  // Auto-linkage: if no row by auth_user_id, check for a pre-registered row by email
+  if (!staffRow && user.email) {
+    const { data: preRow } = await sb.from('firm_staff').select('*').eq('email', user.email.toLowerCase()).is('auth_user_id', null).maybeSingle();
+    if (preRow) {
+      // Link their auth_user_id now that they've signed up
+      await sb.from('firm_staff').update({ auth_user_id: user.id }).eq('id', preRow.id);
+      staffRow = { ...preRow, auth_user_id: user.id };
+    }
+  }
+
   STATE.staffRow = staffRow;
   STATE.isStaff = !!staffRow;
-  STATE.isAdmin = (staffRow === null || staffRow === void 0 ? void 0 : staffRow.role) === 'admin';
+  STATE.isAdmin = staffRow?.role === 'admin';
 
   // MFA gate for staff accounts
   if (STATE.isStaff) {
