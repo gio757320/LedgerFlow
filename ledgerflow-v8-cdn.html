@@ -715,6 +715,13 @@ async function onSignedIn(user) {
   STATE.staffRow = staffRow;
   STATE.isStaff = !!staffRow;
   STATE.isAdmin = (staffRow === null || staffRow === void 0 ? void 0 : staffRow.role) === 'admin';
+
+  // MFA gate for staff accounts
+  if (STATE.isStaff) {
+    const aalOk = await ensureStaffMfa();
+    if (!aalOk) return; // MFA screen is showing — don't load the app yet
+  }
+
   if (STATE.isStaff) {
     const {
       data: clients
@@ -731,6 +738,139 @@ async function onSignedIn(user) {
   }
   showApp();
 }
+
+// ── MFA gate for staff ──────────────────────────────────────────────────────
+// Returns true if the session is already AAL2 (MFA verified), false if we
+// showed an enrollment or verification screen (caller must wait).
+async function ensureStaffMfa() {
+  const { data: aalData } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+  const currentLevel = aalData?.currentLevel;
+  const nextLevel    = aalData?.nextLevel;
+
+  // Already fully verified — nothing to do
+  if (currentLevel === 'aal2') return true;
+
+  // Has an enrolled factor but hasn't verified this session yet → verify
+  const { data: factors } = await sb.auth.mfa.listFactors();
+  const totpFactors = (factors?.totp) || [];
+
+  if (totpFactors.length > 0) {
+    showMfaVerifyScreen(totpFactors[0].id);
+    return false;
+  }
+
+  // No factor enrolled yet → enrollment screen
+  showMfaEnrollScreen();
+  return false;
+}
+
+function hideMfaScreen() {
+  const el = document.getElementById('mfa-screen');
+  if (el) el.remove();
+}
+
+async function showMfaEnrollScreen() {
+  document.getElementById('login-screen').hidden = true;
+  document.getElementById('app-shell').hidden = true;
+
+  // Create the TOTP factor
+  const { data: enrollData, error: enrollErr } = await sb.auth.mfa.enroll({ factorType: 'totp', issuer: 'LedgerFlow', friendlyName: 'Authenticator' });
+  if (enrollErr) { alert('MFA setup error: ' + enrollErr.message); return; }
+
+  const qrCode  = enrollData.totp.qr_code;   // SVG data URI
+  const secret  = enrollData.totp.secret;
+  const factorId = enrollData.id;
+
+  let el = document.getElementById('mfa-screen');
+  if (!el) { el = document.createElement('div'); el.id = 'mfa-screen'; document.body.appendChild(el); }
+  el.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:1000;padding:16px';
+  el.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:36px;width:100%;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,.4)">
+      <div style="font-size:22px;font-weight:700;margin-bottom:6px">Set up two-factor authentication</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Scan this QR code with <strong>Google Authenticator</strong>, <strong>Authy</strong>, or any authenticator app, then enter the 6-digit code to confirm.</div>
+      <div style="text-align:center;margin-bottom:16px">
+        <img src="${qrCode}" style="width:180px;height:180px;border-radius:8px;border:2px solid var(--border)">
+      </div>
+      <div style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:20px">
+        Can't scan? Enter this code manually:<br>
+        <code style="font-size:13px;letter-spacing:.1em;color:var(--fg)">${secret}</code>
+      </div>
+      <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">6-digit code from your app</label>
+      <input id="mfa-enroll-code" type="text" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code"
+        style="width:100%;padding:12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--fg);font-size:20px;letter-spacing:.2em;text-align:center;box-sizing:border-box;margin-bottom:12px">
+      <div id="mfa-enroll-err" style="color:var(--red);font-size:13px;min-height:18px;margin-bottom:12px"></div>
+      <button id="mfa-enroll-btn" class="btn btn-primary" style="width:100%;padding:12px;font-size:15px" onclick="submitMfaEnroll('${factorId}')">Verify & activate</button>
+      <button onclick="sb.auth.signOut()" style="margin-top:12px;width:100%;background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer">Cancel — sign out</button>
+    </div>`;
+}
+
+window.submitMfaEnroll = async function(factorId) {
+  const code = document.getElementById('mfa-enroll-code').value.trim();
+  const errEl = document.getElementById('mfa-enroll-err');
+  const btn   = document.getElementById('mfa-enroll-btn');
+  errEl.textContent = '';
+  if (code.length !== 6) { errEl.textContent = 'Please enter the 6-digit code.'; return; }
+  btn.disabled = true; btn.textContent = 'Verifying…';
+
+  const { data: challengeData, error: cErr } = await sb.auth.mfa.challenge({ factorId });
+  if (cErr) { errEl.textContent = cErr.message; btn.disabled = false; btn.textContent = 'Verify & activate'; return; }
+
+  const { error: vErr } = await sb.auth.mfa.verify({ factorId, challengeId: challengeData.id, code });
+  if (vErr) { errEl.textContent = 'Invalid code — try again.'; btn.disabled = false; btn.textContent = 'Verify & activate'; return; }
+
+  // MFA enrolled and verified — proceed into the app
+  hideMfaScreen();
+  const clients = (await sb.from('clients').select('id,full_name,entity_type').order('full_name')).data || [];
+  STATE.clientRows = clients;
+  populateClientSelect();
+  showApp();
+};
+
+async function showMfaVerifyScreen(factorId) {
+  document.getElementById('login-screen').hidden = true;
+  document.getElementById('app-shell').hidden = true;
+
+  let el = document.getElementById('mfa-screen');
+  if (!el) { el = document.createElement('div'); el.id = 'mfa-screen'; document.body.appendChild(el); }
+  el.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:1000;padding:16px';
+  el.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:36px;width:100%;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.4)">
+      <div style="font-size:22px;font-weight:700;margin-bottom:6px">Two-factor verification</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:24px">Enter the 6-digit code from your authenticator app to continue.</div>
+      <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">Authenticator code</label>
+      <input id="mfa-verify-code" type="text" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code"
+        style="width:100%;padding:12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--fg);font-size:20px;letter-spacing:.2em;text-align:center;box-sizing:border-box;margin-bottom:12px">
+      <div id="mfa-verify-err" style="color:var(--red);font-size:13px;min-height:18px;margin-bottom:12px"></div>
+      <button id="mfa-verify-btn" class="btn btn-primary" style="width:100%;padding:12px;font-size:15px" onclick="submitMfaVerify('${factorId}')">Verify</button>
+      <button onclick="sb.auth.signOut()" style="margin-top:12px;width:100%;background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer">Cancel — sign out</button>
+    </div>`;
+
+  document.getElementById('mfa-verify-code').addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitMfaVerify(factorId);
+  });
+}
+
+window.submitMfaVerify = async function(factorId) {
+  const code = document.getElementById('mfa-verify-code').value.trim();
+  const errEl = document.getElementById('mfa-verify-err');
+  const btn   = document.getElementById('mfa-verify-btn');
+  errEl.textContent = '';
+  if (code.length !== 6) { errEl.textContent = 'Please enter the 6-digit code.'; return; }
+  btn.disabled = true; btn.textContent = 'Verifying…';
+
+  const { data: challengeData, error: cErr } = await sb.auth.mfa.challenge({ factorId });
+  if (cErr) { errEl.textContent = cErr.message; btn.disabled = false; btn.textContent = 'Verify'; return; }
+
+  const { error: vErr } = await sb.auth.mfa.verify({ factorId, challengeId: challengeData.id, code });
+  if (vErr) { errEl.textContent = 'Invalid code — try again.'; btn.disabled = false; btn.textContent = 'Verify'; return; }
+
+  // Verified — proceed into the app
+  hideMfaScreen();
+  const clients = (await sb.from('clients').select('id,full_name,entity_type').order('full_name')).data || [];
+  STATE.clientRows = clients;
+  populateClientSelect();
+  showApp();
+};
 function onSignedOut() {
   if (window._notifInterval) { clearInterval(window._notifInterval); window._notifInterval = null; }
   STATE = {
