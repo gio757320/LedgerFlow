@@ -2062,20 +2062,33 @@ async function renderClientPortalDashboard(container) {
 // ── CLIENTS ────────────────────────────────────────────────
 async function renderClients(container) {
   container.innerHTML = pageShell('Clients', 'Firm Roster', "\\n    <button class=\\"btn btn-secondary\\" onclick=\\"openAddClientModal()\\">+ Add Client</button>\\n  ", '<div class="loading-block"><span class="spinner"></span> Loading clients…</div>');
-  const {
-    data,
-    error
-  } = await sb.from('clients').select('*').order('full_name');
   const main = container.querySelector('#main');
+
+  // Build query — join regions for name; filter by staff regions if not admin
+  let query = sb.from('clients').select('*, regions(id,name)').order('full_name');
+
+  if (!STATE.isAdmin && STATE.staffRow) {
+    // Load this staff member's assigned region IDs
+    const { data: srData } = await sb.from('staff_regions')
+      .select('region_id').eq('staff_id', STATE.staffRow.id);
+    const myRegionIds = (srData || []).map(r => r.region_id);
+    if (myRegionIds.length === 0) {
+      main.innerHTML = '<div class="empty"><div class="empty-icon">🗺️</div><div>No regions assigned yet.</div><div style="font-size:13px;color:var(--muted);margin-top:8px">Ask an admin to assign your regions in Staff & Access.</div></div>';
+      return;
+    }
+    query = query.in('region_id', myRegionIds);
+  }
+
+  const { data, error } = await query;
   if (error || !data) {
-    main.innerHTML = '<div class="alert alert-red">Error loading clients: ' + esc(error === null || error === void 0 ? void 0 : error.message) + '</div>';
+    main.innerHTML = '<div class="alert alert-red">Error loading clients: ' + esc(error?.message) + '</div>';
     return;
   }
   if (!data.length) {
     main.innerHTML = '<div class="empty"><div class="empty-icon">👥</div>No clients yet.</div>';
     return;
   }
-  main.innerHTML = "\\n    <div class=\\"card\\">\\n      <table>\\n        <thead><tr>\\n          <th>Client</th><th>Business Type</th><th>EIN / ITIN</th><th>Contact</th><th>Status</th><th></th>\\n        </tr></thead>\\n        <tbody>".concat(data.map(c => "\\n          <tr class=\\"client-row\\" data-client-id=\\"".concat(esc(c.id), "\\" style=\\"cursor:pointer\\">\\n            <td><div style=\\"font-weight:600\\">").concat(esc(c.full_name), "</div>").concat(c.service_package ? "<div style=\\\\\\"font-size:11px;margin-top:2px;color:var(--gold);font-weight:600\\\\\\">".concat(({starter:'⭐ Starter',essentials:'✨ Essentials',growth:'🚀 Growth',premium:'💎 Premium'})[c.service_package]||c.service_package, "</div>") : '', "</td>\\n            <td>").concat(esc(c.entity_type || '—'), "</td>\\n            <td style=\\"font-family:monospace;font-size:12px\\">").concat(esc(c.email || '—'), "</td>\\n            <td style=\\"font-size:12px\\">").concat(esc(c.phone || '—'), "</td>\\n            <td><span class=\\"badge ").concat(c.status === 'active' ? 'badge-green' : 'badge-grey', "\\">").concat(esc(c.status || 'inactive'), "</span></td>\\n            <td style=\\"text-align:right;padding-right:8px\\"><button class=\\"btn btn-secondary client-view-btn\\" data-client-id=\\"").concat(esc(c.id), "\\" style=\\"font-size:12px;padding:3px 10px\\">View →</button></td>\\n          </tr>\\n        ")).join(''), "</tbody>\\n      </table>\\n    </div>\\n  ");
+  main.innerHTML = "\\n    <div class=\\"card\\">\\n      <table>\\n        <thead><tr>\\n          <th>Client</th><th>Region</th><th>Business Type</th><th>Contact</th><th>Status</th><th></th>\\n        </tr></thead>\\n        <tbody>".concat(data.map(c => "\\n          <tr class=\\"client-row\\" data-client-id=\\"".concat(esc(c.id), "\\" style=\\"cursor:pointer\\">\\n            <td><div style=\\"font-weight:600\\">").concat(esc(c.full_name), "</div>").concat(c.service_package ? "<div style=\\\\\\"font-size:11px;margin-top:2px;color:var(--gold);font-weight:600\\\\\\">".concat(({starter:'⭐ Starter',essentials:'✨ Essentials',growth:'🚀 Growth',premium:'💎 Premium'})[c.service_package]||c.service_package, "</div>") : '', "</td>\\n            <td><span style=\\"font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:rgba(79,99,210,.1);color:var(--accent)\\">").concat(esc(c.regions?.name || '—'), "</span></td>\\n            <td>").concat(esc(c.entity_type || '—'), "</td>\\n            <td style=\\"font-size:12px\\">").concat(esc(c.email || c.phone || '—'), "</td>\\n            <td><span class=\\"badge ").concat(c.status === 'active' ? 'badge-green' : 'badge-grey', "\\">").concat(esc(c.status || 'inactive'), "</span></td>\\n            <td style=\\"text-align:right;padding-right:8px\\"><button class=\\"btn btn-secondary client-view-btn\\" data-client-id=\\"").concat(esc(c.id), "\\" style=\\"font-size:12px;padding:3px 10px\\">View →</button></td>\\n          </tr>\\n        ")).join(''), "</tbody>\\n      </table>\\n    </div>\\n  ");
 
   // Wire up row / button clicks
   main.querySelectorAll('.client-view-btn').forEach(btn => {
@@ -2100,7 +2113,7 @@ function openClientDetail(c) {
   bd.className = 'modal-backdrop';
   bd.id = 'cdet-backdrop';
   const info = (label, val) => val ? "\\n    <div style=\\"display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)\\">\\n      <span style=\\"min-width:140px;font-size:12px;color:var(--muted)\\">".concat(label, "</span>\\n      <span style=\\"font-size:13px;font-weight:500\\">").concat(esc(val), "</span>\\n    </div>") : '';
-  bd.innerHTML = "\\n    <div class=\\"modal\\" role=\\"dialog\\" style=\\"max-width:520px\\">\\n      <div class=\\"modal-header\\">\\n        <h3>".concat(esc(c.full_name), "</h3>\\n        <button class=\\"modal-close\\" onclick=\\"closeModal('cdet-backdrop')\\" aria-label=\\"Close\\">×</button>\\n      </div>\\n      <div class=\\"modal-body\\">\\n        <div style=\\"margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap\\">\\n          <span class=\\"badge ").concat(c.status === 'active' ? 'badge-green' : 'badge-grey', "\\">").concat(esc(c.status || 'inactive'), "</span>\\n          <span style=\\"font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;").concat((c.client_type || 'personal') === 'business' ? 'background:rgba(234,179,8,.15);color:var(--gold)' : 'background:rgba(34,197,94,.12);color:var(--green)', "\\">").concat((c.client_type || 'personal') === 'business' ? '🏢 Business' : '👤 Personal', "</span>\\n          <span style=\\"font-size:13px;color:var(--muted)\\">").concat(esc(c.entity_type || ''), "</span>\\n        </div>\\n        ").concat(info('Email', c.email), "\\n        ").concat(info('Phone', c.phone), "\\n        ").concat(info('Address', c.address), "\\n        ").concat(info('EIN / ITIN', c.ein), "\\n        ").concat(info('State', c.state), "\\n        ").concat(info('Industry', c.industry), "\\n        ").concat(info('Service Package', c.service_package ? ({starter:'⭐ Starter — $149/mo', essentials:'✨ Essentials — $299/mo', growth:'🚀 Growth — $499/mo', premium:'💎 Premium — $799/mo'})[c.service_package] || c.service_package : null), "\\n        ").concat(info('Notes', c.notes), "\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\\">QUICK ACTIONS</div>\\n          <div style=\\"display:flex;flex-wrap:wrap;gap:8px\\">\\n            <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('journal')\\">📒 Journal Entries</button>\\n            <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('payroll')\\">💼 Payroll</button>\\n            <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('tax')\\">🏛 Tax Returns</button>\\n            <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\\">📊 Dashboard</button>\\n            <button class=\\"btn btn-secondary\\" id=\\"cdet-apply-coa-btn\\" onclick=\\"openApplyCOAPanel('").concat(esc(c.id), "')\\">📂 Apply COA Template</button>\\n          </div>\\n        </div>\\n\\n        <div id=\\"cdet-coa-panel\\" style=\\"display:none;margin-top:12px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\\">\\n          <div style=\\"font-size:12px;font-weight:600;margin-bottom:8px\\">Select an industry template to load into this client's Chart of Accounts:</div>\\n          <select id=\\"cdet-coa-industry\\" style=\\"width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:10px\\">\\n            <option value=\\"\\">— Pick an industry —</option>\\n            <option>Professional Services</option><option>Medical / Healthcare</option>\\n            <option>Salon & Beauty</option><option>Cleaning Services</option>\\n            <option>Landscaping & Lawn Care</option><option>Auto Repair & Mechanic</option>\\n            <option>Restaurant / Food Service</option><option>Catering</option>\\n            <option>Food Truck</option><option>Bar & Nightclub</option>\\n            <option>General Contractor</option><option>Plumbing & HVAC</option>\\n            <option>Electrical</option><option>Painting & Flooring</option>\\n            <option>Retail Store</option><option>E-Commerce/Online Store</option>\\n            <option>Wholesale & Distribution</option><option>Trucking/Freight</option>\\n            <option>Rideshare/Gig Worker</option><option>Moving Company</option>\\n            <option>Real Estate Agent/Broker</option><option>Property Management</option>\\n            <option>Short-Term Rental (Airbnb)</option><option>Tech/Software Company</option>\\n            <option>IT Services & Consulting</option><option>Marketing & Design Agency</option>\\n            <option>Nonprofit Organization</option><option>Church/Religious Organization</option>\\n            <option>General/Other</option>\\n          </select>\\n          <div style=\\"font-size:11px;color:var(--muted);margin-bottom:10px\\">⚠️ This will add template accounts to this client. Existing accounts are kept.</div>\\n          <div style=\\"display:flex;gap:8px\\">\\n            <button class=\\"btn btn-primary\\" id=\\"cdet-coa-apply-btn\\" style=\\"font-size:12px;padding:6px 14px\\">Apply Template</button>\\n            <button class=\\"btn\\" onclick=\\"document.getElementById('cdet-coa-panel').style.display='none'\\" style=\\"font-size:12px;padding:6px 14px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Cancel</button>\\n          </div>\\n          <div id=\\"cdet-coa-msg\\" style=\\"font-size:12px;margin-top:8px;min-height:14px\\"></div>\\n        </div>\\n\\n        <div style=\\"margin-top:20px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\\">\\n          <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\\">🔑 CLIENT PORTAL ACCESS</div>\\n          ").concat(c.auth_user_id ? "<div style=\\"display:flex;align-items:center;gap:8px\\">\\n                <span style=\\"color:var(--green);font-size:16px\\">✓</span>\\n                <span style=\\"font-size:13px;font-weight:500\\">Portal access linked</span>\\n              </div>\\n              <div style=\\"font-size:12px;color:var(--muted);margin-top:4px\\">Client email: <strong>".concat(esc(c.email || ''), "</strong></div>\\n              <button class=\\"btn btn-secondary\\" id=\\"cdet-resend-btn\\" style=\\"margin-top:10px;font-size:12px;padding:6px 12px\\">↺ Resend password email</button>\\n              <div id=\\"cdet-resend-msg\\" style=\\"font-size:12px;margin-top:6px;min-height:16px\\"></div>") : "<div style=\\"font-size:13px;color:var(--muted);margin-bottom:10px\\">This client does not have portal access yet.</div>\\n              <div style=\\"display:flex;align-items:center;gap:8px\\">\\n                <input id=\\"cdet-portal-email\\" type=\\"email\\" placeholder=\\"Client email\\" value=\\"".concat(esc(c.email || ''), "\\" style=\\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\\">\\n                <button class=\\"btn btn-primary\\" id=\\"cdet-invite-btn\\" style=\\"white-space:nowrap;font-size:12px;padding:7px 14px\\">Create Login</button>\\n              </div>\\n              <div id=\\"cdet-invite-msg\\" style=\\"font-size:12px;margin-top:6px;min-height:16px\\"></div>"), "\\n        </div>\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"display:flex;align-items:center;justify-content:space-between;margin-bottom:10px\\">\\n            <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em\\">📋 TASKS</div>\\n            <div style=\\"display:flex;gap:6px\\">\\n              <button class=\\"btn\\" id=\\"cdet-assign-year-btn\\" style=\\"font-size:11px;padding:4px 10px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">📅 Assign Year Tasks</button>\\n              <button class=\\"btn btn-primary\\" id=\\"cdet-add-task-btn\\" style=\\"font-size:11px;padding:4px 10px\\">+ Add Task</button>\\n            </div>\\n          </div>\\n\\n          <div id=\\"cdet-year-task-panel\\" style=\\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:14px;margin-bottom:12px\\">\\n            <div style=\\"font-size:12px;font-weight:600;margin-bottom:8px\\">Select services to assign tasks for:</div>\\n            <div style=\\"display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px\\">\\n              <label style=\\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\\"><input type=\\"checkbox\\" id=\\"yt-svc-tax\\" style=\\"width:auto;accent-color:var(--gold)\\" onchange=\\"ytUpdatePreview()\\"> 🏛 Tax Returns</label>\\n              <label style=\\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\\"><input type=\\"checkbox\\" id=\\"yt-svc-bookkeeping\\" style=\\"width:auto;accent-color:var(--gold)\\" onchange=\\"ytUpdatePreview()\\"> 📒 Bookkeeping</label>\\n              <label style=\\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\\"><input type=\\"checkbox\\" id=\\"yt-svc-payroll\\" style=\\"width:auto;accent-color:var(--gold)\\" onchange=\\"ytUpdatePreview()\\"> 💼 Payroll</label>\\n            </div>\\n            <div id=\\"yt-tasks-preview\\"></div>\\n            <div style=\\"display:flex;gap:8px;margin-top:10px\\">\\n              <button class=\\"btn btn-primary\\" id=\\"yt-assign-btn\\" style=\\"font-size:12px;padding:6px 14px\\">Assign Selected Tasks</button>\\n              <button class=\\"btn\\" onclick=\\"document.getElementById('cdet-year-task-panel').style.display='none';document.getElementById('cdet-assign-year-btn').style.display=''\\" style=\\"font-size:12px;padding:6px 14px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Cancel</button>\\n            </div>\\n            <div id=\\"yt-err\\" style=\\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\\"></div>\\n          </div>\\n\\n          <div id=\\"cdet-task-form\\" style=\\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:12px;margin-bottom:12px\\">\\n            <input id=\\"cdet-task-title\\" type=\\"text\\" placeholder=\\"Task title\\" style=\\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\\">\\n            <textarea id=\\"cdet-task-desc\\" placeholder=\\"Description (optional)\\" rows=\\"2\\" style=\\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;resize:vertical;margin-bottom:8px\\"></textarea>\\n            <div style=\\"display:flex;gap:8px;align-items:center\\">\\n              <select id=\\"cdet-task-priority\\" style=\\"padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px\\">\\n                <option value=\\"normal\\">Normal</option>\\n                <option value=\\"urgent\\">🔴 Urgent</option>\\n                <option value=\\"low\\">⚪ Low</option>\\n              </select>\\n              <input id=\\"cdet-task-due\\" type=\\"date\\" style=\\"padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px\\">\\n              <button class=\\"btn btn-primary\\" id=\\"cdet-task-save\\" style=\\"font-size:12px;padding:6px 12px\\">Save</button>\\n              <button class=\\"btn\\" id=\\"cdet-task-cancel\\" style=\\"font-size:12px;padding:6px 12px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Cancel</button>\\n            </div>\\n            <div id=\\"cdet-task-err\\" style=\\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\\"></div>\\n          </div>\\n          <div id=\\"cdet-tasks-list\\"><span class=\\"spinner\\" style=\\"width:14px;height:14px\\"></span></div>\\n        </div>\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\\">📁 CLIENT DOCUMENTS</div>\\n          <div id=\\"cdet-docs-list\\"><span class=\\"spinner\\" style=\\"width:14px;height:14px\\"></span></div>\\n        </div>\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"display:flex;align-items:center;justify-content:space-between;margin-bottom:10px\\">\\n            <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em\\">💳 BILLING</div>\\n            <button class=\\"btn btn-primary\\" id=\\"cdet-add-bill-btn\\" style=\\"font-size:11px;padding:4px 10px\\">+ Add Charge</button>\\n          </div>\\n          <div id=\\"cdet-bill-form\\" style=\\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:12px;margin-bottom:12px\\">\\n            <input id=\\"cdet-bill-desc\\" type=\\"text\\" placeholder=\\"Description (e.g. Tax prep 2024)\\" style=\\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\\">\\n            <div style=\\"display:flex;gap:8px;margin-bottom:8px\\">\\n              <input id=\\"cdet-bill-amount\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"Amount $\\" style=\\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\\">\\n              <input id=\\"cdet-bill-due\\" type=\\"date\\" style=\\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\\">\\n              <select id=\\"cdet-bill-status\\" style=\\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\\">\\n                <option value=\\"unpaid\\">Unpaid</option>\\n                <option value=\\"paid\\">Paid</option>\\n                <option value=\\"void\\">Void</option>\\n              </select>\\n            </div>\\n            <input id=\\"cdet-bill-notes\\" type=\\"text\\" placeholder=\\"Notes (optional)\\" style=\\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\\">\\n            <div style=\\"display:flex;gap:8px\\">\\n              <button class=\\"btn btn-primary\\" id=\\"cdet-bill-save\\" style=\\"font-size:12px;padding:6px 12px\\">Save Charge</button>\\n              <button class=\\"btn\\" id=\\"cdet-bill-cancel\\" style=\\"font-size:12px;padding:6px 12px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Cancel</button>\\n            </div>\\n            <div id=\\"cdet-bill-err\\" style=\\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\\"></div>\\n          </div>\\n          <div id=\\"cdet-billing-list\\"><span class=\\"spinner\\" style=\\"width:14px;height:14px\\"></span></div>\\n        </div>\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\\">🧾 CLIENT INVOICES</div>\\n          <div id=\\"cdet-invoices-list\\"><span class=\\"spinner\\" style=\\"width:14px;height:14px\\"></span></div>\\n        </div>\\n\\n      </div>\\n      <div class=\\"modal-footer\\">\\n        <button class=\\"btn\\" onclick=\\"closeModal('cdet-backdrop')\\" style=\\"background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Close</button>\\n        <button class=\\"btn\\" id=\\"cdet-edit-btn\\" style=\\"margin-left:auto;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">✏️ Edit Info</button>\\n        <button class=\\"btn btn-primary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\\">Select Client →</button>\\n      </div>\\n    </div>");
+  bd.innerHTML = "\\n    <div class=\\"modal\\" role=\\"dialog\\" style=\\"max-width:520px\\">\\n      <div class=\\"modal-header\\">\\n        <h3>".concat(esc(c.full_name), "</h3>\\n        <button class=\\"modal-close\\" onclick=\\"closeModal('cdet-backdrop')\\" aria-label=\\"Close\\">×</button>\\n      </div>\\n      <div class=\\"modal-body\\">\\n        <div style=\\"margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap\\">\\n          <span class=\\"badge ").concat(c.status === 'active' ? 'badge-green' : 'badge-grey', "\\">").concat(esc(c.status || 'inactive'), "</span>\\n          <span style=\\"font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;").concat((c.client_type || 'personal') === 'business' ? 'background:rgba(234,179,8,.15);color:var(--gold)' : 'background:rgba(34,197,94,.12);color:var(--green)', "\\">").concat((c.client_type || 'personal') === 'business' ? '🏢 Business' : '👤 Personal', "</span>\\n          <span style=\\"font-size:13px;color:var(--muted)\\">").concat(esc(c.entity_type || ''), "</span>\\n          ").concat(c.regions?.name ? "<span style=\\\\\\"font-size:11px;font-weight:600;padding:2px 9px;border-radius:10px;background:rgba(79,99,210,.1);color:var(--accent)\\\\\\">📍 ".concat(esc(c.regions.name), "</span>") : '', "\\n        </div>\\n        ").concat(info('Email', c.email), "\\n        ").concat(info('Phone', c.phone), "\\n        ").concat(info('Address', c.address), "\\n        ").concat(info('EIN / ITIN', c.ein), "\\n        ").concat(info('State', c.state), "\\n        ").concat(info('Region', c.regions?.name || null), "\\n        ").concat(info('Industry', c.industry), "\\n        ").concat(info('Service Package', c.service_package ? ({starter:'⭐ Starter — $149/mo', essentials:'✨ Essentials — $299/mo', growth:'🚀 Growth — $499/mo', premium:'💎 Premium — $799/mo'})[c.service_package] || c.service_package : null), "\\n        ").concat(info('Notes', c.notes), "\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\\">QUICK ACTIONS</div>\\n          <div style=\\"display:flex;flex-wrap:wrap;gap:8px\\">\\n            <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('journal')\\">📒 Journal Entries</button>\\n            <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('payroll')\\">💼 Payroll</button>\\n            <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('tax')\\">🏛 Tax Returns</button>\\n            <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\\">📊 Dashboard</button>\\n            <button class=\\"btn btn-secondary\\" id=\\"cdet-apply-coa-btn\\" onclick=\\"openApplyCOAPanel('").concat(esc(c.id), "')\\">📂 Apply COA Template</button>\\n          </div>\\n        </div>\\n\\n        <div id=\\"cdet-coa-panel\\" style=\\"display:none;margin-top:12px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\\">\\n          <div style=\\"font-size:12px;font-weight:600;margin-bottom:8px\\">Select an industry template to load into this client's Chart of Accounts:</div>\\n          <select id=\\"cdet-coa-industry\\" style=\\"width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:10px\\">\\n            <option value=\\"\\">— Pick an industry —</option>\\n            <option>Professional Services</option><option>Medical / Healthcare</option>\\n            <option>Salon & Beauty</option><option>Cleaning Services</option>\\n            <option>Landscaping & Lawn Care</option><option>Auto Repair & Mechanic</option>\\n            <option>Restaurant / Food Service</option><option>Catering</option>\\n            <option>Food Truck</option><option>Bar & Nightclub</option>\\n            <option>General Contractor</option><option>Plumbing & HVAC</option>\\n            <option>Electrical</option><option>Painting & Flooring</option>\\n            <option>Retail Store</option><option>E-Commerce/Online Store</option>\\n            <option>Wholesale & Distribution</option><option>Trucking/Freight</option>\\n            <option>Rideshare/Gig Worker</option><option>Moving Company</option>\\n            <option>Real Estate Agent/Broker</option><option>Property Management</option>\\n            <option>Short-Term Rental (Airbnb)</option><option>Tech/Software Company</option>\\n            <option>IT Services & Consulting</option><option>Marketing & Design Agency</option>\\n            <option>Nonprofit Organization</option><option>Church/Religious Organization</option>\\n            <option>General/Other</option>\\n          </select>\\n          <div style=\\"font-size:11px;color:var(--muted);margin-bottom:10px\\">⚠️ This will add template accounts to this client. Existing accounts are kept.</div>\\n          <div style=\\"display:flex;gap:8px\\">\\n            <button class=\\"btn btn-primary\\" id=\\"cdet-coa-apply-btn\\" style=\\"font-size:12px;padding:6px 14px\\">Apply Template</button>\\n            <button class=\\"btn\\" onclick=\\"document.getElementById('cdet-coa-panel').style.display='none'\\" style=\\"font-size:12px;padding:6px 14px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Cancel</button>\\n          </div>\\n          <div id=\\"cdet-coa-msg\\" style=\\"font-size:12px;margin-top:8px;min-height:14px\\"></div>\\n        </div>\\n\\n        <div style=\\"margin-top:20px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\\">\\n          <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\\">🔑 CLIENT PORTAL ACCESS</div>\\n          ").concat(c.auth_user_id ? "<div style=\\"display:flex;align-items:center;gap:8px\\">\\n                <span style=\\"color:var(--green);font-size:16px\\">✓</span>\\n                <span style=\\"font-size:13px;font-weight:500\\">Portal access linked</span>\\n              </div>\\n              <div style=\\"font-size:12px;color:var(--muted);margin-top:4px\\">Client email: <strong>".concat(esc(c.email || ''), "</strong></div>\\n              <button class=\\"btn btn-secondary\\" id=\\"cdet-resend-btn\\" style=\\"margin-top:10px;font-size:12px;padding:6px 12px\\">↺ Resend password email</button>\\n              <div id=\\"cdet-resend-msg\\" style=\\"font-size:12px;margin-top:6px;min-height:16px\\"></div>") : "<div style=\\"font-size:13px;color:var(--muted);margin-bottom:10px\\">This client does not have portal access yet.</div>\\n              <div style=\\"display:flex;align-items:center;gap:8px\\">\\n                <input id=\\"cdet-portal-email\\" type=\\"email\\" placeholder=\\"Client email\\" value=\\"".concat(esc(c.email || ''), "\\" style=\\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\\">\\n                <button class=\\"btn btn-primary\\" id=\\"cdet-invite-btn\\" style=\\"white-space:nowrap;font-size:12px;padding:7px 14px\\">Create Login</button>\\n              </div>\\n              <div id=\\"cdet-invite-msg\\" style=\\"font-size:12px;margin-top:6px;min-height:16px\\"></div>"), "\\n        </div>\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"display:flex;align-items:center;justify-content:space-between;margin-bottom:10px\\">\\n            <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em\\">📋 TASKS</div>\\n            <div style=\\"display:flex;gap:6px\\">\\n              <button class=\\"btn\\" id=\\"cdet-assign-year-btn\\" style=\\"font-size:11px;padding:4px 10px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">📅 Assign Year Tasks</button>\\n              <button class=\\"btn btn-primary\\" id=\\"cdet-add-task-btn\\" style=\\"font-size:11px;padding:4px 10px\\">+ Add Task</button>\\n            </div>\\n          </div>\\n\\n          <div id=\\"cdet-year-task-panel\\" style=\\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:14px;margin-bottom:12px\\">\\n            <div style=\\"font-size:12px;font-weight:600;margin-bottom:8px\\">Select services to assign tasks for:</div>\\n            <div style=\\"display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px\\">\\n              <label style=\\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\\"><input type=\\"checkbox\\" id=\\"yt-svc-tax\\" style=\\"width:auto;accent-color:var(--gold)\\" onchange=\\"ytUpdatePreview()\\"> 🏛 Tax Returns</label>\\n              <label style=\\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\\"><input type=\\"checkbox\\" id=\\"yt-svc-bookkeeping\\" style=\\"width:auto;accent-color:var(--gold)\\" onchange=\\"ytUpdatePreview()\\"> 📒 Bookkeeping</label>\\n              <label style=\\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\\"><input type=\\"checkbox\\" id=\\"yt-svc-payroll\\" style=\\"width:auto;accent-color:var(--gold)\\" onchange=\\"ytUpdatePreview()\\"> 💼 Payroll</label>\\n            </div>\\n            <div id=\\"yt-tasks-preview\\"></div>\\n            <div style=\\"display:flex;gap:8px;margin-top:10px\\">\\n              <button class=\\"btn btn-primary\\" id=\\"yt-assign-btn\\" style=\\"font-size:12px;padding:6px 14px\\">Assign Selected Tasks</button>\\n              <button class=\\"btn\\" onclick=\\"document.getElementById('cdet-year-task-panel').style.display='none';document.getElementById('cdet-assign-year-btn').style.display=''\\" style=\\"font-size:12px;padding:6px 14px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Cancel</button>\\n            </div>\\n            <div id=\\"yt-err\\" style=\\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\\"></div>\\n          </div>\\n\\n          <div id=\\"cdet-task-form\\" style=\\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:12px;margin-bottom:12px\\">\\n            <input id=\\"cdet-task-title\\" type=\\"text\\" placeholder=\\"Task title\\" style=\\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\\">\\n            <textarea id=\\"cdet-task-desc\\" placeholder=\\"Description (optional)\\" rows=\\"2\\" style=\\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;resize:vertical;margin-bottom:8px\\"></textarea>\\n            <div style=\\"display:flex;gap:8px;align-items:center\\">\\n              <select id=\\"cdet-task-priority\\" style=\\"padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px\\">\\n                <option value=\\"normal\\">Normal</option>\\n                <option value=\\"urgent\\">🔴 Urgent</option>\\n                <option value=\\"low\\">⚪ Low</option>\\n              </select>\\n              <input id=\\"cdet-task-due\\" type=\\"date\\" style=\\"padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px\\">\\n              <button class=\\"btn btn-primary\\" id=\\"cdet-task-save\\" style=\\"font-size:12px;padding:6px 12px\\">Save</button>\\n              <button class=\\"btn\\" id=\\"cdet-task-cancel\\" style=\\"font-size:12px;padding:6px 12px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Cancel</button>\\n            </div>\\n            <div id=\\"cdet-task-err\\" style=\\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\\"></div>\\n          </div>\\n          <div id=\\"cdet-tasks-list\\"><span class=\\"spinner\\" style=\\"width:14px;height:14px\\"></span></div>\\n        </div>\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\\">📁 CLIENT DOCUMENTS</div>\\n          <div id=\\"cdet-docs-list\\"><span class=\\"spinner\\" style=\\"width:14px;height:14px\\"></span></div>\\n        </div>\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"display:flex;align-items:center;justify-content:space-between;margin-bottom:10px\\">\\n            <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em\\">💳 BILLING</div>\\n            <button class=\\"btn btn-primary\\" id=\\"cdet-add-bill-btn\\" style=\\"font-size:11px;padding:4px 10px\\">+ Add Charge</button>\\n          </div>\\n          <div id=\\"cdet-bill-form\\" style=\\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:12px;margin-bottom:12px\\">\\n            <input id=\\"cdet-bill-desc\\" type=\\"text\\" placeholder=\\"Description (e.g. Tax prep 2024)\\" style=\\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\\">\\n            <div style=\\"display:flex;gap:8px;margin-bottom:8px\\">\\n              <input id=\\"cdet-bill-amount\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"Amount $\\" style=\\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\\">\\n              <input id=\\"cdet-bill-due\\" type=\\"date\\" style=\\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\\">\\n              <select id=\\"cdet-bill-status\\" style=\\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\\">\\n                <option value=\\"unpaid\\">Unpaid</option>\\n                <option value=\\"paid\\">Paid</option>\\n                <option value=\\"void\\">Void</option>\\n              </select>\\n            </div>\\n            <input id=\\"cdet-bill-notes\\" type=\\"text\\" placeholder=\\"Notes (optional)\\" style=\\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\\">\\n            <div style=\\"display:flex;gap:8px\\">\\n              <button class=\\"btn btn-primary\\" id=\\"cdet-bill-save\\" style=\\"font-size:12px;padding:6px 12px\\">Save Charge</button>\\n              <button class=\\"btn\\" id=\\"cdet-bill-cancel\\" style=\\"font-size:12px;padding:6px 12px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Cancel</button>\\n            </div>\\n            <div id=\\"cdet-bill-err\\" style=\\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\\"></div>\\n          </div>\\n          <div id=\\"cdet-billing-list\\"><span class=\\"spinner\\" style=\\"width:14px;height:14px\\"></span></div>\\n        </div>\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\\">🧾 CLIENT INVOICES</div>\\n          <div id=\\"cdet-invoices-list\\"><span class=\\"spinner\\" style=\\"width:14px;height:14px\\"></span></div>\\n        </div>\\n\\n      </div>\\n      <div class=\\"modal-footer\\">\\n        <button class=\\"btn\\" onclick=\\"closeModal('cdet-backdrop')\\" style=\\"background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Close</button>\\n        <button class=\\"btn\\" id=\\"cdet-edit-btn\\" style=\\"margin-left:auto;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">✏️ Edit Info</button>\\n        <button class=\\"btn btn-primary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\\">Select Client →</button>\\n      </div>\\n    </div>");
   document.body.appendChild(bd);
   bd.addEventListener('click', e => {
     if (e.target === bd) closeModal('cdet-backdrop');
@@ -2676,11 +2689,20 @@ function openClientDetail(c) {
             </select>
           </div>
           <div class="form-group" style="margin:0">
+            <label style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em">REGION 📍</label>
+            <select id="edit-region" style="width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px">
+              <option value="">— No region —</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
             <label style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em">NOTES</label>
             <textarea id="edit-notes" rows="3" style="width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px;box-sizing:border-box;resize:vertical">\${esc(c.notes||'')}</textarea>
           </div>
           <div id="edit-msg" style="font-size:13px;min-height:18px"></div>
         </div>\`;
+
+      // Populate region dropdown
+      loadRegionsIntoSelect('edit-region', c.region_id);
 
       modalFooter.innerHTML = \`
         <button class="btn btn-secondary" id="edit-cancel-btn">Cancel</button>
@@ -2709,6 +2731,7 @@ function openClientDetail(c) {
           notes:           document.getElementById('edit-notes').value.trim(),
           services:        svcs.length ? svcs : ['tax'],
           service_package: document.getElementById('edit-package').value || null,
+          region_id:       document.getElementById('edit-region')?.value || null,
         };
         if (!updates.full_name) { msg.style.color='var(--red)'; msg.textContent='Name is required.'; return; }
         if (!updates.email)     { msg.style.color='var(--red)'; msg.textContent='Email is required.'; return; }
@@ -2724,11 +2747,12 @@ function openClientDetail(c) {
           saveBtn.disabled = false;
           saveBtn.textContent = 'Save Changes';
         } else {
-          // Update local state so re-opening shows fresh data
+          // Re-fetch with join to get updated region name
+          const { data: fresh } = await sb.from('clients').select('*, regions(id,name)').eq('id', c.id).single();
+          const merged = fresh || { ...c, ...updates };
           const idx = STATE.clientRows.findIndex(r => r.id === c.id);
-          if (idx !== -1) STATE.clientRows[idx] = { ...STATE.clientRows[idx], ...updates };
-          // Re-open modal with updated data
-          openClientDetail({ ...c, ...updates });
+          if (idx !== -1) STATE.clientRows[idx] = merged;
+          openClientDetail(merged);
         }
       });
     });
@@ -4488,11 +4512,19 @@ async function loadStaffList() {
               style="padding:5px 12px;border-radius:7px;border:1.5px solid var(--border);background:none;color:var(--text);font-size:12px;font-weight:600;cursor:pointer">
               ✏️ Permissions
             </button>
+            <button onclick="openAssignRegionsModal('\${esc(s.id)}','\${esc(s.email)}')"
+              style="padding:5px 12px;border-radius:7px;border:1.5px solid rgba(79,99,210,.35);background:none;color:var(--accent);font-size:12px;font-weight:600;cursor:pointer">
+              📍 Regions
+            </button>
             <button onclick="removeStaff('\${esc(s.id)}','\${esc(s.email)}')"
               style="padding:5px 12px;border-radius:7px;border:1.5px solid rgba(220,53,69,.35);background:none;color:var(--red);font-size:12px;font-weight:600;cursor:pointer">
               Remove
             </button>
           </div>\` : ''}
+        </div>
+        <!-- region badges -->
+        <div id="staff-regions-\${esc(s.id)}" style="display:flex;flex-wrap:wrap;gap:5px;min-height:18px">
+          <span style="font-size:10px;color:var(--muted)">Loading regions…</span>
         </div>
         <!-- permission chips -->
         <div>
@@ -4503,6 +4535,24 @@ async function loadStaffList() {
   }).join('');
 
   wrap.innerHTML = \`<div style="display:flex;flex-direction:column;gap:12px">\${cards}</div>\`;
+
+  // Load region badges for each staff member
+  data.forEach(s => loadStaffRegionBadges(s.id));
+}
+
+async function loadStaffRegionBadges(staffId) {
+  const el = document.getElementById(\`staff-regions-\${staffId}\`);
+  if (!el) return;
+  const { data } = await sb.from('staff_regions')
+    .select('regions(name)').eq('staff_id', staffId);
+  const regions = (data || []).map(r => r.regions?.name).filter(Boolean);
+  if (!regions.length) {
+    el.innerHTML = '<span style="font-size:11px;color:var(--muted);font-style:italic">No regions assigned</span>';
+  } else {
+    el.innerHTML = regions.map(name =>
+      \`<span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:10px;background:rgba(79,99,210,.1);color:var(--accent)">📍 \${esc(name)}</span>\`
+    ).join('');
+  }
 }
 
 window.openAddStaffModal = function() {
@@ -4600,6 +4650,145 @@ window.removeStaff = async function(id, email) {
   const { error } = await sb.from('firm_staff').delete().eq('id', id);
   if (error) { showToast('Error: ' + error.message, 'red'); return; }
   showToast('Staff member removed.', 'green');
+  loadStaffList();
+};
+
+// ── REGION MANAGEMENT ──────────────────────────────────────
+window.openManageRegionsModal = async function() {
+  let bd = document.getElementById('manage-regions-backdrop');
+  if (!bd) {
+    bd = document.createElement('div');
+    bd.id = 'manage-regions-backdrop';
+    bd.className = 'modal-backdrop';
+    document.body.appendChild(bd);
+  }
+  bd.innerHTML = \`<div class="modal" role="dialog" style="max-width:420px">
+    <div class="modal-header">
+      <h3>🗺️ Manage Regions</h3>
+      <button class="modal-close" onclick="closeModal('manage-regions-backdrop')" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="mgr-regions-list"><span class="spinner" style="width:14px;height:14px"></span></div>
+      <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px">
+        <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px">ADD NEW REGION</div>
+        <div style="display:flex;gap:8px">
+          <input id="mgr-new-region-name" type="text" placeholder="e.g. South Texas" style="flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px">
+          <button class="btn btn-primary" onclick="addNewRegion()" style="font-size:12px;padding:7px 14px">Add</button>
+        </div>
+        <div id="mgr-new-err" style="font-size:12px;color:var(--red);margin-top:6px;min-height:14px"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('manage-regions-backdrop')" style="background:var(--surface);color:var(--text);border:1.5px solid var(--border)">Done</button>
+    </div>
+  </div>\`;
+  bd.style.display = 'flex';
+  loadManageRegionsList();
+};
+
+async function loadManageRegionsList() {
+  const el = document.getElementById('mgr-regions-list');
+  if (!el) return;
+  const { data, error } = await sb.from('regions').select('*').order('sort_order');
+  if (error) { el.innerHTML = \`<div class="alert alert-red">\${esc(error.message)}</div>\`; return; }
+  if (!data || !data.length) { el.innerHTML = '<div style="font-size:13px;color:var(--muted)">No regions yet.</div>'; return; }
+  el.innerHTML = data.map((r, i) => \`
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:13px;font-weight:500;flex:1">📍 \${esc(r.name)}</span>
+      <span style="font-size:11px;color:var(--muted)">#\${r.sort_order}</span>
+      <button onclick="deleteRegion('\${esc(r.id)}','\${esc(r.name)}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:2px 6px" title="Delete region">🗑</button>
+    </div>\`).join('');
+}
+
+window.addNewRegion = async function() {
+  const name = document.getElementById('mgr-new-region-name')?.value.trim();
+  const errEl = document.getElementById('mgr-new-err');
+  if (errEl) errEl.textContent = '';
+  if (!name) { if (errEl) errEl.textContent = 'Please enter a region name.'; return; }
+  // Get current max sort_order
+  const { data: existing } = await sb.from('regions').select('sort_order').order('sort_order', { ascending: false }).limit(1);
+  const nextOrder = existing?.length ? (existing[0].sort_order + 10) : 10;
+  const { error } = await sb.from('regions').insert({ name, sort_order: nextOrder });
+  if (error) { if (errEl) errEl.textContent = 'Error: ' + error.message; return; }
+  document.getElementById('mgr-new-region-name').value = '';
+  showToast(\`Region "\${name}" added.\`, 'green');
+  loadManageRegionsList();
+};
+
+window.deleteRegion = async function(id, name) {
+  if (!confirm(\`Delete region "\${name}"?\\n\\nClients in this region will have no region assigned.\`)) return;
+  const { error } = await sb.from('regions').delete().eq('id', id);
+  if (error) { showToast('Error: ' + error.message, 'red'); return; }
+  showToast(\`Region "\${name}" deleted.\`, 'green');
+  loadManageRegionsList();
+};
+
+// ── STAFF REGION ASSIGNMENT ─────────────────────────────────
+window.openAssignRegionsModal = async function(staffId, email) {
+  let bd = document.getElementById('assign-regions-backdrop');
+  if (!bd) {
+    bd = document.createElement('div');
+    bd.id = 'assign-regions-backdrop';
+    bd.className = 'modal-backdrop';
+    document.body.appendChild(bd);
+  }
+  bd.innerHTML = \`<div class="modal" role="dialog" style="max-width:420px">
+    <div class="modal-header">
+      <h3>📍 Assign Regions</h3>
+      <button class="modal-close" onclick="closeModal('assign-regions-backdrop')" aria-label="Close">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px">Regions for <strong>\${esc(email)}</strong></div>
+      <div id="asr-list"><span class="spinner" style="width:14px;height:14px"></span></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('assign-regions-backdrop')" style="background:var(--surface);color:var(--text);border:1.5px solid var(--border)">Cancel</button>
+      <button class="btn btn-primary" onclick="saveStaffRegions('\${esc(staffId)}')">Save Regions</button>
+    </div>
+  </div>\`;
+  bd.style.display = 'flex';
+
+  // Load all regions + current assignments
+  const [{ data: allRegions }, { data: assigned }] = await Promise.all([
+    sb.from('regions').select('*').order('sort_order'),
+    sb.from('staff_regions').select('region_id').eq('staff_id', staffId)
+  ]);
+  const assignedIds = new Set((assigned || []).map(r => r.region_id));
+  const el = document.getElementById('asr-list');
+  if (!el) return;
+  if (!allRegions || !allRegions.length) {
+    el.innerHTML = '<div style="font-size:13px;color:var(--muted)">No regions configured. Add regions first.</div>';
+    return;
+  }
+  el.innerHTML = allRegions.map(r => \`
+    <label style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;border:1.5px solid \${assignedIds.has(r.id)?'rgba(79,99,210,.35)':'var(--border)'};background:\${assignedIds.has(r.id)?'rgba(79,99,210,.06)':'transparent'};margin-bottom:6px;transition:all .15s" id="asr-label-\${esc(r.id)}">
+      <input type="checkbox" id="asr-cb-\${esc(r.id)}" value="\${esc(r.id)}" \${assignedIds.has(r.id)?'checked':''} style="width:auto;accent-color:var(--accent)" onchange="onAsrChange('\${esc(r.id)}')">
+      <span style="font-size:13px;font-weight:500">📍 \${esc(r.name)}</span>
+    </label>\`).join('');
+};
+
+window.onAsrChange = function(regionId) {
+  const cb = document.getElementById(\`asr-cb-\${regionId}\`);
+  const lbl = document.getElementById(\`asr-label-\${regionId}\`);
+  if (!cb || !lbl) return;
+  lbl.style.borderColor = cb.checked ? 'rgba(79,99,210,.35)' : 'var(--border)';
+  lbl.style.background = cb.checked ? 'rgba(79,99,210,.06)' : 'transparent';
+};
+
+window.saveStaffRegions = async function(staffId) {
+  // Collect checked region IDs
+  const checkboxes = document.querySelectorAll('#asr-list input[type=checkbox]');
+  const selectedIds = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+  // Delete existing, then insert new
+  const { error: delErr } = await sb.from('staff_regions').delete().eq('staff_id', staffId);
+  if (delErr) { showToast('Error: ' + delErr.message, 'red'); return; }
+  if (selectedIds.length > 0) {
+    const rows = selectedIds.map(rid => ({ staff_id: staffId, region_id: rid }));
+    const { error: insErr } = await sb.from('staff_regions').insert(rows);
+    if (insErr) { showToast('Error: ' + insErr.message, 'red'); return; }
+  }
+  showToast(\`Regions saved (\${selectedIds.length}).\`, 'green');
+  closeModal('assign-regions-backdrop');
   loadStaffList();
 };
 
@@ -4879,6 +5068,12 @@ function openAddClientModal() {
                 <option value="premium">Premium — $799/mo</option>
               </select>
             </div>
+            <div class="form-group">
+              <label for="acm-region">Region 📍</label>
+              <select id="acm-region">
+                <option value="">— Select region —</option>
+              </select>
+            </div>
           </div>
           <div class="form-group">
             <label for="acm-notes">Internal Notes</label>
@@ -4934,6 +5129,47 @@ function openAddClientModal() {
   bd.addEventListener('click', e => { if (e.target === bd) closeModal('add-client-backdrop'); });
   document.getElementById('acm-name').focus();
   acmUpdateServices();
+  // Load regions into dropdown
+  loadRegionsIntoSelect('acm-region', null);
+}
+
+async function loadRegionsIntoSelect(selectId, selectedId) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const { data } = await sb.from('regions').select('id,name').order('sort_order');
+  if (!data) return;
+  const existing = sel.querySelector('option[value=""]');
+  sel.innerHTML = '';
+  if (existing) sel.appendChild(existing); else {
+    const blank = document.createElement('option');
+    blank.value = '';
+    blank.textContent = '— Select region —';
+    sel.appendChild(blank);
+  }
+  data.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r.id;
+    opt.textContent = r.name;
+    if (r.id === selectedId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  // Add "Manage regions…" option for admins
+  if (STATE.isAdmin) {
+    const divider = document.createElement('option');
+    divider.disabled = true;
+    divider.textContent = '──────────────';
+    sel.appendChild(divider);
+    const mgr = document.createElement('option');
+    mgr.value = '__manage__';
+    mgr.textContent = '+ Add new region…';
+    sel.appendChild(mgr);
+    sel.addEventListener('change', function() {
+      if (this.value === '__manage__') {
+        this.value = selectedId || '';
+        openManageRegionsModal();
+      }
+    }, { once: false });
+  }
 }
 
 function acmUpdateServices() {
@@ -4981,8 +5217,9 @@ async function saveNewClient() {
   const gig    = document.getElementById('acm-gig').checked;
   const portal = document.getElementById('acm-portal').checked;
   const hasTax = document.getElementById('acm-svc-tax').checked;
-  const hasBk  = document.getElementById('acm-svc-bookkeeping').checked;
-  const hasPr  = document.getElementById('acm-svc-payroll').checked;
+  const hasBk    = document.getElementById('acm-svc-bookkeeping').checked;
+  const hasPr    = document.getElementById('acm-svc-payroll').checked;
+  const regionId = document.getElementById('acm-region')?.value || null;
   const errEl  = document.getElementById('acm-error');
   const btn    = document.getElementById('acm-save');
   errEl.textContent = '';
@@ -5006,7 +5243,8 @@ async function saveNewClient() {
     state: state || null, status: 'active', gig_worker: gig,
     notes: notes || null, services: svcs, service_package: pkg,
     client_since: new Date().toISOString().slice(0, 10), ytd_billed: 0,
-    industry: industry || null
+    industry: industry || null,
+    region_id: regionId || null
   }).select().single();
 
   if (clientErr) {
