@@ -5429,7 +5429,7 @@ async function renderAdminInvoices(container) {
   // Load invoices joined with client name
   let query = sb.from('client_invoices')
     .select('*, clients(id, full_name)')
-    .order('invoice_date', { ascending: false });
+    .order('issue_date', { ascending: false });
 
   if (STATE.selectedClientId) {
     query = query.eq('client_id', STATE.selectedClientId);
@@ -5454,8 +5454,8 @@ async function renderAdminInvoices(container) {
   const fmt = v => v == null ? '—' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   // Totals summary
-  const total = invoices.reduce((s, r) => s + (Number(r.total_amount) || 0), 0);
-  const paid  = invoices.filter(r => r.status === 'paid').reduce((s, r) => s + (Number(r.total_amount) || 0), 0);
+  const total = invoices.reduce((s, r) => s + (Number(r.total) || 0), 0);
+  const paid  = invoices.filter(r => r.status === 'paid').reduce((s, r) => s + (Number(r.total) || 0), 0);
   const outstanding = total - paid;
 
   main.innerHTML = `
@@ -5492,9 +5492,9 @@ async function renderAdminInvoices(container) {
             <tr>
               <td style="font-weight:600;font-family:monospace">${esc(inv.invoice_number || '—')}</td>
               <td>${esc(inv.clients?.full_name || '—')}</td>
-              <td>${esc(inv.invoice_date || '—')}</td>
+              <td>${esc(inv.issue_date || '—')}</td>
               <td>${esc(inv.due_date || '—')}</td>
-              <td class="amt">${fmt(inv.total_amount)}</td>
+              <td class="amt">${fmt(inv.total)}</td>
               <td>${statusBadge(inv.status)}</td>
               <td style="text-align:right;padding-right:8px">
                 <div style="display:flex;gap:6px;justify-content:flex-end">
@@ -5549,11 +5549,11 @@ function openAdminInvoiceDetail(inv, container) {
           <span style="font-size:13px;color:var(--muted)">Client: <strong>${esc(inv.clients?.full_name || '—')}</strong></span>
         </div>
         <div style="display:flex;gap:24px;margin-bottom:16px;flex-wrap:wrap">
-          <div><div style="font-size:11px;color:var(--muted);font-weight:600">INVOICE DATE</div><div style="font-size:14px;font-weight:600">${esc(inv.invoice_date || '—')}</div></div>
+          <div><div style="font-size:11px;color:var(--muted);font-weight:600">INVOICE DATE</div><div style="font-size:14px;font-weight:600">${esc(inv.issue_date || '—')}</div></div>
           <div><div style="font-size:11px;color:var(--muted);font-weight:600">DUE DATE</div><div style="font-size:14px;font-weight:600">${esc(inv.due_date || '—')}</div></div>
-          <div><div style="font-size:11px;color:var(--muted);font-weight:600">AMOUNT</div><div style="font-size:18px;font-weight:700;color:var(--green)">${fmt(inv.total_amount)}</div></div>
+          <div><div style="font-size:11px;color:var(--muted);font-weight:600">AMOUNT</div><div style="font-size:18px;font-weight:700;color:var(--green)">${fmt(inv.total)}</div></div>
         </div>
-        ${inv.description ? `<div style="background:var(--bg);border-radius:8px;padding:12px;font-size:13px;border:1px solid var(--border);margin-bottom:16px"><strong>Description:</strong><br>${esc(inv.description)}</div>` : ''}
+        ${inv.notes ? `<div style="background:var(--bg);border-radius:8px;padding:12px;font-size:13px;border:1px solid var(--border);margin-bottom:16px"><strong>Notes:</strong><br>${esc(inv.notes)}</div>` : ''}
         ${inv.notes ? `<div style="font-size:12px;color:var(--muted);margin-bottom:12px"><strong>Notes:</strong> ${esc(inv.notes)}</div>` : ''}
         <div id="adm-inv-action-msg" style="font-size:12px;min-height:14px;margin-top:8px"></div>
       </div>
@@ -5635,7 +5635,7 @@ function openNewAdminInvoiceModal() {
           </div>
         </div>
         <div class="form-group">
-          <label for="nai-desc">Description</label>
+          <label for="nai-desc">Description / Notes</label>
           <input id="nai-desc" type="text" placeholder="e.g. Tax preparation — 2025 returns" autocomplete="off">
         </div>
         <div class="form-group">
@@ -5676,13 +5676,12 @@ function openNewAdminInvoiceModal() {
 
     const payload = {
       client_id: clientId,
-      invoice_date: date,
+      issue_date: date,
       due_date: due || null,
-      total_amount: amount,
-      description: desc || null,
+      total: amount,
+      notes: desc || null,
       invoice_number: num || null,
       status,
-      created_by: (await sb.auth.getUser()).data?.user?.id || null,
     };
     const { error } = await sb.from('client_invoices').insert(payload);
     if (error) {
