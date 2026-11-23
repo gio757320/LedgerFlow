@@ -468,6 +468,9 @@ tr:hover td { background: rgba(46,158,107,.04); }
         <button class="nav-item" data-screen="bankimport" id="nav-bankimport-btn">
           <span class="icon">🏦</span> Bank Import
         </button>
+        <button class="nav-item" data-screen="adminInvoices">
+          <span class="icon">🧾</span> Invoices
+        </button>
         <button class="nav-item" data-screen="routeworth">
           <span class="icon">🚗</span> RouteWorth Packages
         </button>
@@ -771,7 +774,7 @@ async function onSignedIn(user) {
   if (STATE.isStaff) {
     const {
       data: clients
-    } = await sb.from('clients').select('id,full_name,entity_type').order('full_name');
+    } = await sb.from('clients').select('id,full_name,entity_type,is_firm').order('full_name');
     STATE.clientRows = clients || [];
     populateClientSelect();
   } else {
@@ -880,7 +883,7 @@ window.submitMfaEnroll = async function(factorId) {
 
   // MFA enrolled and verified — proceed into the app
   hideMfaScreen();
-  const clients = (await sb.from('clients').select('id,full_name,entity_type').order('full_name')).data || [];
+  const clients = (await sb.from('clients').select('id,full_name,entity_type,is_firm').order('full_name')).data || [];
   STATE.clientRows = clients;
   populateClientSelect();
   showApp();
@@ -926,7 +929,7 @@ window.submitMfaVerify = async function(factorId) {
 
   // Verified — proceed into the app
   hideMfaScreen();
-  const clients = (await sb.from('clients').select('id,full_name,entity_type').order('full_name')).data || [];
+  const clients = (await sb.from('clients').select('id,full_name,entity_type,is_firm').order('full_name')).data || [];
   STATE.clientRows = clients;
   populateClientSelect();
   showApp();
@@ -1063,6 +1066,9 @@ function renderScreen(screen) {
       break;
     case 'tax':
       renderTax(container);
+      break;
+    case 'adminInvoices':
+      renderAdminInvoices(container);
       break;
     case 'reports':
       renderReports(container);
@@ -1334,7 +1340,7 @@ function populateClientSelect() {
   STATE.clientRows.forEach(c => {
     const opt = document.createElement('option');
     opt.value = c.id;
-    opt.textContent = c.full_name;
+    opt.textContent = c.is_firm ? '🏛 ' + c.full_name : c.full_name;
     sel.appendChild(opt);
   });
 }
@@ -2114,7 +2120,7 @@ async function renderClients(container) {
     main.innerHTML = '<div class="empty"><div class="empty-icon">👥</div>No clients yet.</div>';
     return;
   }
-  main.innerHTML = "\n    <div class=\"card\">\n      <table>\n        <thead><tr>\n          <th>Client</th><th>Region</th><th>Business Type</th><th>Contact</th><th>Status</th><th></th>\n        </tr></thead>\n        <tbody>".concat(data.map(c => "\n          <tr class=\"client-row\" data-client-id=\"".concat(esc(c.id), "\" style=\"cursor:pointer\">\n            <td><div style=\"font-weight:600\">").concat(esc(c.full_name), "</div>").concat(c.service_package ? "<div style=\\\"font-size:11px;margin-top:2px;color:var(--gold);font-weight:600\\\">".concat(({starter:'⭐ Starter',essentials:'✨ Essentials',growth:'🚀 Growth',premium:'💎 Premium'})[c.service_package]||c.service_package, "</div>") : '', "</td>\n            <td><span style=\"font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:rgba(79,99,210,.1);color:var(--accent)\">").concat(esc(c.regions?.name || '—'), "</span></td>\n            <td>").concat(esc(c.entity_type || '—'), "</td>\n            <td style=\"font-size:12px\">").concat(esc(c.email || c.phone || '—'), "</td>\n            <td><span class=\"badge ").concat(c.status === 'active' ? 'badge-green' : 'badge-grey', "\">").concat(esc(c.status || 'inactive'), "</span></td>\n            <td style=\"text-align:right;padding-right:8px\"><button class=\"btn btn-secondary client-view-btn\" data-client-id=\"").concat(esc(c.id), "\" style=\"font-size:12px;padding:3px 10px\">View →</button></td>\n          </tr>\n        ")).join(''), "</tbody>\n      </table>\n    </div>\n  ");
+  main.innerHTML = "\n    <div class=\"card\">\n      <table>\n        <thead><tr>\n          <th>Client</th><th>Region</th><th>Business Type</th><th>Contact</th><th>Status</th><th></th>\n        </tr></thead>\n        <tbody>".concat(data.map(c => "\n          <tr class=\"client-row\" data-client-id=\"".concat(esc(c.id), "\" style=\"cursor:pointer\">\n            <td><div style=\"font-weight:600\">").concat(esc(c.full_name), c.is_firm ? " <span style=\\\"font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;background:rgba(79,99,210,.15);color:var(--accent);vertical-align:middle\\\">🏛 Firm</span>" : '', "</div>").concat(c.service_package ? "<div style=\\\"font-size:11px;margin-top:2px;color:var(--gold);font-weight:600\\\">".concat(({starter:'⭐ Starter',essentials:'✨ Essentials',growth:'🚀 Growth',premium:'💎 Premium'})[c.service_package]||c.service_package, "</div>") : '', "</td>\n            <td><span style=\"font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:rgba(79,99,210,.1);color:var(--accent)\">").concat(esc(c.regions?.name || '—'), "</span></td>\n            <td>").concat(esc(c.entity_type || '—'), "</td>\n            <td style=\"font-size:12px\">").concat(esc(c.email || c.phone || '—'), "</td>\n            <td><span class=\"badge ").concat(c.status === 'active' ? 'badge-green' : 'badge-grey', "\">").concat(esc(c.status || 'inactive'), "</span></td>\n            <td style=\"text-align:right;padding-right:8px\"><button class=\"btn btn-secondary client-view-btn\" data-client-id=\"").concat(esc(c.id), "\" style=\"font-size:12px;padding:3px 10px\">View →</button></td>\n          </tr>\n        ")).join(''), "</tbody>\n      </table>\n    </div>\n  ");
 
   // Wire up row / button clicks
   main.querySelectorAll('.client-view-btn').forEach(btn => {
@@ -5406,6 +5412,287 @@ async function biPostSelected() {
 function fmtAmt(n) {
   if (typeof n !== 'number') n = parseFloat(n) || 0;
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// ── ADMIN INVOICES (staff only) ───────────────────────────
+async function renderAdminInvoices(container) {
+  if (!STATE.isStaff) {
+    container.innerHTML = '<div class="alert alert-red" style="margin:28px">Access denied.</div>';
+    return;
+  }
+
+  container.innerHTML = pageShell('Invoices', 'All Client Invoices', `
+    <button class="btn btn-primary" onclick="openNewAdminInvoiceModal()">+ New Invoice</button>
+  `, '<div class="loading-block"><span class="spinner"></span> Loading invoices…</div>');
+  const main = container.querySelector('#main');
+
+  // Load invoices joined with client name
+  let query = sb.from('client_invoices')
+    .select('*, clients(id, full_name)')
+    .order('invoice_date', { ascending: false });
+
+  if (STATE.selectedClientId) {
+    query = query.eq('client_id', STATE.selectedClientId);
+  }
+
+  const { data: invoices, error } = await query;
+  if (error) {
+    main.innerHTML = `<div class="alert alert-red">Error loading invoices: ${esc(error.message)}</div>`;
+    return;
+  }
+
+  if (!invoices || !invoices.length) {
+    main.innerHTML = `<div class="empty"><div class="empty-icon">🧾</div><div>No invoices yet.</div><div style="font-size:13px;color:var(--muted);margin-top:8px">Create your first invoice with the button above.</div></div>`;
+    return;
+  }
+
+  const statusBadge = s => {
+    const map = { draft: 'badge-grey', sent: 'badge-blue', paid: 'badge-green', void: 'badge-grey', overdue: 'badge-red' };
+    return `<span class="badge ${map[s] || 'badge-grey'}">${esc(s || 'draft')}</span>`;
+  };
+
+  const fmt = v => v == null ? '—' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // Totals summary
+  const total = invoices.reduce((s, r) => s + (Number(r.total_amount) || 0), 0);
+  const paid  = invoices.filter(r => r.status === 'paid').reduce((s, r) => s + (Number(r.total_amount) || 0), 0);
+  const outstanding = total - paid;
+
+  main.innerHTML = `
+    <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+      <div class="stat-card stat-green" style="flex:1;min-width:140px">
+        <div class="stat-label">Total Invoiced</div>
+        <div class="stat-val">${fmt(total)}</div>
+        <div class="stat-sub">${invoices.length} invoice${invoices.length !== 1 ? 's' : ''}</div>
+      </div>
+      <div class="stat-card stat-gold" style="flex:1;min-width:140px">
+        <div class="stat-label">Outstanding</div>
+        <div class="stat-val">${fmt(outstanding)}</div>
+        <div class="stat-sub">Unpaid / sent</div>
+      </div>
+      <div class="stat-card stat-blue" style="flex:1;min-width:140px">
+        <div class="stat-label">Collected</div>
+        <div class="stat-val">${fmt(paid)}</div>
+        <div class="stat-sub">Paid invoices</div>
+      </div>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr>
+          <th>Invoice #</th>
+          <th>Client</th>
+          <th>Date</th>
+          <th>Due</th>
+          <th class="amt">Amount</th>
+          <th>Status</th>
+          <th></th>
+        </tr></thead>
+        <tbody>
+          ${invoices.map(inv => `
+            <tr>
+              <td style="font-weight:600;font-family:monospace">${esc(inv.invoice_number || '—')}</td>
+              <td>${esc(inv.clients?.full_name || '—')}</td>
+              <td>${esc(inv.invoice_date || '—')}</td>
+              <td>${esc(inv.due_date || '—')}</td>
+              <td class="amt">${fmt(inv.total_amount)}</td>
+              <td>${statusBadge(inv.status)}</td>
+              <td style="text-align:right;padding-right:8px">
+                <div style="display:flex;gap:6px;justify-content:flex-end">
+                  ${inv.status !== 'paid' && inv.status !== 'void' ? `<button class="btn btn-secondary" data-inv-id="${esc(inv.id)}" data-action="markpaid" style="font-size:11px;padding:3px 8px;background:rgba(34,197,94,.1);color:var(--green);border-color:var(--green)">✓ Mark Paid</button>` : ''}
+                  <button class="btn btn-secondary" data-inv-id="${esc(inv.id)}" data-action="view" style="font-size:11px;padding:3px 8px">View →</button>
+                </div>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  // Wire up buttons
+  main.querySelectorAll('[data-action="markpaid"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const invId = btn.dataset.invId;
+      btn.disabled = true;
+      btn.textContent = '…';
+      const { error: upErr } = await sb.from('client_invoices').update({ status: 'paid' }).eq('id', invId);
+      if (upErr) { btn.disabled = false; btn.textContent = '✓ Mark Paid'; alert('Error: ' + upErr.message); return; }
+      renderAdminInvoices(container);
+    });
+  });
+  main.querySelectorAll('[data-action="view"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const inv = invoices.find(i => i.id === btn.dataset.invId);
+      if (inv) openAdminInvoiceDetail(inv, container);
+    });
+  });
+}
+
+function openAdminInvoiceDetail(inv, container) {
+  const bd = document.createElement('div');
+  bd.className = 'modal-backdrop';
+  bd.id = 'adm-inv-backdrop';
+  const fmt = v => v == null ? '—' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const statusBadge = s => {
+    const map = { draft: 'badge-grey', sent: 'badge-blue', paid: 'badge-green', void: 'badge-grey', overdue: 'badge-red' };
+    return `<span class="badge ${map[s] || 'badge-grey'}">${esc(s || 'draft')}</span>`;
+  };
+  bd.innerHTML = `
+    <div class="modal" role="dialog" style="max-width:520px">
+      <div class="modal-header">
+        <h3>Invoice ${esc(inv.invoice_number || '')}</h3>
+        <button class="modal-close" onclick="closeModal('adm-inv-backdrop')" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+          ${statusBadge(inv.status)}
+          <span style="font-size:13px;color:var(--muted)">Client: <strong>${esc(inv.clients?.full_name || '—')}</strong></span>
+        </div>
+        <div style="display:flex;gap:24px;margin-bottom:16px;flex-wrap:wrap">
+          <div><div style="font-size:11px;color:var(--muted);font-weight:600">INVOICE DATE</div><div style="font-size:14px;font-weight:600">${esc(inv.invoice_date || '—')}</div></div>
+          <div><div style="font-size:11px;color:var(--muted);font-weight:600">DUE DATE</div><div style="font-size:14px;font-weight:600">${esc(inv.due_date || '—')}</div></div>
+          <div><div style="font-size:11px;color:var(--muted);font-weight:600">AMOUNT</div><div style="font-size:18px;font-weight:700;color:var(--green)">${fmt(inv.total_amount)}</div></div>
+        </div>
+        ${inv.description ? `<div style="background:var(--bg);border-radius:8px;padding:12px;font-size:13px;border:1px solid var(--border);margin-bottom:16px"><strong>Description:</strong><br>${esc(inv.description)}</div>` : ''}
+        ${inv.notes ? `<div style="font-size:12px;color:var(--muted);margin-bottom:12px"><strong>Notes:</strong> ${esc(inv.notes)}</div>` : ''}
+        <div id="adm-inv-action-msg" style="font-size:12px;min-height:14px;margin-top:8px"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal('adm-inv-backdrop')" style="background:var(--surface);color:var(--text);border:1.5px solid var(--border)">Close</button>
+        ${inv.status !== 'paid' && inv.status !== 'void' ? `<button class="btn btn-primary" id="adm-inv-markpaid-btn" style="background:var(--green)">✓ Mark as Paid</button>` : ''}
+        ${inv.status === 'draft' ? `<button class="btn btn-primary" id="adm-inv-send-btn">📧 Mark as Sent</button>` : ''}
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bd);
+  bd.addEventListener('click', e => { if (e.target === bd) closeModal('adm-inv-backdrop'); });
+
+  const msgEl = bd.querySelector('#adm-inv-action-msg');
+  const paidBtn = bd.querySelector('#adm-inv-markpaid-btn');
+  const sentBtn = bd.querySelector('#adm-inv-send-btn');
+
+  if (paidBtn) {
+    paidBtn.addEventListener('click', async () => {
+      paidBtn.disabled = true; paidBtn.textContent = '…';
+      const { error } = await sb.from('client_invoices').update({ status: 'paid' }).eq('id', inv.id);
+      if (error) { paidBtn.disabled = false; paidBtn.textContent = '✓ Mark as Paid'; msgEl.innerHTML = `<span style="color:var(--red)">${esc(error.message)}</span>`; return; }
+      closeModal('adm-inv-backdrop');
+      renderAdminInvoices(container);
+    });
+  }
+  if (sentBtn) {
+    sentBtn.addEventListener('click', async () => {
+      sentBtn.disabled = true; sentBtn.textContent = '…';
+      const { error } = await sb.from('client_invoices').update({ status: 'sent' }).eq('id', inv.id);
+      if (error) { sentBtn.disabled = false; sentBtn.textContent = '📧 Mark as Sent'; msgEl.innerHTML = `<span style="color:var(--red)">${esc(error.message)}</span>`; return; }
+      closeModal('adm-inv-backdrop');
+      renderAdminInvoices(container);
+    });
+  }
+}
+
+function openNewAdminInvoiceModal() {
+  const bd = document.createElement('div');
+  bd.className = 'modal-backdrop';
+  bd.id = 'new-adm-inv-backdrop';
+  const clientOpts = (STATE.clientRows || []).map(c =>
+    `<option value="${esc(c.id)}"${STATE.selectedClientId === c.id ? ' selected' : ''}>${esc(c.is_firm ? '🏛 ' + c.full_name : c.full_name)}</option>`
+  ).join('');
+  const today = new Date().toISOString().slice(0, 10);
+  const due30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  bd.innerHTML = `
+    <div class="modal" role="dialog" style="max-width:500px">
+      <div class="modal-header">
+        <h3>New Invoice</h3>
+        <button class="modal-close" onclick="closeModal('new-adm-inv-backdrop')" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="nai-client">Client *</label>
+          <select id="nai-client">
+            <option value="">— Select client —</option>
+            ${clientOpts}
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="nai-num">Invoice #</label>
+            <input id="nai-num" type="text" placeholder="e.g. INV-2026-001" autocomplete="off">
+          </div>
+          <div class="form-group">
+            <label for="nai-amount">Amount ($) *</label>
+            <input id="nai-amount" type="number" min="0" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="nai-date">Invoice Date *</label>
+            <input id="nai-date" type="date" value="${today}">
+          </div>
+          <div class="form-group">
+            <label for="nai-due">Due Date</label>
+            <input id="nai-due" type="date" value="${due30}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="nai-desc">Description</label>
+          <input id="nai-desc" type="text" placeholder="e.g. Tax preparation — 2025 returns" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label for="nai-status">Status</label>
+          <select id="nai-status">
+            <option value="draft">Draft</option>
+            <option value="sent">Sent</option>
+            <option value="paid">Paid</option>
+          </select>
+        </div>
+        <div class="modal-error" id="nai-error"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('new-adm-inv-backdrop')">Cancel</button>
+        <button class="btn btn-primary" id="nai-save">Create Invoice</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bd);
+  bd.addEventListener('click', e => { if (e.target === bd) closeModal('new-adm-inv-backdrop'); });
+
+  bd.querySelector('#nai-save').addEventListener('click', async () => {
+    const clientId = bd.querySelector('#nai-client').value.trim();
+    const amount   = parseFloat(bd.querySelector('#nai-amount').value) || 0;
+    const date     = bd.querySelector('#nai-date').value.trim();
+    const due      = bd.querySelector('#nai-due').value.trim();
+    const desc     = bd.querySelector('#nai-desc').value.trim();
+    const num      = bd.querySelector('#nai-num').value.trim();
+    const status   = bd.querySelector('#nai-status').value;
+    const errEl    = bd.querySelector('#nai-error');
+
+    if (!clientId) { errEl.textContent = 'Please select a client.'; return; }
+    if (!amount || amount <= 0) { errEl.textContent = 'Enter a valid amount.'; return; }
+    if (!date) { errEl.textContent = 'Invoice date is required.'; return; }
+
+    const saveBtn = bd.querySelector('#nai-save');
+    saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+
+    const payload = {
+      client_id: clientId,
+      invoice_date: date,
+      due_date: due || null,
+      total_amount: amount,
+      description: desc || null,
+      invoice_number: num || null,
+      status,
+      created_by: (await sb.auth.getUser()).data?.user?.id || null,
+    };
+    const { error } = await sb.from('client_invoices').insert(payload);
+    if (error) {
+      errEl.textContent = error.message;
+      saveBtn.disabled = false; saveBtn.textContent = 'Create Invoice';
+      return;
+    }
+    closeModal('new-adm-inv-backdrop');
+    renderAdminInvoices(document.getElementById('screen-container'));
+  });
 }
 
 // ── REPORTS (staff only) ──────────────────────────────────
