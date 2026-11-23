@@ -5380,7 +5380,6 @@ async function biPostSelected() {
       client_id: clientId,
       entry_date: r.date,
       description: r.description,
-      source: 'bank_import',
       status: 'posted',
     }).select('id').single();
 
