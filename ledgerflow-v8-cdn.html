@@ -5476,8 +5476,8 @@ async function renderAdminInvoices(container) {
         <div class="stat-sub">Paid invoices</div>
       </div>
     </div>
-    <div class="card">
-      <table>
+    <div class="card" style="overflow-x:auto">
+      <table style="min-width:600px">
         <thead><tr>
           <th>Invoice #</th>
           <th>Client</th>
@@ -5496,10 +5496,10 @@ async function renderAdminInvoices(container) {
               <td>${esc(inv.due_date || '—')}</td>
               <td class="amt">${fmt(inv.total)}</td>
               <td>${statusBadge(inv.status)}</td>
-              <td style="text-align:right;padding-right:8px">
-                <div style="display:flex;gap:6px;justify-content:flex-end">
-                  ${inv.status !== 'paid' && inv.status !== 'void' ? `<button class="btn btn-secondary" data-inv-id="${esc(inv.id)}" data-action="markpaid" style="font-size:11px;padding:3px 8px;background:rgba(34,197,94,.1);color:var(--green);border-color:var(--green)">✓ Mark Paid</button>` : ''}
-                  <button class="btn btn-secondary" data-inv-id="${esc(inv.id)}" data-action="view" style="font-size:11px;padding:3px 8px">View →</button>
+              <td style="text-align:right;padding-right:8px;white-space:nowrap;width:1%">
+                <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:nowrap">
+                  <button class="btn btn-secondary" data-inv-id="${esc(inv.id)}" data-action="view" style="font-size:11px;padding:3px 10px;font-weight:600">View →</button>
+                  ${inv.status !== 'paid' && inv.status !== 'void' ? `<button class="btn btn-secondary" data-inv-id="${esc(inv.id)}" data-action="markpaid" style="font-size:11px;padding:3px 8px;background:rgba(34,197,94,.1);color:var(--green);border-color:var(--green)">✓ Paid</button>` : ''}
                 </div>
               </td>
             </tr>
