@@ -465,6 +465,9 @@ tr:hover td { background: rgba(46,158,107,.04); }
         <button class="nav-item" data-screen="reports">
           <span class="icon">📈</span> Reports
         </button>
+        <button class="nav-item" data-screen="bankimport" id="nav-bankimport-btn">
+          <span class="icon">🏦</span> Bank Import
+        </button>
         <button class="nav-item" data-screen="routeworth">
           <span class="icon">🚗</span> RouteWorth Packages
         </button>
@@ -1063,6 +1066,9 @@ function renderScreen(screen) {
       break;
     case 'reports':
       renderReports(container);
+      break;
+    case 'bankimport':
+      renderBankImport(container);
       break;
     case 'routeworth':
       renderRouteWorth(container);
@@ -4869,6 +4875,477 @@ window.saveStaffRegions = async function(staffId) {
   closeModal('assign-regions-backdrop');
   loadStaffList();
 };
+
+// ── BANK CSV IMPORT ───────────────────────────────────────
+// Supported bank formats (auto-detected by column headers)
+const BANK_FORMATS = {
+  bofa: {
+    name: 'Bank of America',
+    detect: h => h.includes('Date') && h.includes('Description') && h.includes('Amount') && !h.includes('Transaction Date'),
+    date: 'Date', desc: 'Description', amount: 'Amount', credit: null, debit: null,
+  },
+  chase: {
+    name: 'Chase',
+    detect: h => h.includes('Transaction Date') && h.includes('Description') && h.includes('Amount') && h.includes('Type'),
+    date: 'Transaction Date', desc: 'Description', amount: 'Amount', credit: null, debit: null,
+  },
+  wells: {
+    name: 'Wells Fargo',
+    detect: h => !h.includes('Date') && !h.includes('Description') && h.length <= 5 && h.length >= 3,
+    // WF exports no header row: col 0=date, 1=amount, 4=description
+    noHeader: true,
+  },
+  citi: {
+    name: 'Citi',
+    detect: h => h.includes('Date') && h.includes('Description') && (h.includes('Debit') || h.includes('Credit')),
+    date: 'Date', desc: 'Description', amount: null, credit: 'Credit', debit: 'Debit',
+  },
+  capital: {
+    name: 'Capital One',
+    detect: h => h.includes('Transaction Date') && h.includes('Transaction Description') && (h.includes('Debit') || h.includes('Credit')),
+    date: 'Transaction Date', desc: 'Transaction Description', amount: null, credit: 'Credit', debit: 'Debit',
+  },
+  generic: {
+    name: 'Generic / Other',
+    detect: () => true,
+    date: null, desc: null, amount: null,
+  },
+};
+
+function parseBankCSV(text) {
+  // Split into lines, handle \\r\\n and \\r
+  const lines = text.replace(/\\r\\n/g, '\\n').replace(/\\r/g, '\\n').split('\\n').filter(l => l.trim());
+  if (lines.length < 2) return { error: 'File appears empty or too short.' };
+
+  // CSV parser that handles quoted fields
+  function parseRow(line) {
+    const fields = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"' && !inQ) { inQ = true; }
+      else if (c === '"' && inQ) {
+        if (line[i+1] === '"') { cur += '"'; i++; }
+        else inQ = false;
+      } else if (c === ',' && !inQ) { fields.push(cur.trim()); cur = ''; }
+      else cur += c;
+    }
+    fields.push(cur.trim());
+    return fields;
+  }
+
+  // Skip comment/preamble lines (BofA has them)
+  let headerIdx = 0;
+  while (headerIdx < lines.length) {
+    const f = parseRow(lines[headerIdx]);
+    if (f.length >= 3 && (f[0].toLowerCase().includes('date') || f[1].toLowerCase().includes('date') || f[0].toLowerCase().includes('transaction'))) break;
+    headerIdx++;
+  }
+
+  // Wells Fargo: no header, detect by content
+  const firstRow = parseRow(lines[0]);
+  let isWells = false;
+  if (!firstRow[0]?.toLowerCase().includes('date') && /^\\d{1,2}\\/\\d{1,2}\\/\\d{4}$/.test(firstRow[0]?.trim())) {
+    isWells = true;
+  }
+
+  if (isWells) {
+    const rows = [];
+    for (const line of lines) {
+      const f = parseRow(line);
+      if (f.length < 2) continue;
+      const date = f[0]?.trim();
+      const amount = parseFloat(f[1]?.replace(/[^0-9.\\-]/g, '') || '0');
+      const desc = f[4]?.trim() || f[2]?.trim() || '';
+      if (!date || isNaN(amount)) continue;
+      rows.push({ date, description: desc, amount, bank: 'Wells Fargo' });
+    }
+    return { bank: 'Wells Fargo', rows, format: 'wells' };
+  }
+
+  if (headerIdx >= lines.length) return { error: 'Could not find header row.' };
+  const headers = parseRow(lines[headerIdx]);
+
+  // Auto-detect bank
+  let format = null, fmtKey = null;
+  for (const [key, fmt] of Object.entries(BANK_FORMATS)) {
+    if (key === 'generic') continue;
+    if (fmt.detect && fmt.detect(headers)) { format = fmt; fmtKey = key; break; }
+  }
+  if (!format) { format = BANK_FORMATS.generic; fmtKey = 'generic'; }
+
+  // For generic: try to guess columns
+  if (fmtKey === 'generic') {
+    for (const h of headers) {
+      const hl = h.toLowerCase();
+      if (!format.date && (hl.includes('date'))) format.date = h;
+      if (!format.desc && (hl.includes('desc') || hl.includes('memo') || hl.includes('payee') || hl.includes('narr'))) format.desc = h;
+      if (!format.amount && (hl === 'amount' || hl === 'amt')) format.amount = h;
+      if (!format.debit && (hl.includes('debit') || hl.includes('withdrawal'))) format.debit = h;
+      if (!format.credit && (hl.includes('credit') || hl.includes('deposit'))) format.credit = h;
+    }
+  }
+
+  const colIdx = {};
+  headers.forEach((h, i) => { colIdx[h] = i; });
+
+  const rows = [];
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const f = parseRow(lines[i]);
+    if (f.every(c => !c)) continue;
+
+    const dateStr = format.date ? (f[colIdx[format.date]] || '').trim() : f[0]?.trim();
+    // Normalize date to YYYY-MM-DD
+    let date = dateStr;
+    const dm = dateStr?.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{2,4})$/);
+    if (dm) {
+      const yr = dm[3].length === 2 ? '20' + dm[3] : dm[3];
+      date = \`\${yr}-\${dm[1].padStart(2,'0')}-\${dm[2].padStart(2,'0')}\`;
+    }
+
+    const descStr = format.desc ? (f[colIdx[format.desc]] || '').trim()
+      : (f[1] || f[2] || '').trim();
+
+    let amount = 0;
+    if (format.amount && colIdx[format.amount] !== undefined) {
+      amount = parseFloat((f[colIdx[format.amount]] || '0').replace(/[^0-9.\\-]/g, '')) || 0;
+    } else if (format.credit || format.debit) {
+      const cr = parseFloat((f[colIdx[format.credit]] || '').replace(/[^0-9.]/g, '')) || 0;
+      const db = parseFloat((f[colIdx[format.debit]] || '').replace(/[^0-9.]/g, '')) || 0;
+      amount = cr > 0 ? cr : -db;
+    }
+
+    if (!date || (!descStr && amount === 0)) continue;
+    rows.push({ date, description: descStr, amount, bank: format.name });
+  }
+
+  return { bank: format.name, rows, format: fmtKey };
+}
+
+// State for the bank import screen
+const BI = {
+  rows: [],       // parsed transactions
+  accounts: [],   // client accounts for categorization
+  postQueue: [],  // rows checked for posting
+};
+
+async function renderBankImport(container) {
+  if (!STATE.isStaff) {
+    container.innerHTML = '<div class="alert alert-red" style="margin:28px">Staff access required.</div>';
+    return;
+  }
+  const clientId = STATE.selectedClientId;
+
+  container.innerHTML = \`
+  <div style="padding:28px 28px 48px;max-width:1100px">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <div>
+        <h2 style="font-size:20px;font-weight:700;margin:0 0 4px">🏦 Bank CSV Import</h2>
+        <p style="font-size:13px;color:var(--muted);margin:0">
+          Import a bank statement CSV, review transactions, and post them to the journal.
+          Supports Bank of America, Chase, Wells Fargo, Citi, Capital One, and most banks.
+        </p>
+      </div>
+      \${!clientId ? '<div class="alert" style="background:rgba(201,150,58,.12);color:var(--gold);border:none;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500">⚠️ Select a client first</div>' : ''}
+    </div>
+
+    <!-- Upload area -->
+    <div id="bi-upload-area" style="border:2px dashed var(--border);border-radius:14px;padding:40px 28px;text-align:center;background:var(--bg);cursor:pointer;transition:border-color .2s"
+      onclick="document.getElementById('bi-file-input').click()"
+      ondragover="event.preventDefault();this.style.borderColor='var(--green)'"
+      ondragleave="this.style.borderColor='var(--border)'"
+      ondrop="event.preventDefault();this.style.borderColor='var(--border)';handleBIFile(event.dataTransfer.files[0])">
+      <div style="font-size:36px;margin-bottom:12px">📂</div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:6px">Drop your bank CSV here, or click to browse</div>
+      <div style="font-size:12px;color:var(--muted)">Accepts .csv files · Bank of America, Chase, Wells Fargo, Citi, Capital One, and most banks auto-detected</div>
+      <input id="bi-file-input" type="file" accept=".csv,text/csv" style="display:none" onchange="handleBIFile(this.files[0])">
+    </div>
+
+    <!-- Detected bank + summary -->
+    <div id="bi-summary" hidden style="margin-top:16px;padding:14px 18px;border-radius:10px;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="font-size:22px" id="bi-bank-icon">🏦</div>
+      <div>
+        <div id="bi-bank-name" style="font-size:14px;font-weight:700"></div>
+        <div id="bi-bank-counts" style="font-size:12px;color:var(--muted);margin-top:2px"></div>
+      </div>
+      <button class="btn" onclick="document.getElementById('bi-file-input').click()" style="margin-left:auto;font-size:12px;padding:6px 14px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)">↺ Change file</button>
+    </div>
+
+    <!-- Filters row -->
+    <div id="bi-filters" hidden style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <input id="bi-search" type="text" placeholder="🔍 Filter transactions…" oninput="renderBITable()"
+        style="padding:8px 12px;border-radius:7px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;width:220px">
+      <select id="bi-filter-type" onchange="renderBITable()"
+        style="padding:8px 12px;border-radius:7px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px">
+        <option value="">All transactions</option>
+        <option value="income">Income (credits)</option>
+        <option value="expense">Expenses (debits)</option>
+      </select>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="bi-select-all" style="width:auto;accent-color:var(--navy)" onchange="biToggleAll(this.checked)"> Select all visible
+      </label>
+      <button class="btn btn-primary" id="bi-post-btn" onclick="biPostSelected()" style="margin-left:auto;display:none">
+        ✅ Post selected to Journal
+      </button>
+    </div>
+
+    <!-- Results table -->
+    <div id="bi-table-wrap" style="margin-top:14px;overflow-x:auto"></div>
+
+    <!-- Progress/status -->
+    <div id="bi-status" style="margin-top:12px;font-size:13px;min-height:18px"></div>
+  </div>\`;
+
+  // Load accounts for this client (for categorization dropdowns)
+  if (clientId) {
+    const { data: accts } = await sb.from('accounts')
+      .select('id, account_number, name, type')
+      .eq('client_id', clientId).eq('is_active', true).order('account_number');
+    BI.accounts = accts || [];
+  } else {
+    BI.accounts = [];
+  }
+  BI.rows = [];
+  BI.postQueue = [];
+}
+
+function handleBIFile(file) {
+  if (!file) return;
+  if (!file.name.toLowerCase().endsWith('.csv')) {
+    document.getElementById('bi-status').textContent = '⚠️ Please upload a .csv file.';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const result = parseBankCSV(e.target.result);
+    if (result.error) {
+      document.getElementById('bi-status').textContent = '❌ ' + result.error;
+      return;
+    }
+    BI.rows = result.rows.map((r, i) => ({ ...r, _id: i, _checked: false, _acct: '', _type: r.amount >= 0 ? 'income' : 'expense' }));
+    BI.postQueue = [];
+
+    // Update summary banner
+    const bankIcons = { 'Bank of America': '🏦', 'Chase': '🏛', 'Wells Fargo': '🌐', 'Citi': '🌍', 'Capital One': '💳' };
+    const icon = bankIcons[result.bank] || '🏦';
+    document.getElementById('bi-bank-icon').textContent = icon;
+    document.getElementById('bi-bank-name').textContent = result.bank + ' · ' + file.name;
+    const totalIncome = BI.rows.filter(r => r.amount > 0).reduce((s, r) => s + r.amount, 0);
+    const totalExpense = BI.rows.filter(r => r.amount < 0).reduce((s, r) => s + r.amount, 0);
+    document.getElementById('bi-bank-counts').textContent =
+      \`\${BI.rows.length} transactions  ·  Income: $\${fmtAmt(totalIncome)}  ·  Expenses: $\${fmtAmt(Math.abs(totalExpense))}\`;
+    document.getElementById('bi-summary').hidden = false;
+    document.getElementById('bi-filters').hidden = false;
+    renderBITable();
+  };
+  reader.readAsText(file);
+}
+
+function renderBITable() {
+  const search = (document.getElementById('bi-search')?.value || '').toLowerCase();
+  const typeFilter = document.getElementById('bi-filter-type')?.value || '';
+
+  const visible = BI.rows.filter(r => {
+    if (search && !r.description.toLowerCase().includes(search) && !r.date.includes(search)) return false;
+    if (typeFilter === 'income' && r.amount <= 0) return false;
+    if (typeFilter === 'expense' && r.amount >= 0) return false;
+    return true;
+  });
+
+  const hasChecked = BI.rows.some(r => r._checked);
+  const postBtn = document.getElementById('bi-post-btn');
+  if (postBtn) postBtn.style.display = hasChecked ? '' : 'none';
+
+  const needsClient = !STATE.selectedClientId;
+
+  // Build account options
+  const incomeAccts = BI.accounts.filter(a => ['Revenue', 'Income', 'Other Income'].includes(a.type));
+  const expenseAccts = BI.accounts.filter(a => ['Expense', 'Cost of Goods Sold', 'Other Expense'].includes(a.type));
+  const assetAccts = BI.accounts.filter(a => a.type === 'Asset');
+
+  function acctOpts(type) {
+    const pool = type === 'income' ? [...incomeAccts, ...assetAccts] : [...expenseAccts, ...assetAccts];
+    if (!pool.length) {
+      // fall back to all accounts
+      return BI.accounts.map(a => \`<option value="\${a.id}">\${a.account_number ? a.account_number + ' · ' : ''}\${esc(a.name)}</option>\`).join('');
+    }
+    return pool.map(a => \`<option value="\${a.id}">\${a.account_number ? a.account_number + ' · ' : ''}\${esc(a.name)}</option>\`).join('');
+  }
+
+  if (!visible.length) {
+    document.getElementById('bi-table-wrap').innerHTML = '<div style="text-align:center;padding:28px;color:var(--muted);font-size:13px">No transactions match your filter.</div>';
+    return;
+  }
+
+  const rows = visible.map(r => {
+    const isIncome = r.amount >= 0;
+    const amtStyle = isIncome ? 'color:var(--green);font-weight:600' : 'color:var(--red);font-weight:600';
+    return \`<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 10px;width:36px">
+        <input type="checkbox" data-id="\${r._id}" \${r._checked ? 'checked' : ''} style="width:auto;accent-color:var(--navy)"
+          onchange="biToggleRow(\${r._id},this.checked)" \${needsClient ? 'disabled title="Select a client first"' : ''}>
+      </td>
+      <td style="padding:8px 10px;font-size:13px;white-space:nowrap;color:var(--muted)">\${r.date}</td>
+      <td style="padding:8px 10px;font-size:13px;max-width:300px">
+        <div style="font-weight:500">\${esc(r.description)}</div>
+      </td>
+      <td style="padding:8px 10px;font-size:13px;text-align:right;white-space:nowrap">
+        <span style="\${amtStyle}">\${isIncome ? '+' : ''}$\${fmtAmt(r.amount)}</span>
+      </td>
+      <td style="padding:8px 8px;min-width:140px">
+        <select data-id="\${r._id}" data-field="type" onchange="biUpdateRow(\${r._id},'type',this.value)"
+          style="width:100%;padding:5px 7px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px">
+          <option value="income" \${r._type==='income'?'selected':''}>Income</option>
+          <option value="expense" \${r._type==='expense'?'selected':''}>Expense</option>
+          <option value="transfer" \${r._type==='transfer'?'selected':''}>Transfer</option>
+          <option value="skip" \${r._type==='skip'?'selected':''}>Skip</option>
+        </select>
+      </td>
+      <td style="padding:8px 8px;min-width:200px">
+        \${needsClient
+          ? '<span style="font-size:11px;color:var(--muted)">Select client</span>'
+          : \`<select data-id="\${r._id}" data-field="acct" onchange="biUpdateRow(\${r._id},'acct',this.value)"
+              style="width:100%;padding:5px 7px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px">
+              <option value="">— Categorize —</option>
+              \${acctOpts(r._type)}
+            </select>\`
+        }
+      </td>
+      <td style="padding:8px 8px">
+        <input data-id="\${r._id}" data-field="memo" placeholder="Memo" value="\${esc(r._memo||'')}"
+          oninput="biUpdateRow(\${r._id},'memo',this.value)"
+          style="width:100%;min-width:120px;padding:5px 7px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px">
+      </td>
+    </tr>\`;
+  }).join('');
+
+  document.getElementById('bi-table-wrap').innerHTML = \`
+    <table style="width:100%;border-collapse:collapse;min-width:700px">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border)">
+          <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;width:36px"></th>
+          <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Date</th>
+          <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Description</th>
+          <th style="padding:8px 10px;text-align:right;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Amount</th>
+          <th style="padding:8px 8px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Type</th>
+          <th style="padding:8px 8px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Account</th>
+          <th style="padding:8px 8px;text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Memo</th>
+        </tr>
+      </thead>
+      <tbody>\${rows}</tbody>
+    </table>\`;
+}
+
+function biUpdateRow(id, field, value) {
+  const r = BI.rows.find(r => r._id === id);
+  if (!r) return;
+  if (field === 'type') r._type = value;
+  if (field === 'acct') r._acct = value;
+  if (field === 'memo') r._memo = value;
+  // Re-render only the account dropdown if type changed (to filter accounts)
+  if (field === 'type') renderBITable();
+}
+
+function biToggleRow(id, checked) {
+  const r = BI.rows.find(r => r._id === id);
+  if (r) r._checked = checked;
+  const hasChecked = BI.rows.some(r => r._checked);
+  const postBtn = document.getElementById('bi-post-btn');
+  if (postBtn) postBtn.style.display = hasChecked ? '' : 'none';
+}
+
+function biToggleAll(checked) {
+  const search = (document.getElementById('bi-search')?.value || '').toLowerCase();
+  const typeFilter = document.getElementById('bi-filter-type')?.value || '';
+  BI.rows.forEach(r => {
+    const matchSearch = !search || r.description.toLowerCase().includes(search) || r.date.includes(search);
+    const matchType = !typeFilter || (typeFilter === 'income' && r.amount > 0) || (typeFilter === 'expense' && r.amount < 0);
+    if (matchSearch && matchType) r._checked = checked;
+  });
+  renderBITable();
+}
+
+async function biPostSelected() {
+  const clientId = STATE.selectedClientId;
+  if (!clientId) { showToast('Select a client first.', 'red'); return; }
+
+  const toPost = BI.rows.filter(r => r._checked && r._type !== 'skip');
+  if (!toPost.length) { showToast('No rows selected.', 'red'); return; }
+  if (toPost.some(r => !r._acct && r._type !== 'transfer')) {
+    showToast('Please categorize all selected transactions before posting.', 'red'); return;
+  }
+
+  // Find or create "Cash / Checking" account (type Asset, used as the bank account side)
+  let cashAcctId = null;
+  const cashAcct = BI.accounts.find(a =>
+    a.type === 'Asset' && (a.name?.toLowerCase().includes('cash') || a.name?.toLowerCase().includes('checking') || (a.account_number && parseInt(a.account_number) >= 1000 && parseInt(a.account_number) < 1100))
+  );
+  if (cashAcct) cashAcctId = cashAcct.id;
+
+  // If no cash account, ask user to pick
+  if (!cashAcctId) {
+    showToast('⚠️ No Cash/Checking account found. Please add one in Chart of Accounts first.', 'red');
+    return;
+  }
+
+  document.getElementById('bi-status').innerHTML = '<span class="spinner" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></span> Posting entries…';
+  document.getElementById('bi-post-btn').disabled = true;
+
+  let posted = 0, errors = 0;
+  for (const r of toPost) {
+    const memo = r._memo || r.description;
+    const isIncome = r.amount >= 0;
+    const absAmt = Math.abs(r.amount);
+
+    // Build journal entry: DR cash / CR income  OR  DR expense / CR cash
+    let lines;
+    if (r._type === 'income') {
+      lines = [
+        { account_id: cashAcctId, debit: absAmt, credit: 0, memo },
+        { account_id: r._acct, debit: 0, credit: absAmt, memo },
+      ];
+    } else if (r._type === 'expense') {
+      lines = [
+        { account_id: r._acct, debit: absAmt, credit: 0, memo },
+        { account_id: cashAcctId, debit: 0, credit: absAmt, memo },
+      ];
+    } else { // transfer — skip for now
+      continue;
+    }
+
+    // Insert journal entry header
+    const { data: je, error: jeErr } = await sb.from('journal_entries').insert({
+      client_id: clientId,
+      entry_date: r.date,
+      description: r.description,
+      source: 'bank_import',
+      status: 'posted',
+    }).select('id').single();
+
+    if (jeErr) { errors++; continue; }
+
+    // Insert lines
+    const lineRows = lines.map(l => ({ ...l, journal_entry_id: je.id, client_id: clientId }));
+    const { error: lErr } = await sb.from('journal_lines').insert(lineRows);
+    if (lErr) { errors++; continue; }
+
+    // Mark as done
+    r._checked = false;
+    r._posted = true;
+    posted++;
+  }
+
+  document.getElementById('bi-post-btn').disabled = false;
+  document.getElementById('bi-status').textContent = '';
+  if (errors) showToast(\`Posted \${posted}, \${errors} error(s). Check journal for details.\`, 'gold');
+  else showToast(\`✅ \${posted} transaction\${posted !== 1 ? 's' : ''} posted to journal!\`, 'green');
+  renderBITable();
+}
+
+function fmtAmt(n) {
+  if (typeof n !== 'number') n = parseFloat(n) || 0;
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
 // ── REPORTS (staff only) ──────────────────────────────────
 async function renderReports(container) {
