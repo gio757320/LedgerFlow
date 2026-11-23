@@ -5024,9 +5024,10 @@ function parseBankCSV(text) {
 
 // State for the bank import screen
 const BI = {
-  rows: [],       // parsed transactions
-  accounts: [],   // client accounts for categorization
-  postQueue: [],  // rows checked for posting
+  rows: [],              // parsed transactions
+  accounts: [],          // client accounts for categorization
+  postQueue: [],         // rows checked for posting
+  selectedCashAcctId: '',// which bank account the CSV belongs to
 };
 
 async function renderBankImport(container) {
@@ -5071,6 +5072,21 @@ async function renderBankImport(container) {
       <button class="btn" onclick="document.getElementById('bi-file-input').click()" style="margin-left:auto;font-size:12px;padding:6px 14px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)">↺ Change file</button>
     </div>
 
+    <!-- Bank account selector (which account did these transactions come from?) -->
+    <div id="bi-acct-select" hidden style="margin-top:14px;padding:14px 18px;border-radius:10px;background:var(--surface);border:1.5px solid var(--gold);display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div style="font-size:18px">🏧</div>
+      <div style="flex:1;min-width:200px">
+        <label style="display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Which bank account are these transactions from?</label>
+        <select id="bi-cash-acct" onchange="BI.selectedCashAcctId=this.value"
+          style="width:100%;padding:8px 12px;border-radius:7px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:13px">
+          <option value="">— Select a bank / cash account —</option>
+        </select>
+      </div>
+      <div style="font-size:11px;color:var(--muted);max-width:220px">
+        This is the account that will be debited or credited for each transaction (the other side is the category you pick per row).
+      </div>
+    </div>
+
     <!-- Filters row -->
     <div id="bi-filters" hidden style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <input id="bi-search" type="text" placeholder="🔍 Filter transactions…" oninput="renderBITable()"
@@ -5107,6 +5123,10 @@ async function renderBankImport(container) {
   }
   BI.rows = [];
   BI.postQueue = [];
+  BI.selectedCashAcctId = '';
+  document.getElementById('bi-acct-select').hidden = true;
+  document.getElementById('bi-summary').hidden = true;
+  document.getElementById('bi-filters').hidden = true;
 }
 
 function handleBIFile(file) {
@@ -5136,6 +5156,21 @@ function handleBIFile(file) {
       `${BI.rows.length} transactions  ·  Income: $${fmtAmt(totalIncome)}  ·  Expenses: $${fmtAmt(Math.abs(totalExpense))}`;
     document.getElementById('bi-summary').hidden = false;
     document.getElementById('bi-filters').hidden = false;
+
+    // Populate and show the bank account selector
+    const cashSel = document.getElementById('bi-cash-acct');
+    const assetAccts = BI.accounts.filter(a => a.type === 'Asset');
+    cashSel.innerHTML = '<option value="">— Select a bank / cash account —</option>' +
+      assetAccts.map(a => `<option value="${a.id}">${a.account_number ? a.account_number + ' · ' : ''}${esc(a.name)}</option>`).join('');
+    // Auto-select if only one asset account
+    if (assetAccts.length === 1) {
+      cashSel.value = assetAccts[0].id;
+      BI.selectedCashAcctId = assetAccts[0].id;
+    } else {
+      BI.selectedCashAcctId = '';
+    }
+    document.getElementById('bi-acct-select').hidden = false;
+
     renderBITable();
   };
   reader.readAsText(file);
@@ -5275,16 +5310,11 @@ async function biPostSelected() {
     showToast('Please categorize all selected transactions before posting.', 'red'); return;
   }
 
-  // Find or create "Cash / Checking" account (type Asset, used as the bank account side)
-  let cashAcctId = null;
-  const cashAcct = BI.accounts.find(a =>
-    a.type === 'Asset' && (a.name?.toLowerCase().includes('cash') || a.name?.toLowerCase().includes('checking') || (a.account_number && parseInt(a.account_number) >= 1000 && parseInt(a.account_number) < 1100))
-  );
-  if (cashAcct) cashAcctId = cashAcct.id;
-
-  // If no cash account, ask user to pick
+  // Use the bank account the firm selected in the dropdown
+  const cashAcctId = BI.selectedCashAcctId;
   if (!cashAcctId) {
-    showToast('⚠️ No Cash/Checking account found. Please add one in Chart of Accounts first.', 'red');
+    showToast('⚠️ Please select the bank account these transactions came from (the gold box above the table).', 'gold');
+    document.getElementById('bi-cash-acct')?.focus();
     return;
   }
 
