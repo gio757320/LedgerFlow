@@ -5592,12 +5592,12 @@ function openAdminInvoiceDetail(inv, container) {
         \${inv.notes ? \`<div style="background:var(--bg);border-radius:8px;padding:12px;font-size:13px;border:1px solid var(--border);margin-bottom:12px"><strong>Notes:</strong> \${esc(inv.notes)}</div>\` : ''}
         <div id="adm-inv-action-msg" style="font-size:12px;min-height:14px;margin-top:4px"></div>
       </div>
-      <div class="modal-footer" style="gap:8px">
+      <div class="modal-footer" style="gap:8px;flex-wrap:wrap">
         <button class="btn" onclick="closeModal('adm-inv-backdrop')" style="background:var(--surface);color:var(--text);border:1.5px solid var(--border)">Close</button>
-        <button class="btn btn-secondary" id="adm-inv-edit-btn">✏️ Edit</button>
+        <button class="btn btn-secondary" id="adm-inv-edit-btn" style="margin-left:auto">✏️ Edit</button>
         <button class="btn btn-secondary" id="adm-inv-preview-btn">🖨️ Preview</button>
-        \${inv.status !== 'paid' && inv.status !== 'void' ? \`<button class="btn btn-primary" id="adm-inv-markpaid-btn" style="background:var(--green)">✓ Mark as Paid</button>\` : ''}
-        \${inv.status === 'draft' ? \`<button class="btn btn-primary" id="adm-inv-send-btn">📧 Mark as Sent</button>\` : ''}
+        \${inv.status !== 'paid' && inv.status !== 'void' ? \`<button class="btn btn-primary" id="adm-inv-markpaid-btn" style="background:var(--green)">✓ Mark Paid</button>\` : ''}
+        \${inv.status === 'draft' ? \`<button class="btn btn-primary" id="adm-inv-send-btn">📧 Sent</button>\` : ''}
       </div>
     </div>
   \`;
@@ -6038,9 +6038,10 @@ function openNewAdminInvoiceModal() {
     const clientRow = (STATE.clientRows || []).find(c => c.id === clientId);
     const payload = {
       client_id: clientId,
-      customer_name: clientRow?.full_name || clientId,
+      customer_name: clientRow?.full_name || 'Client',
       issue_date: date,
       due_date: due || null,
+      subtotal: amount,
       total: amount,
       notes: desc || null,
       invoice_number: num || null,
