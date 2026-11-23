@@ -5605,7 +5605,7 @@ function openAdminInvoiceDetail(inv, container) {
     </div>
   \`;
   document.body.appendChild(bd);
-  bd.addEventListener('click', e => { if (e.target === bd) closeModal('adm-inv-backdrop'); });
+  setTimeout(() => { bd.addEventListener('click', e => { if (e.target === bd) closeModal('adm-inv-backdrop'); }); }, 0);
 
   const msgEl = bd.querySelector('#adm-inv-action-msg');
   const paidBtn = bd.querySelector('#adm-inv-markpaid-btn');
