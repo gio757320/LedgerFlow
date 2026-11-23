@@ -1,4 +1,3 @@
-// v20261123-1511
 const HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5530,6 +5529,7 @@ async function renderAdminInvoices(container) {
 }
 
 function openAdminInvoiceDetail(inv, container) {
+  // BUILD v20261123-1524
   const bd = document.createElement('div');
   bd.className = 'modal-backdrop';
   bd.id = 'adm-inv-backdrop';
