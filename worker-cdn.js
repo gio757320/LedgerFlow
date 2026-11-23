@@ -5554,12 +5554,12 @@ function openAdminInvoiceDetail(inv, container) {
   const lineItems = Array.isArray(inv.line_items) ? inv.line_items : [];
 
   bd.innerHTML = \`
-    <div class="modal" role="dialog" style="max-width:580px">
-      <div class="modal-header">
+    <div class="modal" role="dialog" style="max-width:580px;display:flex;flex-direction:column;max-height:90vh">
+      <div class="modal-header" style="flex-shrink:0">
         <h3>Invoice \${esc(inv.invoice_number || '(no number)')}</h3>
         <button class="modal-close" onclick="closeModal('adm-inv-backdrop')" aria-label="Close">×</button>
       </div>
-      <div class="modal-body">
+      <div class="modal-body" style="overflow-y:auto;flex:1;min-height:0">
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
           \${statusBadge(inv.status)}
           <span style="font-size:13px;color:var(--muted)">Client: <strong>\${esc(inv.clients?.full_name || inv.customer_name || '—')}</strong></span>
@@ -5595,7 +5595,7 @@ function openAdminInvoiceDetail(inv, container) {
         \${inv.notes ? \`<div style="background:var(--bg);border-radius:8px;padding:12px;font-size:13px;border:1px solid var(--border);margin-bottom:12px"><strong>Notes:</strong> \${esc(inv.notes)}</div>\` : ''}
         <div id="adm-inv-action-msg" style="font-size:12px;min-height:14px;margin-top:4px"></div>
       </div>
-      <div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex-shrink:0">
         <button class="btn" onclick="closeModal('adm-inv-backdrop')" style="background:var(--surface);color:var(--text);border:1.5px solid var(--border)">Close</button>
         <button class="btn btn-secondary" id="adm-inv-edit-btn">✏️ Edit</button>
         <button class="btn btn-secondary" id="adm-inv-preview-btn">🖨️ Preview</button>
