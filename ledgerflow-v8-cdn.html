@@ -5208,6 +5208,14 @@ function handleBIFile(file) {
     }
     document.getElementById('bi-acct-select').hidden = false;
 
+    // Auto-default income rows to the first Revenue account (e.g. Service Revenue 4000)
+    const defaultIncomeAcct = BI.accounts.find(a => ['Revenue', 'Income', 'Other Income'].includes(a.type));
+    if (defaultIncomeAcct) {
+      BI.rows.forEach(r => {
+        if (r.amount >= 0 && !r._acct) r._acct = String(defaultIncomeAcct.id);
+      });
+    }
+
     renderBITable();
   };
   reader.readAsText(file);
@@ -5235,13 +5243,13 @@ function renderBITable() {
   const expenseAccts = BI.accounts.filter(a => ['Expense', 'Cost of Goods Sold', 'Other Expense'].includes(a.type));
   const assetAccts = BI.accounts.filter(a => a.type === 'Asset');
 
-  function acctOpts(type) {
+  function acctOpts(type, selectedId) {
     const pool = type === 'income' ? [...incomeAccts, ...assetAccts] : [...expenseAccts, ...assetAccts];
-    if (!pool.length) {
-      // fall back to all accounts
-      return BI.accounts.map(a => `<option value="${a.id}">${a.account_number ? a.account_number + ' · ' : ''}${esc(a.name)}</option>`).join('');
-    }
-    return pool.map(a => `<option value="${a.id}">${a.account_number ? a.account_number + ' · ' : ''}${esc(a.name)}</option>`).join('');
+    const list = pool.length ? pool : BI.accounts;
+    return list.map(a => {
+      const sel = String(a.id) === String(selectedId) ? ' selected' : '';
+      return `<option value="${a.id}"${sel}>${a.account_number ? a.account_number + ' · ' : ''}${esc(a.name)}</option>`;
+    }).join('');
   }
 
   if (!visible.length) {
@@ -5278,8 +5286,8 @@ function renderBITable() {
           ? '<span style="font-size:11px;color:var(--muted)">Select client</span>'
           : `<select data-id="${r._id}" data-field="acct" onchange="biUpdateRow(${r._id},'acct',this.value)"
               style="width:100%;padding:5px 7px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px">
-              <option value="">— Categorize —</option>
-              ${acctOpts(r._type)}
+              ${!r._acct ? '<option value="">— Categorize —</option>' : ''}
+              ${acctOpts(r._type, r._acct)}
             </select>`
         }
       </td>
