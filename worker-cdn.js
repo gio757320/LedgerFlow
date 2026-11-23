@@ -6024,8 +6024,10 @@ function openNewAdminInvoiceModal() {
     const saveBtn = bd.querySelector('#nai-save');
     saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
 
+    const clientRow = (STATE.clientRows || []).find(c => c.id === clientId);
     const payload = {
       client_id: clientId,
+      customer_name: clientRow?.full_name || clientId,
       issue_date: date,
       due_date: due || null,
       total: amount,
