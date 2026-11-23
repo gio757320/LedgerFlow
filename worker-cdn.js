@@ -1041,7 +1041,7 @@ function renderScreen(screen) {
       renderClients(container);
       break;
     case 'accounts':
-      renderAccounts(container);
+      renderChartOfAccounts(container);
       break;
     case 'expenses':
       renderExpenses(container);
