@@ -5164,11 +5164,19 @@ function handleBIFile(file) {
     document.getElementById('bi-filters').hidden = false;
 
     // Populate and show the bank account selector
+    // Only show bank/cash accounts: Current Asset subtype or name matches cash/bank/checking/savings
     const cashSel = document.getElementById('bi-cash-acct');
-    const assetAccts = BI.accounts.filter(a => a.type === 'Asset');
+    const cashKeywords = /bank|cash|checking|savings|petty/i;
+    const assetAccts = BI.accounts.filter(a =>
+      a.type === 'Asset' && (
+        a.subtype === 'Current Asset' ||
+        cashKeywords.test(a.name) ||
+        cashKeywords.test(a.subtype || '')
+      )
+    );
     cashSel.innerHTML = '<option value="">— Select a bank / cash account —</option>' +
       assetAccts.map(a => `<option value="${a.id}">${a.account_number ? a.account_number + ' · ' : ''}${esc(a.name)}</option>`).join('');
-    // Auto-select if only one asset account
+    // Auto-select if only one cash account
     if (assetAccts.length === 1) {
       cashSel.value = assetAccts[0].id;
       BI.selectedCashAcctId = assetAccts[0].id;
