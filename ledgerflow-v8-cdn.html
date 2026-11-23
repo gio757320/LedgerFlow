@@ -4995,8 +4995,8 @@ window.runReport = async function(type) {
   }
 
   // ── Business reports (journal-entry based) ────────────────
-  const { data: coa, error: coaErr } = await sb.from('chart_of_accounts')
-    .select('id, account_number, account_name, account_type, account_subtype')
+  const { data: coa, error: coaErr } = await sb.from('accounts')
+    .select('id, account_number, name, type, subtype')
     .eq('client_id', clientId).eq('is_active', true).order('account_number');
   if (coaErr) { out.innerHTML = `<div class="alert alert-red">${esc(coaErr.message)}</div>`; return; }
 
@@ -5021,7 +5021,15 @@ window.runReport = async function(type) {
     totals[l.account_id].credit += parseFloat(l.credit || 0);
   }
   const acctMap = {};
-  for (const a of (coa || [])) acctMap[a.id] = a;
+  for (const a of (coa || [])) {
+    // normalize: accounts table uses `name`/`type`/`subtype`; builders expect account_name/account_type/account_subtype
+    acctMap[a.id] = {
+      ...a,
+      account_name:    a.name    || a.account_name,
+      account_type:    a.type    || a.account_type,
+      account_subtype: a.subtype || a.account_subtype,
+    };
+  }
 
   if (type === 'pl')   out.innerHTML = buildPL(acctMap, totals, clientName, dateLabel);
   if (type === 'bs')   out.innerHTML = buildBS(acctMap, totals, clientName, dateLabel);
