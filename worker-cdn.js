@@ -5155,10 +5155,18 @@ function handleBIFile(file) {
     const clientId = STATE.selectedClientId;
     if (clientId) {
       const { data: coaAccts } = await sb.from('chart_of_accounts')
-        .select('id, account_number, name, type, subtype')
+        .select('id, account_number, account_name, account_type, account_subtype')
         .eq('client_id', clientId).eq('is_active', true).order('account_number');
-      if (coaAccts && coaAccts.length > 0) BI.accounts = coaAccts;
-      else {
+      if (coaAccts && coaAccts.length > 0) {
+        // Remap chart_of_accounts column names to the unified field names the UI expects
+        BI.accounts = coaAccts.map(a => ({
+          id: a.id,
+          account_number: a.account_number,
+          name: a.account_name,
+          type: a.account_type,
+          subtype: a.account_subtype
+        }));
+      } else {
         const { data: accts } = await sb.from('accounts')
           .select('id, account_number, name, type')
           .eq('client_id', clientId).eq('is_active', true).order('account_number');
