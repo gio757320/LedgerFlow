@@ -3925,31 +3925,29 @@ async function renderChartOfAccounts(container) {
 }
 
 window.openCoaModal = async function(id) {
-  // Remove any stale modal first, then build a fresh one on document.body
-  let modal = document.getElementById('coa-modal');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'coa-modal';
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px';
-    modal.innerHTML = \`
-      <div style="background:var(--surface);border-radius:12px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.35)">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)">
-          <div style="font-weight:700;font-size:16px" id="coa-modal-title">New Account</div>
-          <button onclick="document.getElementById('coa-modal').remove()" style="font-size:20px;color:var(--muted);background:none;border:none;cursor:pointer">✕</button>
-        </div>
-        <div style="padding:24px" id="coa-modal-body"></div>
-      </div>\`;
-    document.body.appendChild(modal);
-    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-  }
+  // Remove any stale modal
+  document.getElementById('coa-modal')?.remove();
 
   let row = null;
   if (id) {
     const { data } = await sb.from('chart_of_accounts').select('*').eq('id', id).single();
     row = data;
   }
-  document.getElementById('coa-modal-title').textContent = id ? 'Edit Account' : 'New Account';
-  document.getElementById('coa-modal-body').innerHTML = coaFormHtml(row);
+
+  // Build modal with content already filled in, then append
+  const modal = document.createElement('div');
+  modal.id = 'coa-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px';
+  modal.innerHTML = \`
+    <div style="background:var(--surface);border-radius:12px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.35)">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)">
+        <div style="font-weight:700;font-size:16px">\${id ? 'Edit Account' : 'New Account'}</div>
+        <button onclick="document.getElementById('coa-modal').remove()" style="font-size:20px;color:var(--muted);background:none;border:none;cursor:pointer">✕</button>
+      </div>
+      <div style="padding:24px" id="coa-modal-body">\${coaFormHtml(row)}</div>
+    </div>\`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
 };
 
 function coaFormHtml(r) {
