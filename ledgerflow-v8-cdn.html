@@ -5159,7 +5159,7 @@ function handleBIFile(file) {
     const totalIncome = BI.rows.filter(r => r.amount > 0).reduce((s, r) => s + r.amount, 0);
     const totalExpense = BI.rows.filter(r => r.amount < 0).reduce((s, r) => s + r.amount, 0);
     document.getElementById('bi-bank-counts').textContent =
-      `${BI.rows.length} transactions  ·  Income: $${fmtAmt(totalIncome)}  ·  Expenses: $${fmtAmt(Math.abs(totalExpense))}`;
+      `${BI.rows.length} transactions  ·  Income: ${fmtAmt(totalIncome)}  ·  Expenses: ${fmtAmt(Math.abs(totalExpense))}`;
     document.getElementById('bi-summary').hidden = false;
     document.getElementById('bi-filters').hidden = false;
 
@@ -5231,7 +5231,7 @@ function renderBITable() {
         <div style="font-weight:500">${esc(r.description)}</div>
       </td>
       <td style="padding:8px 10px;font-size:13px;text-align:right;white-space:nowrap">
-        <span style="${amtStyle}">${isIncome ? '+' : ''}$${fmtAmt(r.amount)}</span>
+        <span style="${amtStyle}">${isIncome ? '+' : ''}${fmtAmt(r.amount)}</span>
       </td>
       <td style="padding:8px 8px;min-width:140px">
         <select data-id="${r._id}" data-field="type" onchange="biUpdateRow(${r._id},'type',this.value)"
