@@ -4856,23 +4856,269 @@ async function renderReports(container) {
     container.innerHTML = '<div class="alert alert-red" style="margin:28px">Access denied.</div>';
     return;
   }
-  container.innerHTML = pageShell('Reports', 'Admin Only', "\\n    <button class=\\"btn btn-secondary\\">Generate Report</button>\\n  ", "\\n    <div class=\\"alert alert-gold\\">🔒 This section is visible to firm staff only.</div>\\n    <div id=\\"saved-reports-content\\"><div class=\\"loading-block\\"><span class=\\"spinner\\"></span></div></div>\\n  ");
-  const {
-    data,
-    error
-  } = await sb.from('saved_reports').select('*').order('generated_at', {
-    ascending: false
-  }).limit(20);
-  const el = document.getElementById('saved-reports-content');
-  if (error) {
-    el.innerHTML = "<div class=\\"alert alert-red\\">".concat(esc(error.message), "</div>");
-    return;
+
+  // Load clients for selector
+  const { data: clients } = await sb.from('clients').select('id, name').order('name');
+  const today = new Date();
+  const firstOfYear = today.getFullYear() + '-01-01';
+  const todayStr = today.toISOString().slice(0, 10);
+
+  container.innerHTML = pageShell('Reports', 'Financial statements for your clients', '', \`
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:20px">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Client</label>
+        <select id="rpt-client" style="padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;min-width:200px">
+          \${(clients||[]).map(c => \`<option value="\${esc(c.id)}">\${esc(c.name)}</option>\`).join('')}
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">From</label>
+        <input id="rpt-from" type="date" value="\${firstOfYear}" style="padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">To</label>
+        <input id="rpt-to" type="date" value="\${todayStr}" style="padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px">
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="runReport('pl')" class="btn btn-primary" style="white-space:nowrap">📊 P&amp;L</button>
+        <button onclick="runReport('bs')" class="btn btn-primary" style="white-space:nowrap;background:var(--accent2,#6c5ce7)">⚖️ Balance Sheet</button>
+        <button onclick="runReport('tb')" class="btn btn-secondary" style="white-space:nowrap">📋 Trial Balance</button>
+      </div>
+    </div>
+    <div id="rpt-output">
+      <div class="empty"><div class="empty-icon">📈</div><p>Select a client and date range, then choose a report.</p></div>
+    </div>
+  \`);
+}
+
+window.runReport = async function(type) {
+  const clientId = document.getElementById('rpt-client')?.value;
+  const from     = document.getElementById('rpt-from')?.value;
+  const to       = document.getElementById('rpt-to')?.value;
+  const out      = document.getElementById('rpt-output');
+  if (!clientId || !from || !to) { showToast('Please select a client and date range.', 'red'); return; }
+  out.innerHTML = '<div class="loading-block"><span class="spinner"></span> Generating report…</div>';
+
+  // Load COA for this client
+  const { data: coa, error: coaErr } = await sb.from('chart_of_accounts')
+    .select('id, account_number, account_name, account_type, account_subtype')
+    .eq('client_id', clientId).eq('is_active', true).order('account_number');
+  if (coaErr) { out.innerHTML = \`<div class="alert alert-red">\${esc(coaErr.message)}</div>\`; return; }
+
+  // Load journal entries in range
+  const { data: entries, error: jeErr } = await sb.from('journal_entries')
+    .select('id').eq('client_id', clientId).eq('status', 'posted')
+    .gte('entry_date', from).lte('entry_date', to);
+  if (jeErr) { out.innerHTML = \`<div class="alert alert-red">\${esc(jeErr.message)}</div>\`; return; }
+
+  const entryIds = (entries || []).map(e => e.id);
+
+  // Load journal lines for those entries
+  let lines = [];
+  if (entryIds.length > 0) {
+    const { data: jl, error: jlErr } = await sb.from('journal_lines')
+      .select('account_id, debit, credit').in('journal_entry_id', entryIds);
+    if (jlErr) { out.innerHTML = \`<div class="alert alert-red">\${esc(jlErr.message)}</div>\`; return; }
+    lines = jl || [];
   }
-  if (!data || !data.length) {
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📈</div><p>No saved reports yet.</p><p style="font-size:12px;margin-top:4px;color:var(--muted)">Generate reports from your data to see them here.</p></div>';
-    return;
+
+  // Aggregate by account
+  const totals = {}; // account_id -> { debit, credit }
+  for (const l of lines) {
+    if (!totals[l.account_id]) totals[l.account_id] = { debit: 0, credit: 0 };
+    totals[l.account_id].debit  += parseFloat(l.debit  || 0);
+    totals[l.account_id].credit += parseFloat(l.credit || 0);
   }
-  el.innerHTML = "<div class=\\"card\\"><table>\\n    <thead><tr><th>Title</th><th>Type</th><th>Client</th><th>Generated</th><th></th></tr></thead>\\n    <tbody>".concat(data.map(r => "\\n      <tr>\\n        <td style=\\"font-weight:600\\">".concat(esc(r.title), "</td>\\n        <td>").concat(esc(r.report_type), "</td>\\n        <td>").concat(esc(r.client_name || 'All'), "</td>\\n        <td style=\\"font-size:12px\\">").concat(relTime(r.generated_at), "</td>\\n        <td><button class=\\"btn btn-sm btn-secondary\\" style=\\"background:var(--bg);color:var(--text)\\">View</button></td>\\n      </tr>\\n    ")).join(''), "</tbody>\\n  </table></div>");
+
+  // Build account map
+  const acctMap = {};
+  for (const a of (coa || [])) acctMap[a.id] = a;
+
+  const clientName = document.getElementById('rpt-client').selectedOptions[0]?.text || '';
+  const dateLabel  = \`\${from} to \${to}\`;
+
+  if (type === 'pl')   out.innerHTML = buildPL(acctMap, totals, clientName, dateLabel);
+  if (type === 'bs')   out.innerHTML = buildBS(acctMap, totals, clientName, dateLabel);
+  if (type === 'tb')   out.innerHTML = buildTB(acctMap, totals, clientName, dateLabel);
+};
+
+function rptHeader(title, client, dates) {
+  return \`<div style="margin-bottom:20px">
+    <div style="font-size:18px;font-weight:700">\${title}</div>
+    <div style="font-size:13px;color:var(--muted);margin-top:2px">\${esc(client)} · \${dates}</div>
+  </div>\`;
+}
+function rptTable(rows, totalLabel, totalAmt, positiveIsGood) {
+  const color = totalAmt >= 0 ? (positiveIsGood ? 'var(--green)' : 'var(--red)') : (positiveIsGood ? 'var(--red)' : 'var(--green)');
+  return \`<table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead><tr>
+      <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Account</th>
+      <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Amount</th>
+    </tr></thead>
+    <tbody>\${rows}</tbody>
+    <tfoot><tr>
+      <td style="padding:10px 8px 4px;font-weight:700;border-top:2px solid var(--border)">\${esc(totalLabel)}</td>
+      <td style="padding:10px 8px 4px;text-align:right;font-weight:700;border-top:2px solid var(--border);color:\${color};font-variant-numeric:tabular-nums">\${fmtAmt(totalAmt)}</td>
+    </tr></tfoot>
+  </table>\`;
+}
+function rptRow(name, num, indent) {
+  return \`<tr>
+    <td style="padding:5px 8px 5px \${indent?'24px':'8px'};color:var(--text)">\${esc(name)}</td>
+    <td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums;color:var(--text)">\${fmtAmt(num)}</td>
+  </tr>\`;
+}
+function rptSection(label) {
+  return \`<tr><td colspan="2" style="padding:12px 8px 4px;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-top:1px solid var(--border)">\${esc(label)}</td></tr>\`;
+}
+function fmtAmt(n) {
+  if (n === 0) return '—';
+  const abs = Math.abs(n).toLocaleString('en-US', { style:'currency', currency:'USD' });
+  return n < 0 ? \`(\${abs})\` : abs;
+}
+
+function buildPL(acctMap, totals, client, dates) {
+  // Revenue: credit-normal accounts of type Revenue
+  // Expense: debit-normal accounts of type Expense
+  let revenueRows = '', revenueTotal = 0;
+  let expenseRows = '', expenseTotal = 0;
+
+  for (const [id, t] of Object.entries(totals)) {
+    const a = acctMap[id]; if (!a) continue;
+    const type = (a.account_type || '').toLowerCase();
+    if (type === 'revenue' || type === 'income') {
+      const amt = t.credit - t.debit;
+      revenueTotal += amt;
+      revenueRows += rptRow(\`\${a.account_number} \${a.account_name}\`, amt, true);
+    } else if (type === 'expense') {
+      const amt = t.debit - t.credit;
+      expenseTotal += amt;
+      expenseRows += rptRow(\`\${a.account_number} \${a.account_name}\`, amt, true);
+    }
+  }
+
+  const netIncome = revenueTotal - expenseTotal;
+  const html = \`
+    \${rptHeader('Profit & Loss', client, dates)}
+    <div class="card" style="padding:20px">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr>
+          <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Account</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Amount</th>
+        </tr></thead>
+        <tbody>
+          \${rptSection('Revenue')}
+          \${revenueRows || '<tr><td colspan="2" style="padding:5px 8px 5px 24px;color:var(--muted);font-size:12px">No revenue accounts with activity</td></tr>'}
+          <tr><td style="padding:6px 8px;font-weight:600">Total Revenue</td><td style="padding:6px 8px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums;color:var(--green)">\${fmtAmt(revenueTotal)}</td></tr>
+          \${rptSection('Expenses')}
+          \${expenseRows || '<tr><td colspan="2" style="padding:5px 8px 5px 24px;color:var(--muted);font-size:12px">No expense accounts with activity</td></tr>'}
+          <tr><td style="padding:6px 8px;font-weight:600">Total Expenses</td><td style="padding:6px 8px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums;color:var(--red)">\${fmtAmt(expenseTotal)}</td></tr>
+        </tbody>
+        <tfoot><tr>
+          <td style="padding:12px 8px 4px;font-weight:700;font-size:15px;border-top:2px solid var(--border)">Net Income</td>
+          <td style="padding:12px 8px 4px;text-align:right;font-weight:700;font-size:15px;border-top:2px solid var(--border);font-variant-numeric:tabular-nums;color:\${netIncome>=0?'var(--green)':'var(--red)'}">\${fmtAmt(netIncome)}</td>
+        </tr></tfoot>
+      </table>
+    </div>\`;
+  return html;
+}
+
+function buildBS(acctMap, totals, client, dates) {
+  let assetRows = '', assetTotal = 0;
+  let liabRows  = '', liabTotal  = 0;
+  let equityRows= '', equityTotal= 0;
+
+  for (const [id, t] of Object.entries(totals)) {
+    const a = acctMap[id]; if (!a) continue;
+    const type = (a.account_type || '').toLowerCase();
+    if (type === 'asset') {
+      const amt = t.debit - t.credit;
+      assetTotal += amt;
+      assetRows += rptRow(\`\${a.account_number} \${a.account_name}\`, amt, true);
+    } else if (type === 'liability') {
+      const amt = t.credit - t.debit;
+      liabTotal += amt;
+      liabRows += rptRow(\`\${a.account_number} \${a.account_name}\`, amt, true);
+    } else if (type === 'equity') {
+      const amt = t.credit - t.debit;
+      equityTotal += amt;
+      equityRows += rptRow(\`\${a.account_number} \${a.account_name}\`, amt, true);
+    }
+  }
+
+  const liabPlusEquity = liabTotal + equityTotal;
+  return \`
+    \${rptHeader('Balance Sheet', client, \`As of \${dates.split(' to ')[1] || dates}\`)}
+    <div class="card" style="padding:20px">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr>
+          <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Account</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Balance</th>
+        </tr></thead>
+        <tbody>
+          \${rptSection('Assets')}
+          \${assetRows || '<tr><td colspan="2" style="padding:5px 8px 5px 24px;color:var(--muted);font-size:12px">No asset accounts with activity</td></tr>'}
+          <tr><td style="padding:6px 8px;font-weight:600">Total Assets</td><td style="padding:6px 8px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums">\${fmtAmt(assetTotal)}</td></tr>
+          \${rptSection('Liabilities')}
+          \${liabRows || '<tr><td colspan="2" style="padding:5px 8px 5px 24px;color:var(--muted);font-size:12px">No liability accounts with activity</td></tr>'}
+          <tr><td style="padding:6px 8px;font-weight:600">Total Liabilities</td><td style="padding:6px 8px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums">\${fmtAmt(liabTotal)}</td></tr>
+          \${rptSection('Equity')}
+          \${equityRows || '<tr><td colspan="2" style="padding:5px 8px 5px 24px;color:var(--muted);font-size:12px">No equity accounts with activity</td></tr>'}
+          <tr><td style="padding:6px 8px;font-weight:600">Total Equity</td><td style="padding:6px 8px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums">\${fmtAmt(equityTotal)}</td></tr>
+        </tbody>
+        <tfoot><tr>
+          <td style="padding:12px 8px 4px;font-weight:700;font-size:15px;border-top:2px solid var(--border)">Total Liabilities + Equity</td>
+          <td style="padding:12px 8px 4px;text-align:right;font-weight:700;font-size:15px;border-top:2px solid var(--border);font-variant-numeric:tabular-nums;color:\${Math.abs(assetTotal-liabPlusEquity)<0.01?'var(--green)':'var(--red)'}">\${fmtAmt(liabPlusEquity)}</td>
+        </tr></tfoot>
+      </table>
+      \${Math.abs(assetTotal - liabPlusEquity) > 0.01
+        ? \`<div class="alert alert-gold" style="margin-top:12px;font-size:12px">⚠️ Balance sheet is out of balance by \${fmtAmt(Math.abs(assetTotal - liabPlusEquity))}. Check for missing journal entries.</div>\`
+        : \`<div style="margin-top:12px;font-size:12px;color:var(--green);font-weight:600">✅ Balance sheet is balanced.</div>\`}
+    </div>\`;
+}
+
+function buildTB(acctMap, totals, client, dates) {
+  let rows = '';
+  let totalDr = 0, totalCr = 0;
+  const sorted = Object.entries(totals).sort((a, b) => {
+    const na = acctMap[a[0]]?.account_number || '';
+    const nb = acctMap[b[0]]?.account_number || '';
+    return na.localeCompare(nb);
+  });
+  for (const [id, t] of sorted) {
+    const a = acctMap[id]; if (!a) continue;
+    totalDr += t.debit; totalCr += t.credit;
+    rows += \`<tr>
+      <td style="padding:5px 8px;font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px">\${esc(a.account_number)}</td>
+      <td style="padding:5px 8px">\${esc(a.account_name)}</td>
+      <td style="padding:5px 8px;font-size:11px;color:var(--muted)">\${esc(a.account_type)}</td>
+      <td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums">\${t.debit ? fmtAmt(t.debit) : '—'}</td>
+      <td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums">\${t.credit ? fmtAmt(t.credit) : '—'}</td>
+    </tr>\`;
+  }
+  if (!rows) rows = '<tr><td colspan="5" style="padding:16px 8px;text-align:center;color:var(--muted)">No posted journal entries in this period.</td></tr>';
+  return \`
+    \${rptHeader('Trial Balance', client, dates)}
+    <div class="card" style="padding:20px">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr>
+          <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Acct #</th>
+          <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Account Name</th>
+          <th style="text-align:left;padding:6px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Type</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Debit</th>
+          <th style="text-align:right;padding:6px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Credit</th>
+        </tr></thead>
+        <tbody>\${rows}</tbody>
+        <tfoot><tr>
+          <td colspan="3" style="padding:10px 8px 4px;font-weight:700;border-top:2px solid var(--border)">Totals</td>
+          <td style="padding:10px 8px 4px;text-align:right;font-weight:700;border-top:2px solid var(--border);font-variant-numeric:tabular-nums">\${fmtAmt(totalDr)}</td>
+          <td style="padding:10px 8px 4px;text-align:right;font-weight:700;border-top:2px solid var(--border);font-variant-numeric:tabular-nums;color:\${Math.abs(totalDr-totalCr)<0.01?'var(--green)':'var(--red)'}">\${fmtAmt(totalCr)}</td>
+        </tr></tfoot>
+      </table>
+      \${Math.abs(totalDr - totalCr) > 0.01
+        ? \`<div class="alert alert-gold" style="margin-top:12px;font-size:12px">⚠️ Debits and credits don't balance — difference of \${fmtAmt(Math.abs(totalDr-totalCr))}.</div>\`
+        : totalDr > 0 ? \`<div style="margin-top:12px;font-size:12px;color:var(--green);font-weight:600">✅ Debits equal credits.</div>\` : ''}
+    </div>\`;
 }
 
 // ── ROUTEWORTH PACKAGES (staff only) ─────────────────────
