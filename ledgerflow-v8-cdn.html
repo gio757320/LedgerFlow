@@ -303,6 +303,26 @@ tr:hover td { background: rgba(46,158,107,.04); }
 .rw-pkg-code { font-family: monospace; font-size: 12px; color: var(--muted); }
 .rw-pkg-name { font-weight: 600; font-size: 14px; }
 .rw-pkg-meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+/* ── Print styles ────────────────────────────────────────────── */
+@media print {
+  /* hide everything except the report output area */
+  #sidebar, #topbar, .tab-bar, #rpt-controls, .btn-print-rpt { display: none !important; }
+  #main-content { margin-left: 0 !important; padding: 0 !important; }
+  #page-content  { padding: 0 !important; }
+  body { background: #fff !important; color: #000 !important; }
+  .card { border: 1px solid #ccc !important; box-shadow: none !important; break-inside: avoid; }
+  /* firm letterhead */
+  #print-letterhead { display: block !important; }
+  /* force page to show report area */
+  #rpt-out { display: block !important; }
+}
+#print-letterhead {
+  display: none;
+  margin-bottom: 24px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #0f1f3d;
+}
 </style>
 </head>
 <body>
@@ -4868,7 +4888,7 @@ async function renderReports(container) {
   (clients || []).forEach(c => { window._rptClients[c.id] = c; });
 
   container.innerHTML = pageShell('Reports', 'Smart reports by client type', '', `
-    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:20px">
+    <div id="rpt-controls" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:20px">
       <div style="display:flex;flex-direction:column;gap:4px">
         <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Client</label>
         <select id="rpt-client" onchange="onRptClientChange()" style="padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;min-width:220px">
@@ -5229,9 +5249,28 @@ function buildTaxChecklist(client, dates, incomeCount, expenseCount, docCount) {
 }
 
 function rptHeader(title, client, dates) {
-  return `<div style="margin-bottom:20px">
-    <div style="font-size:18px;font-weight:700">${title}</div>
-    <div style="font-size:13px;color:var(--muted);margin-top:2px">${esc(client)} · ${dates}</div>
+  return `
+  <div id="print-letterhead">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:20px;font-weight:800;color:#0f1f3d;letter-spacing:-.5px">Manrique &amp; Associates LLC</div>
+        <div style="font-size:11px;color:#555;margin-top:2px">Accounting &amp; Tax Services · manriqueassociates.com</div>
+      </div>
+      <div style="text-align:right;font-size:11px;color:#555">
+        <div>Prepared: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}</div>
+        <div>Confidential — Client Copy</div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-bottom:20px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+    <div>
+      <div style="font-size:18px;font-weight:700">${title}</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:2px">${esc(client)} · ${dates}</div>
+    </div>
+    <button class="btn-print-rpt" onclick="window.print()"
+      style="display:flex;align-items:center;gap:6px;padding:7px 14px;background:var(--navy);color:#fff;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;border:none;white-space:nowrap;flex-shrink:0">
+      🖨️ Print / Save PDF
+    </button>
   </div>`;
 }
 function rptTable(rows, totalLabel, totalAmt, positiveIsGood) {
