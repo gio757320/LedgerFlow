@@ -634,8 +634,16 @@ let STATE = {
 
   // Logout
   document.getElementById('logout-btn').addEventListener('click', async () => {
-    await sb.auth.signOut();
-    // Force UI reset in case onAuthStateChange doesn't fire
+    await sb.auth.signOut({ scope: 'global' });
+    // Clear all Supabase session data from browser storage
+    try {
+      Object.keys(localStorage).forEach(k => {
+        if (k.startsWith('sb-')) localStorage.removeItem(k);
+      });
+      Object.keys(sessionStorage).forEach(k => {
+        if (k.startsWith('sb-')) sessionStorage.removeItem(k);
+      });
+    } catch(e) {}
     onSignedOut();
   });
 
