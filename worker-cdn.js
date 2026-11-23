@@ -5142,7 +5142,7 @@ function handleBIFile(file) {
     return;
   }
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     const result = parseBankCSV(e.target.result);
     if (result.error) {
       document.getElementById('bi-status').textContent = '❌ ' + result.error;
@@ -5150,6 +5150,21 @@ function handleBIFile(file) {
     }
     BI.rows = result.rows.map((r, i) => ({ ...r, _id: i, _checked: false, _acct: '', _type: r.amount >= 0 ? 'income' : 'expense' }));
     BI.postQueue = [];
+
+    // Re-fetch accounts fresh so newly added accounts appear in dropdown
+    const clientId = STATE.selectedClientId;
+    if (clientId) {
+      const { data: coaAccts } = await sb.from('chart_of_accounts')
+        .select('id, account_number, name, type, subtype')
+        .eq('client_id', clientId).eq('is_active', true).order('account_number');
+      if (coaAccts && coaAccts.length > 0) BI.accounts = coaAccts;
+      else {
+        const { data: accts } = await sb.from('accounts')
+          .select('id, account_number, name, type')
+          .eq('client_id', clientId).eq('is_active', true).order('account_number');
+        BI.accounts = accts || [];
+      }
+    }
 
     // Update summary banner
     const bankIcons = { 'Bank of America': '🏦', 'Chase': '🏛', 'Wells Fargo': '🌐', 'Citi': '🌍', 'Capital One': '💳' };
