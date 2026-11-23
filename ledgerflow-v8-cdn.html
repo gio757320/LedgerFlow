@@ -4857,17 +4857,22 @@ async function renderReports(container) {
     return;
   }
 
-  // Load clients for selector
-  const { data: clients } = await sb.from('clients').select('id, full_name').order('full_name');
+  // Load clients (with entity_type so we can detect individual vs business)
+  const { data: clients } = await sb.from('clients').select('id, full_name, entity_type').order('full_name');
   const today = new Date();
   const firstOfYear = today.getFullYear() + '-01-01';
   const todayStr = today.toISOString().slice(0, 10);
 
-  container.innerHTML = pageShell('Reports', 'Financial statements for your clients', '', `
+  // Store client list for later lookup
+  window._rptClients = {};
+  (clients || []).forEach(c => { window._rptClients[c.id] = c; });
+
+  container.innerHTML = pageShell('Reports', 'Smart reports by client type', '', `
     <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:20px">
       <div style="display:flex;flex-direction:column;gap:4px">
         <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Client</label>
-        <select id="rpt-client" style="padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;min-width:200px">
+        <select id="rpt-client" onchange="onRptClientChange()" style="padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;min-width:220px">
+          <option value="">— Select a client —</option>
           ${(clients||[]).map(c => `<option value="${esc(c.id)}">${esc(c.full_name)}</option>`).join('')}
         </select>
       </div>
@@ -4879,41 +4884,128 @@ async function renderReports(container) {
         <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">To</label>
         <input id="rpt-to" type="date" value="${todayStr}" style="padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px">
       </div>
-      <div style="display:flex;gap:8px">
-        <button onclick="runReport('pl')" class="btn btn-primary" style="white-space:nowrap">📊 P&amp;L</button>
-        <button onclick="runReport('bs')" class="btn btn-primary" style="white-space:nowrap;background:var(--accent2,#6c5ce7)">⚖️ Balance Sheet</button>
-        <button onclick="runReport('tb')" class="btn btn-secondary" style="white-space:nowrap">📋 Trial Balance</button>
-      </div>
+      <div id="rpt-buttons" style="display:flex;gap:8px;flex-wrap:wrap"></div>
     </div>
+    <div id="rpt-client-badge" style="margin-bottom:16px"></div>
     <div id="rpt-output">
-      <div class="empty"><div class="empty-icon">📈</div><p>Select a client and date range, then choose a report.</p></div>
+      <div class="empty"><div class="empty-icon">📈</div><p>Select a client to see their available reports.</p></div>
     </div>
   `);
 }
 
+// Called when client dropdown changes — show the right buttons for their type
+window.onRptClientChange = function() {
+  const sel = document.getElementById('rpt-client');
+  const clientId = sel?.value;
+  const btnDiv = document.getElementById('rpt-buttons');
+  const badge  = document.getElementById('rpt-client-badge');
+  const out    = document.getElementById('rpt-output');
+
+  if (!clientId) {
+    if (btnDiv) btnDiv.innerHTML = '';
+    if (badge)  badge.innerHTML = '';
+    if (out)    out.innerHTML = '<div class="empty"><div class="empty-icon">📈</div><p>Select a client to see their available reports.</p></div>';
+    return;
+  }
+
+  const client = window._rptClients?.[clientId];
+  const et = (client?.entity_type || '').toLowerCase();
+  const isIndividual = et === 'individual' || et === '' || !et;
+
+  // Badge showing client type
+  if (badge) {
+    const label = isIndividual ? '👤 Individual / Tax Client' : '🏢 Business Client';
+    const color = isIndividual ? '#6c5ce7' : '#00b894';
+    badge.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;background:${color}22;color:${color};font-size:12px;font-weight:600">${label} · <span style="font-weight:400;text-transform:capitalize">${esc(client?.entity_type || 'Individual')}</span></span>`;
+  }
+
+  // Show appropriate action buttons
+  if (btnDiv) {
+    if (isIndividual) {
+      btnDiv.innerHTML = `
+        <button onclick="runReport('income-summary')" class="btn btn-primary" style="white-space:nowrap">💰 Income Summary</button>
+        <button onclick="runReport('expense-summary')" class="btn btn-primary" style="white-space:nowrap;background:#e17055">💸 Expense Summary</button>
+        <button onclick="runReport('documents')" class="btn btn-secondary" style="white-space:nowrap">📁 Documents</button>
+        <button onclick="runReport('tax-checklist')" class="btn btn-secondary" style="white-space:nowrap">✅ Tax Checklist</button>
+      `;
+    } else {
+      btnDiv.innerHTML = `
+        <button onclick="runReport('pl')" class="btn btn-primary" style="white-space:nowrap">📊 P&amp;L</button>
+        <button onclick="runReport('bs')" class="btn btn-primary" style="white-space:nowrap;background:#6c5ce7">⚖️ Balance Sheet</button>
+        <button onclick="runReport('tb')" class="btn btn-secondary" style="white-space:nowrap">📋 Trial Balance</button>
+        <button onclick="runReport('income-summary')" class="btn btn-secondary" style="white-space:nowrap">💰 Income</button>
+        <button onclick="runReport('expense-summary')" class="btn btn-secondary" style="white-space:nowrap">💸 Expenses</button>
+      `;
+    }
+  }
+
+  if (out) out.innerHTML = '<div class="empty"><div class="empty-icon">📊</div><p>Choose a report above.</p></div>';
+};
+
 window.runReport = async function(type) {
-  const clientId = document.getElementById('rpt-client')?.value;
-  const from     = document.getElementById('rpt-from')?.value;
-  const to       = document.getElementById('rpt-to')?.value;
-  const out      = document.getElementById('rpt-output');
+  const clientId   = document.getElementById('rpt-client')?.value;
+  const from       = document.getElementById('rpt-from')?.value;
+  const to         = document.getElementById('rpt-to')?.value;
+  const out        = document.getElementById('rpt-output');
   if (!clientId || !from || !to) { showToast('Please select a client and date range.', 'red'); return; }
   out.innerHTML = '<div class="loading-block"><span class="spinner"></span> Generating report…</div>';
 
-  // Load COA for this client
+  const clientName = document.getElementById('rpt-client').selectedOptions[0]?.text || '';
+  const dateLabel  = `${from} to ${to}`;
+
+  // ── Individual reports ────────────────────────────────────
+  if (type === 'income-summary') {
+    const { data, error } = await sb.from('income')
+      .select('income_date, source, category, amount, payment_method, notes, status')
+      .eq('client_id', clientId).gte('income_date', from).lte('income_date', to)
+      .order('income_date');
+    if (error) { out.innerHTML = `<div class="alert alert-red">${esc(error.message)}</div>`; return; }
+    out.innerHTML = buildIncomeSummary(data || [], clientName, dateLabel);
+    return;
+  }
+
+  if (type === 'expense-summary') {
+    const { data, error } = await sb.from('expenses')
+      .select('expense_date, merchant, category, amount, payment_method, notes, status')
+      .eq('client_id', clientId).gte('expense_date', from).lte('expense_date', to)
+      .order('expense_date');
+    if (error) { out.innerHTML = `<div class="alert alert-red">${esc(error.message)}</div>`; return; }
+    out.innerHTML = buildExpenseSummary(data || [], clientName, dateLabel);
+    return;
+  }
+
+  if (type === 'documents') {
+    const { data, error } = await sb.from('client_documents')
+      .select('id, file_name, file_path, file_size, mime_type, uploaded_at, note, reviewed, reviewed_at')
+      .eq('client_id', clientId).order('uploaded_at', { ascending: false });
+    if (error) { out.innerHTML = `<div class="alert alert-red">${esc(error.message)}</div>`; return; }
+    out.innerHTML = buildDocumentsList(data || [], clientName, dateLabel);
+    return;
+  }
+
+  if (type === 'tax-checklist') {
+    // Load income, expenses and documents to show completion status
+    const [incRes, expRes, docRes] = await Promise.all([
+      sb.from('income').select('id', { count: 'exact', head: true }).eq('client_id', clientId).gte('income_date', from).lte('income_date', to),
+      sb.from('expenses').select('id', { count: 'exact', head: true }).eq('client_id', clientId).gte('expense_date', from).lte('expense_date', to),
+      sb.from('client_documents').select('id', { count: 'exact', head: true }).eq('client_id', clientId),
+    ]);
+    out.innerHTML = buildTaxChecklist(clientName, dateLabel, incRes.count || 0, expRes.count || 0, docRes.count || 0);
+    return;
+  }
+
+  // ── Business reports (journal-entry based) ────────────────
   const { data: coa, error: coaErr } = await sb.from('chart_of_accounts')
     .select('id, account_number, account_name, account_type, account_subtype')
     .eq('client_id', clientId).eq('is_active', true).order('account_number');
   if (coaErr) { out.innerHTML = `<div class="alert alert-red">${esc(coaErr.message)}</div>`; return; }
 
-  // Load journal entries in range
   const { data: entries, error: jeErr } = await sb.from('journal_entries')
     .select('id').eq('client_id', clientId).eq('status', 'posted')
     .gte('entry_date', from).lte('entry_date', to);
   if (jeErr) { out.innerHTML = `<div class="alert alert-red">${esc(jeErr.message)}</div>`; return; }
 
   const entryIds = (entries || []).map(e => e.id);
-
-  // Load journal lines for those entries
   let lines = [];
   if (entryIds.length > 0) {
     const { data: jl, error: jlErr } = await sb.from('journal_lines')
@@ -4922,25 +5014,211 @@ window.runReport = async function(type) {
     lines = jl || [];
   }
 
-  // Aggregate by account
-  const totals = {}; // account_id -> { debit, credit }
+  const totals = {};
   for (const l of lines) {
     if (!totals[l.account_id]) totals[l.account_id] = { debit: 0, credit: 0 };
     totals[l.account_id].debit  += parseFloat(l.debit  || 0);
     totals[l.account_id].credit += parseFloat(l.credit || 0);
   }
-
-  // Build account map
   const acctMap = {};
   for (const a of (coa || [])) acctMap[a.id] = a;
-
-  const clientName = document.getElementById('rpt-client').selectedOptions[0]?.text || '';
-  const dateLabel  = `${from} to ${to}`;
 
   if (type === 'pl')   out.innerHTML = buildPL(acctMap, totals, clientName, dateLabel);
   if (type === 'bs')   out.innerHTML = buildBS(acctMap, totals, clientName, dateLabel);
   if (type === 'tb')   out.innerHTML = buildTB(acctMap, totals, clientName, dateLabel);
 };
+
+// ── Individual report builders ───────────────────────────────
+function buildIncomeSummary(rows, client, dates) {
+  const byCategory = {};
+  let grand = 0;
+  for (const r of rows) {
+    const cat = r.category || r.source || 'Uncategorized';
+    if (!byCategory[cat]) byCategory[cat] = 0;
+    byCategory[cat] += parseFloat(r.amount || 0);
+    grand += parseFloat(r.amount || 0);
+  }
+  const catRows = Object.entries(byCategory).sort((a,b) => b[1]-a[1])
+    .map(([cat, amt]) => `<tr>
+      <td style="padding:6px 8px;color:var(--text)">${esc(cat)}</td>
+      <td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:var(--green)">${fmtAmt(amt)}</td>
+    </tr>`).join('');
+
+  const detailRows = rows.map(r => `<tr>
+    <td style="padding:5px 8px;font-size:12px;color:var(--muted)">${r.income_date || ''}</td>
+    <td style="padding:5px 8px;font-size:12px">${esc(r.source || '')}</td>
+    <td style="padding:5px 8px;font-size:12px;color:var(--muted)">${esc(r.category || '')}</td>
+    <td style="padding:5px 8px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums">${fmtAmt(parseFloat(r.amount||0))}</td>
+    <td style="padding:5px 8px;font-size:11px;color:var(--muted)">${esc(r.payment_method || '')}</td>
+  </tr>`).join('') || '<tr><td colspan="5" style="padding:16px 8px;text-align:center;color:var(--muted)">No income records in this period.</td></tr>';
+
+  return `
+    ${rptHeader('Income Summary', client, dates)}
+    <div class="card" style="padding:20px;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">By Category</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <tbody>${catRows || '<tr><td colspan="2" style="color:var(--muted);padding:8px">No income recorded.</td></tr>'}</tbody>
+        <tfoot><tr>
+          <td style="padding:10px 8px 4px;font-weight:700;border-top:2px solid var(--border)">Total Income</td>
+          <td style="padding:10px 8px 4px;text-align:right;font-weight:700;border-top:2px solid var(--border);color:var(--green);font-variant-numeric:tabular-nums">${fmtAmt(grand)}</td>
+        </tr></tfoot>
+      </table>
+    </div>
+    <div class="card" style="padding:20px">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Transaction Detail</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr>
+            <th style="text-align:left;padding:5px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase">Date</th>
+            <th style="text-align:left;padding:5px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase">Source</th>
+            <th style="text-align:left;padding:5px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase">Category</th>
+            <th style="text-align:right;padding:5px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase">Amount</th>
+            <th style="text-align:left;padding:5px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase">Method</th>
+          </tr></thead>
+          <tbody>${detailRows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function buildExpenseSummary(rows, client, dates) {
+  const byCategory = {};
+  let grand = 0;
+  for (const r of rows) {
+    const cat = r.category || 'Uncategorized';
+    if (!byCategory[cat]) byCategory[cat] = 0;
+    byCategory[cat] += parseFloat(r.amount || 0);
+    grand += parseFloat(r.amount || 0);
+  }
+  const catRows = Object.entries(byCategory).sort((a,b) => b[1]-a[1])
+    .map(([cat, amt]) => `<tr>
+      <td style="padding:6px 8px;color:var(--text)">${esc(cat)}</td>
+      <td style="padding:6px 8px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:var(--red,#e17055)">${fmtAmt(amt)}</td>
+    </tr>`).join('');
+
+  const detailRows = rows.map(r => `<tr>
+    <td style="padding:5px 8px;font-size:12px;color:var(--muted)">${r.expense_date || ''}</td>
+    <td style="padding:5px 8px;font-size:12px">${esc(r.merchant || '')}</td>
+    <td style="padding:5px 8px;font-size:12px;color:var(--muted)">${esc(r.category || '')}</td>
+    <td style="padding:5px 8px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums">${fmtAmt(parseFloat(r.amount||0))}</td>
+    <td style="padding:5px 8px;font-size:11px;color:var(--muted)">${esc(r.payment_method || '')}</td>
+  </tr>`).join('') || '<tr><td colspan="5" style="padding:16px 8px;text-align:center;color:var(--muted)">No expense records in this period.</td></tr>';
+
+  return `
+    ${rptHeader('Expense Summary', client, dates)}
+    <div class="card" style="padding:20px;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">By Category</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <tbody>${catRows || '<tr><td colspan="2" style="color:var(--muted);padding:8px">No expenses recorded.</td></tr>'}</tbody>
+        <tfoot><tr>
+          <td style="padding:10px 8px 4px;font-weight:700;border-top:2px solid var(--border)">Total Expenses</td>
+          <td style="padding:10px 8px 4px;text-align:right;font-weight:700;border-top:2px solid var(--border);color:var(--red,#e17055);font-variant-numeric:tabular-nums">${fmtAmt(grand)}</td>
+        </tr></tfoot>
+      </table>
+    </div>
+    <div class="card" style="padding:20px">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Transaction Detail</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr>
+            <th style="text-align:left;padding:5px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase">Date</th>
+            <th style="text-align:left;padding:5px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase">Merchant</th>
+            <th style="text-align:left;padding:5px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase">Category</th>
+            <th style="text-align:right;padding:5px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase">Amount</th>
+            <th style="text-align:left;padding:5px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase">Method</th>
+          </tr></thead>
+          <tbody>${detailRows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function buildDocumentsList(rows, client, dates) {
+  const fmtSize = b => b > 1048576 ? (b/1048576).toFixed(1)+' MB' : b > 1024 ? (b/1024).toFixed(0)+' KB' : b+' B';
+  const fmtDate = d => d ? new Date(d).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '—';
+
+  const docRows = rows.map(r => `<tr>
+    <td style="padding:7px 8px">
+      <div style="font-size:13px;font-weight:500">${esc(r.file_name || 'Unnamed file')}</div>
+      ${r.note ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${esc(r.note)}</div>` : ''}
+    </td>
+    <td style="padding:7px 8px;font-size:12px;color:var(--muted);white-space:nowrap">${fmtDate(r.uploaded_at)}</td>
+    <td style="padding:7px 8px;font-size:12px;color:var(--muted);text-align:right">${r.file_size ? fmtSize(r.file_size) : '—'}</td>
+    <td style="padding:7px 8px;text-align:center">
+      ${r.reviewed
+        ? `<span style="font-size:11px;color:var(--green);font-weight:600">✅ Reviewed</span>`
+        : `<span style="font-size:11px;color:var(--muted)">Pending</span>`}
+    </td>
+  </tr>`).join('') || '<tr><td colspan="4" style="padding:16px 8px;text-align:center;color:var(--muted)">No documents uploaded for this client yet.</td></tr>';
+
+  return `
+    ${rptHeader('Documents', client, 'All time')}
+    <div class="card" style="padding:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">${rows.length} Document${rows.length !== 1 ? 's' : ''}</div>
+        <div style="font-size:12px;color:var(--muted)">${rows.filter(r=>r.reviewed).length} reviewed · ${rows.filter(r=>!r.reviewed).length} pending</div>
+      </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr>
+            <th style="text-align:left;padding:5px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase">File</th>
+            <th style="text-align:left;padding:5px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase">Uploaded</th>
+            <th style="text-align:right;padding:5px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase">Size</th>
+            <th style="text-align:center;padding:5px 8px;border-bottom:2px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase">Status</th>
+          </tr></thead>
+          <tbody>${docRows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function buildTaxChecklist(client, dates, incomeCount, expenseCount, docCount) {
+  const year = dates.split('-')[0] || new Date().getFullYear();
+  const checks = [
+    { label: 'W-2s / 1099s collected', desc: 'All income forms received from employers and payers', done: false },
+    { label: `Income recorded (${incomeCount} entries)`, desc: 'Income entries entered in the system for the period', done: incomeCount > 0 },
+    { label: `Expenses recorded (${expenseCount} entries)`, desc: 'Deductible expenses entered for the period', done: expenseCount > 0 },
+    { label: `Supporting documents (${docCount} files)`, desc: 'Receipts, statements, and supporting documents uploaded', done: docCount > 0 },
+    { label: 'Charitable contributions documented', desc: 'Receipts for any cash or non-cash donations', done: false },
+    { label: 'Business use of home / vehicle', desc: 'If applicable — square footage, mileage log', done: false },
+    { label: 'Health insurance premiums', desc: 'If self-employed or paying your own premiums', done: false },
+    { label: 'Education expenses', desc: 'Tuition, student loan interest (Form 1098-T / 1098-E)', done: false },
+    { label: 'Bank / investment statements', desc: 'Year-end statements for interest and dividends (1099-INT / 1099-DIV)', done: false },
+    { label: 'Prior year return reviewed', desc: 'Last year\'s return on file for carryover amounts', done: false },
+  ];
+
+  const done = checks.filter(c => c.done).length;
+  const pct  = Math.round((done / checks.length) * 100);
+  const barColor = pct >= 80 ? '#00b894' : pct >= 50 ? '#fdcb6e' : '#e17055';
+
+  const rows = checks.map(c => `
+    <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+      <div style="width:22px;height:22px;border-radius:50%;border:2px solid ${c.done ? '#00b894' : 'var(--border)'};background:${c.done ? '#00b894' : 'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">
+        ${c.done ? '<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' : ''}
+      </div>
+      <div>
+        <div style="font-size:13px;font-weight:${c.done ? '600' : '500'};color:${c.done ? 'var(--text)' : 'var(--text)'}">${esc(c.label)}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(c.desc)}</div>
+      </div>
+      <div style="margin-left:auto;font-size:11px;font-weight:600;color:${c.done ? '#00b894' : 'var(--muted)'};white-space:nowrap">${c.done ? '✓ Done' : 'Needed'}</div>
+    </div>
+  `).join('');
+
+  return `
+    ${rptHeader('Tax Prep Checklist', client, dates)}
+    <div class="card" style="padding:20px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:600">${done} of ${checks.length} complete</div>
+        <div style="font-size:13px;font-weight:700;color:${barColor}">${pct}%</div>
+      </div>
+      <div style="height:8px;border-radius:4px;background:var(--border);overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px;transition:width .4s ease"></div>
+      </div>
+    </div>
+    <div class="card" style="padding:20px">
+      ${rows}
+    </div>`;
+}
 
 function rptHeader(title, client, dates) {
   return `<div style="margin-bottom:20px">
