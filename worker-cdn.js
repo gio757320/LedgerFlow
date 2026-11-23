@@ -5353,7 +5353,7 @@ async function biPostSelected() {
   document.getElementById('bi-status').innerHTML = '<span class="spinner" style="width:14px;height:14px;display:inline-block;vertical-align:middle"></span> Posting entries…';
   document.getElementById('bi-post-btn').disabled = true;
 
-  let posted = 0, errors = 0;
+  let posted = 0, errors = 0, lastErr = '';
   for (const r of toPost) {
     const memo = r._memo || r.description;
     const isIncome = r.amount >= 0;
@@ -5384,12 +5384,12 @@ async function biPostSelected() {
       status: 'posted',
     }).select('id').single();
 
-    if (jeErr) { errors++; continue; }
+    if (jeErr) { errors++; console.error('JE insert error:', jeErr.message, jeErr.details); lastErr = jeErr.message; continue; }
 
     // Insert lines
     const lineRows = lines.map(l => ({ ...l, journal_entry_id: je.id, client_id: clientId }));
     const { error: lErr } = await sb.from('journal_lines').insert(lineRows);
-    if (lErr) { errors++; continue; }
+    if (lErr) { errors++; console.error('Line insert error:', lErr.message, lErr.details, 'lines:', JSON.stringify(lineRows)); lastErr = lErr.message; continue; }
 
     // Mark as done
     r._checked = false;
@@ -5399,7 +5399,7 @@ async function biPostSelected() {
 
   document.getElementById('bi-post-btn').disabled = false;
   document.getElementById('bi-status').textContent = '';
-  if (errors) showToast(\`Posted \${posted}, \${errors} error(s). Check journal for details.\`, 'gold');
+  if (errors) showToast(\`Posted \${posted}, \${errors} error(s): \${lastErr || 'check browser console'}\`, 'gold');
   else showToast(\`✅ \${posted} transaction\${posted !== 1 ? 's' : ''} posted to journal!\`, 'green');
   renderBITable();
 }
