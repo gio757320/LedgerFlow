@@ -4858,7 +4858,7 @@ async function renderReports(container) {
   }
 
   // Load clients for selector
-  const { data: clients } = await sb.from('clients').select('id, name').order('name');
+  const { data: clients } = await sb.from('clients').select('id, full_name').order('full_name');
   const today = new Date();
   const firstOfYear = today.getFullYear() + '-01-01';
   const todayStr = today.toISOString().slice(0, 10);
@@ -4868,7 +4868,7 @@ async function renderReports(container) {
       <div style="display:flex;flex-direction:column;gap:4px">
         <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Client</label>
         <select id="rpt-client" style="padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;min-width:200px">
-          ${(clients||[]).map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')}
+          ${(clients||[]).map(c => `<option value="${esc(c.id)}">${esc(c.full_name)}</option>`).join('')}
         </select>
       </div>
       <div style="display:flex;flex-direction:column;gap:4px">
