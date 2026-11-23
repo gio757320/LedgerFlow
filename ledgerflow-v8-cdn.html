@@ -5386,7 +5386,7 @@ async function biPostSelected() {
     if (jeErr) { errors++; console.error('JE insert error:', jeErr.message, jeErr.details); lastErr = jeErr.message; continue; }
 
     // Insert lines
-    const lineRows = lines.map(l => ({ ...l, journal_entry_id: je.id, client_id: clientId }));
+    const lineRows = lines.map(l => ({ ...l, journal_entry_id: je.id }));
     const { error: lErr } = await sb.from('journal_lines').insert(lineRows);
     if (lErr) { errors++; console.error('Line insert error:', lErr.message, lErr.details, 'lines:', JSON.stringify(lineRows)); lastErr = lErr.message; continue; }
 
