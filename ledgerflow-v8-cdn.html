@@ -635,6 +635,8 @@ let STATE = {
   // Logout
   document.getElementById('logout-btn').addEventListener('click', async () => {
     await sb.auth.signOut();
+    // Force UI reset in case onAuthStateChange doesn't fire
+    onSignedOut();
   });
 
   // Sidebar navigation
