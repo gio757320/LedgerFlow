@@ -471,7 +471,7 @@ tr:hover td { background: rgba(46,158,107,.04); }
         <button class="nav-item" data-screen="adminInvoices">
           <span class="icon">🧾</span> Invoices
         </button>
-        <button class="nav-item" data-screen="routeworth">
+        <button class="nav-item" id="nav-routeworth-btn" data-screen="routeworth" style="display:none">
           <span class="icon">🚗</span> RouteWorth Packages
         </button>
         <button class="nav-item" data-screen="staff" id="nav-staff-btn">
@@ -657,6 +657,7 @@ let STATE = {
   // Client selector
   document.getElementById('client-select').addEventListener('change', e => {
     STATE.selectedClientId = e.target.value || null;
+    updateRouteWorthNav();
     renderScreen(STATE.currentScreen);
   });
 
@@ -784,7 +785,7 @@ async function onSignedIn(user) {
   if (STATE.isStaff) {
     const {
       data: clients
-    } = await sb.from('clients').select('id,full_name,entity_type,is_firm,email,phone,address,state,logo_url').order('full_name');
+    } = await sb.from('clients').select('id,full_name,entity_type,is_firm,email,phone,address,state,logo_url,services').order('full_name');
     STATE.clientRows = clients || [];
     populateClientSelect();
   } else {
@@ -893,7 +894,7 @@ window.submitMfaEnroll = async function(factorId) {
 
   // MFA enrolled and verified — proceed into the app
   hideMfaScreen();
-  const clients = (await sb.from('clients').select('id,full_name,entity_type,is_firm,email,phone,address,state,logo_url').order('full_name')).data || [];
+  const clients = (await sb.from('clients').select('id,full_name,entity_type,is_firm,email,phone,address,state,logo_url,services').order('full_name')).data || [];
   STATE.clientRows = clients;
   populateClientSelect();
   showApp();
@@ -939,7 +940,7 @@ window.submitMfaVerify = async function(factorId) {
 
   // Verified — proceed into the app
   hideMfaScreen();
-  const clients = (await sb.from('clients').select('id,full_name,entity_type,is_firm,email,phone,address,state,logo_url').order('full_name')).data || [];
+  const clients = (await sb.from('clients').select('id,full_name,entity_type,is_firm,email,phone,address,state,logo_url,services').order('full_name')).data || [];
   STATE.clientRows = clients;
   populateClientSelect();
   showApp();
@@ -1028,12 +1029,33 @@ function showApp() {
     if (ptDivider) ptDivider.hidden = !hasPayroll && !hasTax;
   }
 
+  updateRouteWorthNav();
   navigateTo('dashboard');
 
   // Start notification badge polling (every 60 seconds)
   if (window._notifInterval) clearInterval(window._notifInterval);
   refreshNotificationBadges();
   window._notifInterval = setInterval(refreshNotificationBadges, 60000);
+}
+
+// ════════════════════════════════════════════════════════════
+//  ROUTEWORTH NAV VISIBILITY
+// ════════════════════════════════════════════════════════════
+function updateRouteWorthNav() {
+  const btn = document.getElementById('nav-routeworth-btn');
+  if (!btn) return;
+  if (!STATE.isStaff) {
+    // Client portal: show if the client's own services include routeworth
+    const svcs = (STATE.clientRow && STATE.clientRow.services) || [];
+    btn.style.display = svcs.includes('routeworth') ? '' : 'none';
+  } else {
+    // Staff view: show if the selected client has routeworth
+    const clientRow = STATE.clientRows && STATE.selectedClientId
+      ? STATE.clientRows.find(r => r.id === STATE.selectedClientId)
+      : null;
+    const svcs = (clientRow && clientRow.services) || [];
+    btn.style.display = svcs.includes('routeworth') ? '' : 'none';
+  }
 }
 
 // ════════════════════════════════════════════════════════════
@@ -2721,6 +2743,10 @@ function openClientDetail(c) {
                 <input type="checkbox" id="edit-svc-payroll" style="width:16px;height:16px" ${(c.services||[]).includes('payroll')?'checked':''}>
                 💼 Payroll
               </label>
+              <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:14px">
+                <input type="checkbox" id="edit-svc-routeworth" style="width:16px;height:16px" ${(c.services||[]).includes('routeworth')?'checked':''}>
+                🚗 RouteWorth
+              </label>
             </div>
           </div>
           <div class="form-group" style="margin:0">
@@ -2827,6 +2853,7 @@ function openClientDetail(c) {
         if (document.getElementById('edit-svc-tax').checked)         svcs.push('tax');
         if (document.getElementById('edit-svc-bookkeeping').checked)  svcs.push('bookkeeping');
         if (document.getElementById('edit-svc-payroll').checked)      svcs.push('payroll');
+        if (document.getElementById('edit-svc-routeworth').checked)   svcs.push('routeworth');
         const updates = {
           full_name: document.getElementById('edit-name').value.trim(),
           email:     document.getElementById('edit-email').value.trim(),
@@ -2878,6 +2905,7 @@ function openClientDetail(c) {
           const merged = fresh || { ...c, ...updates };
           const idx = STATE.clientRows.findIndex(r => r.id === c.id);
           if (idx !== -1) STATE.clientRows[idx] = merged;
+          updateRouteWorthNav();
           openClientDetail(merged);
         }
       });
@@ -6745,6 +6773,18 @@ async function renderRouteWorth(container) {
     container.innerHTML = '<div class="alert alert-red" style="margin:28px">Access denied.</div>';
     return;
   }
+  // Guard: only show for clients who have RouteWorth enabled
+  const selClient = STATE.clientRows && STATE.selectedClientId
+    ? STATE.clientRows.find(r => r.id === STATE.selectedClientId)
+    : null;
+  if (!selClient || !(selClient.services || []).includes('routeworth')) {
+    container.innerHTML = `<div style="padding:48px;text-align:center;color:var(--muted)">
+      <div style="font-size:48px;margin-bottom:16px">🚗</div>
+      <div style="font-size:18px;font-weight:600;margin-bottom:8px">RouteWorth not enabled</div>
+      <div style="font-size:14px">${selClient ? `${esc(selClient.full_name)} does not have the RouteWorth service.` : 'Select a client first.'} You can enable it in the client's settings under <b>Services</b>.</div>
+    </div>`;
+    return;
+  }
   container.innerHTML = pageShell('RouteWorth Packages', 'Driver Tax Packages', '', "\n    <div class=\"alert alert-green\">🔗 Packages received from drivers via RouteWorth mobile app.</div>\n    <div id=\"rw-content\"><div class=\"loading-block\"><span class=\"spinner\"></span></div></div>\n  ");
   const {
     data,
@@ -7022,6 +7062,10 @@ function openAddClientModal() {
               <input type="checkbox" id="acm-svc-payroll" style="width:auto;accent-color:var(--gold)" onchange="acmUpdateServices()">
               💼 Payroll
             </label>
+            <label style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:8px;border:1.5px solid var(--border);cursor:pointer;font-size:13px;font-weight:500" id="svc-rw-label">
+              <input type="checkbox" id="acm-svc-routeworth" style="width:auto;accent-color:var(--gold)" onchange="acmUpdateServices()">
+              🚗 RouteWorth
+            </label>
           </div>
         </div>
 
@@ -7141,6 +7185,7 @@ async function saveNewClient() {
   const hasTax = document.getElementById('acm-svc-tax').checked;
   const hasBk    = document.getElementById('acm-svc-bookkeeping').checked;
   const hasPr    = document.getElementById('acm-svc-payroll').checked;
+  const hasRw    = document.getElementById('acm-svc-routeworth')?.checked;
   const regionId = document.getElementById('acm-region')?.value || null;
   const errEl  = document.getElementById('acm-error');
   const btn    = document.getElementById('acm-save');
@@ -7149,12 +7194,13 @@ async function saveNewClient() {
   if (!name)   { errEl.textContent = 'Full name is required.';        return; }
   if (!entity) { errEl.textContent = 'Please select an entity type.'; return; }
   if (!email)  { errEl.textContent = 'Email is required.';            return; }
-  if (!hasTax && !hasBk && !hasPr) { errEl.textContent = 'Select at least one service.'; return; }
+  if (!hasTax && !hasBk && !hasPr && !hasRw) { errEl.textContent = 'Select at least one service.'; return; }
 
   const svcs = [];
   if (hasTax) svcs.push('tax');
   if (hasBk)  svcs.push('bookkeeping');
   if (hasPr)  svcs.push('payroll');
+  if (hasRw)  svcs.push('routeworth');
 
   btn.disabled = true;
   btn.textContent = 'Creating client…';
