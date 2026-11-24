@@ -6799,9 +6799,11 @@ async function renderRouteWorth(container) {
   const {
     data,
     error
-  } = await sb.from('routeworth_packages').select('*').order('received_at', {
-    ascending: false
-  });
+  } = await (() => {
+    let q = sb.from('routeworth_packages').select('*').order('received_at', { ascending: false });
+    if (STATE.selectedClientId) q = q.eq('client_id', STATE.selectedClientId);
+    return q;
+  })();
   const el = document.getElementById('rw-content');
   if (error) {
     el.innerHTML = "<div class=\\"alert alert-red\\">".concat(esc(error.message), "</div>");
