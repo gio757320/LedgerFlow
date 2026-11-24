@@ -784,7 +784,7 @@ async function onSignedIn(user) {
   if (STATE.isStaff) {
     const {
       data: clients
-    } = await sb.from('clients').select('id,full_name,entity_type,is_firm').order('full_name');
+    } = await sb.from('clients').select('id,full_name,entity_type,is_firm,email,phone,address,state').order('full_name');
     STATE.clientRows = clients || [];
     populateClientSelect();
   } else {
@@ -893,7 +893,7 @@ window.submitMfaEnroll = async function(factorId) {
 
   // MFA enrolled and verified — proceed into the app
   hideMfaScreen();
-  const clients = (await sb.from('clients').select('id,full_name,entity_type,is_firm').order('full_name')).data || [];
+  const clients = (await sb.from('clients').select('id,full_name,entity_type,is_firm,email,phone,address,state').order('full_name')).data || [];
   STATE.clientRows = clients;
   populateClientSelect();
   showApp();
@@ -939,7 +939,7 @@ window.submitMfaVerify = async function(factorId) {
 
   // Verified — proceed into the app
   hideMfaScreen();
-  const clients = (await sb.from('clients').select('id,full_name,entity_type,is_firm').order('full_name')).data || [];
+  const clients = (await sb.from('clients').select('id,full_name,entity_type,is_firm,email,phone,address,state').order('full_name')).data || [];
   STATE.clientRows = clients;
   populateClientSelect();
   showApp();
@@ -5828,6 +5828,12 @@ function openInvoicePreview(inv) {
   const fmtMoney = v => v == null ? '$0.00' : '$' + Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   const clientName = inv.customer_name || inv.clients?.full_name || '—';
   const clientEmail = inv.customer_email || '';
+  // FROM = selected client (the entity issuing this invoice)
+  const selClient = STATE.clientRows?.find(r => r.id === STATE.selectedClientId);
+  const fromName = selClient?.full_name || 'Manrique & Associates LLC';
+  const fromEmail = selClient?.email || 'contact@manriqueassociates.com';
+  const fromAddress = selClient?.address || '';
+  const fromState = selClient?.state || 'Florida, USA';
   const statusColor = {draft:'#6b7280',sent:'#3b82f6',paid:'#22c55e',void:'#6b7280',overdue:'#ef4444'};
   
   const previewWin = window.open('', '_blank', 'width=820,height:1000,scrollbars=yes');
@@ -5839,7 +5845,7 @@ function openInvoicePreview(inv) {
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Invoice \${inv.invoice_number || ''} — Manrique &amp; Associates</title>
+  <title>Invoice \${inv.invoice_number || ''} — \${fromName}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 13px; color: #1a1a2e; background: #fff; }
@@ -5894,10 +5900,10 @@ function openInvoicePreview(inv) {
     <div class="meta-row">
       <div class="meta-box">
         <h4>From</h4>
-        <p><strong>Manrique &amp; Associates LLC</strong><br>
-        Accounting &amp; Tax Services<br>
-        Florida, USA<br>
-        contact@manriqueassociates.com</p>
+        <p><strong>\${fromName}</strong><br>
+        \${fromAddress ? fromAddress + '<br>' : ''}
+        \${fromState}<br>
+        \${fromEmail}</p>
       </div>
       <div class="meta-box">
         <h4>Bill To</h4>
@@ -5946,7 +5952,7 @@ function openInvoicePreview(inv) {
 
     <div class="footer">
       <p>Thank you for your business.</p>
-      <p>Manrique &amp; Associates LLC — Confidential</p>
+      <p>\${fromName} — Confidential</p>
     </div>
   </div>
 </body>
