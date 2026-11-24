@@ -1411,11 +1411,12 @@ async function renderDashboard(container) {
 
   // Show RouteWorth tile/quicklink only when the selected client has the service
   const selClientRow = cid ? (STATE.clientRows || []).find(r => r.id === cid) : null;
-  const clientHasRw = !cid || ((selClientRow?.services || []).includes('routeworth'));
-  const rwTile = document.querySelector('#dash-kpi-row .stat-red');
-  if (rwTile) rwTile.style.display = clientHasRw ? '' : 'none';
-  const rwLink = container.querySelector('[onclick*="routeworth"]');
-  if (rwLink) rwLink.style.display = clientHasRw ? '' : 'none';
+  // No client selected → show for firm overview. Client selected → check their services.
+  const clientHasRw = !cid || ((selClientRow?.services ?? []).includes('routeworth'));
+  document.querySelectorAll('#dash-kpi-row .stat-red').forEach(el => el.style.display = clientHasRw ? '' : 'none');
+  container.querySelectorAll('button').forEach(btn => {
+    if (btn.getAttribute('onclick')?.includes('routeworth')) btn.style.display = clientHasRw ? '' : 'none';
+  });
 
   let jeQ = sb.from('journal_entries').select('id', {
     count: 'exact',
