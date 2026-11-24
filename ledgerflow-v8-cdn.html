@@ -5772,7 +5772,7 @@ function openEditAdminInvoiceModal(inv, container) {
   }
 
   if (lineItems.length) {
-    lineItems.forEach(li => addLine(li.description, li.quantity||1, li.unit_price||0));
+    lineItems.forEach(li => addLine(li.description, li.quantity||1, li.unit_price || (li.amount && li.quantity ? li.amount/(li.quantity||1) : li.amount) || 0));
   } else {
     addLine('', 1, Number(inv.total)||0);
   }
@@ -5897,7 +5897,7 @@ function openInvoicePreview(inv) {
         <p><strong>Manrique &amp; Associates LLC</strong><br>
         Accounting &amp; Tax Services<br>
         Florida, USA<br>
-        privacy@routeworth.app</p>
+        contact@manriqueassociates.com</p>
       </div>
       <div class="meta-box">
         <h4>Bill To</h4>
