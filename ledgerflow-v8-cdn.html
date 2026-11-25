@@ -1005,7 +1005,7 @@ function showApp() {
     const hasTax = svcs.includes('tax');
 
     // Expenses, My Invoices, Income — hidden for Individual (personal) clients
-    const isBusiness = (STATE.clientData.client_type || 'personal') === 'business';
+    const isBusiness = (STATE.clientRow.client_type || 'personal') === 'business';
     const expensesBtn = document.getElementById('nav-expenses-btn');
     if (expensesBtn) expensesBtn.hidden = !isBusiness;
 
