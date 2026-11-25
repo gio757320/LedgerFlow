@@ -961,13 +961,13 @@ function onSignedOut() {
   document.getElementById('app-shell').hidden = true;
 }
 function showApp() {
-  var _STATE$clientRow;
+  var _STATE\$clientRow;
   document.getElementById('login-screen').hidden = true;
   document.getElementById('app-shell').hidden = false;
 
   // Topbar
   const email = STATE.user.email;
-  document.getElementById('topbar-user').textContent = STATE.isStaff ? email.split('@')[0] : ((_STATE$clientRow = STATE.clientRow) === null || _STATE$clientRow === void 0 ? void 0 : _STATE$clientRow.full_name) || email.split('@')[0];
+  document.getElementById('topbar-user').textContent = STATE.isStaff ? email.split('@')[0] : ((_STATE\$clientRow = STATE.clientRow) === null || _STATE\$clientRow === void 0 ? void 0 : _STATE\$clientRow.full_name) || email.split('@')[0];
   document.getElementById('topbar-role-badge').textContent = STATE.isAdmin ? 'Admin' : STATE.isStaff ? 'Staff' : 'Client';
 
   // Sidebar: staff-only sections
@@ -1399,7 +1399,7 @@ function selectedClientName() {
 
 // ── DASHBOARD ──────────────────────────────────────────────
 async function renderDashboard(container) {
-  var _clientsEl$closest, _jeRes$count, _taxRes$count, _rwRes$count;
+  var _clientsEl\$closest, _jeRes\$count, _taxRes\$count, _rwRes\$count;
   if (!STATE.isStaff) {
     await renderClientPortalDashboard(container);
     return;
@@ -1446,19 +1446,19 @@ async function renderDashboard(container) {
 
   // If a client is selected, show their name in the KPI label instead of "Active"
   const clientsEl = document.getElementById('d-clients');
-  const clientsSubEl = clientsEl === null || clientsEl === void 0 || (_clientsEl$closest = clientsEl.closest('.stat-card')) === null || _clientsEl$closest === void 0 ? void 0 : _clientsEl$closest.querySelector('.stat-sub');
+  const clientsSubEl = clientsEl === null || clientsEl === void 0 || (_clientsEl\$closest = clientsEl.closest('.stat-card')) === null || _clientsEl\$closest === void 0 ? void 0 : _clientsEl\$closest.querySelector('.stat-sub');
   if (cid) {
-    var _STATE$clientRows$fin;
+    var _STATE\$clientRows\$fin;
     if (clientsEl) clientsEl.textContent = '1';
-    if (clientsSubEl) clientsSubEl.textContent = ((_STATE$clientRows$fin = STATE.clientRows.find(r => r.id === cid)) === null || _STATE$clientRows$fin === void 0 ? void 0 : _STATE$clientRows$fin.full_name) || 'Selected';
+    if (clientsSubEl) clientsSubEl.textContent = ((_STATE\$clientRows\$fin = STATE.clientRows.find(r => r.id === cid)) === null || _STATE\$clientRows\$fin === void 0 ? void 0 : _STATE\$clientRows\$fin.full_name) || 'Selected';
   } else {
-    var _clientsRes$count;
-    if (clientsEl) clientsEl.textContent = (_clientsRes$count = clientsRes.count) !== null && _clientsRes$count !== void 0 ? _clientsRes$count : '—';
+    var _clientsRes\$count;
+    if (clientsEl) clientsEl.textContent = (_clientsRes\$count = clientsRes.count) !== null && _clientsRes\$count !== void 0 ? _clientsRes\$count : '—';
     if (clientsSubEl) clientsSubEl.textContent = 'Active';
   }
-  document.getElementById('d-je').textContent = (_jeRes$count = jeRes.count) !== null && _jeRes$count !== void 0 ? _jeRes$count : '—';
-  document.getElementById('d-tax').textContent = (_taxRes$count = taxRes.count) !== null && _taxRes$count !== void 0 ? _taxRes$count : '—';
-  document.getElementById('d-rw').textContent = (_rwRes$count = rwRes.count) !== null && _rwRes$count !== void 0 ? _rwRes$count : '—';
+  document.getElementById('d-je').textContent = (_jeRes\$count = jeRes.count) !== null && _jeRes\$count !== void 0 ? _jeRes\$count : '—';
+  document.getElementById('d-tax').textContent = (_taxRes\$count = taxRes.count) !== null && _taxRes\$count !== void 0 ? _taxRes\$count : '—';
+  document.getElementById('d-rw').textContent = (_rwRes\$count = rwRes.count) !== null && _rwRes\$count !== void 0 ? _rwRes\$count : '—';
   const actEl = document.getElementById('d-activity');
   if (actRes.data && actRes.data.length) {
     actEl.innerHTML = actRes.data.map(a => "\\n      <div style=\\"display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)\\">\\n        <span style=\\"font-size:16px\\">".concat(activityIcon(a.action), "</span>\\n        <div style=\\"min-width:0\\">\\n          <div style=\\"font-size:13px;font-weight:500\\">").concat(esc(a.action), "</div>\\n          <div style=\\"font-size:11px;color:var(--muted)\\">").concat(esc(a.actor_name), " · ").concat(relTime(a.logged_at), "</div>\\n        </div>\\n      </div>\\n    ")).join('');
@@ -1639,7 +1639,7 @@ async function renderClientPortalDashboard(container) {
     }
     const unpaid = bills.filter(b => b.status === 'unpaid');
     const unpaidTotal = unpaid.reduce((s, b) => s + parseFloat(b.amount), 0);
-    if (badge) badge.textContent = unpaid.length ? \`$\${unpaidTotal.toFixed(2)} outstanding\` : 'All paid ✓';
+    if (badge) badge.textContent = unpaid.length ? \`\$\${unpaidTotal.toFixed(2)} outstanding\` : 'All paid ✓';
     el.innerHTML = bills.map(b => {
       const statusColor = { unpaid: 'var(--red)', paid: 'var(--green)', void: 'var(--muted)' }[b.status] || 'var(--muted)';
       const statusLabel = { unpaid: 'Unpaid', paid: 'Paid', void: 'Void' }[b.status] || b.status;
@@ -1651,7 +1651,7 @@ async function renderClientPortalDashboard(container) {
           \${due ? \`<div style="font-size:11px;color:var(--muted);margin-top:3px">\${due}</div>\` : ''}
         </div>
         <div style="text-align:right">
-          <div style="font-weight:700;font-size:15px">$\${parseFloat(b.amount).toFixed(2)}</div>
+          <div style="font-weight:700;font-size:15px">\$\${parseFloat(b.amount).toFixed(2)}</div>
           <div style="font-size:11px;font-weight:600;color:\${statusColor};margin-top:2px">\${statusLabel}</div>
         </div>
       </div>\`;
@@ -1676,7 +1676,7 @@ async function renderClientPortalDashboard(container) {
           <div style="font-weight:600;font-size:14px">\${esc(inv.invoice_number)} · \${esc(inv.customer_name)}</div>
           <div style="font-size:11px;color:var(--muted);margin-top:3px">Due \${due} · <span style="font-weight:600;color:\${statusColor}">\${inv.status.toUpperCase()}</span></div>
         </div>
-        <div style="font-weight:700;font-size:15px;margin-right:8px">$\${parseFloat(inv.total).toFixed(2)}</div>
+        <div style="font-weight:700;font-size:15px;margin-right:8px">\$\${parseFloat(inv.total).toFixed(2)}</div>
         <div style="display:flex;gap:6px">
           <button onclick="openEditInvoiceModal('\${esc(inv.id)}')" style="border:1px solid var(--border);background:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--text)">Edit</button>
           <button onclick="downloadInvoicePdf('\${esc(inv.id)}')" style="border:1px solid var(--gold);background:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--gold)">⬇ PDF</button>
@@ -1734,7 +1734,7 @@ async function renderClientPortalDashboard(container) {
               <div class="inv-item-row" style="display:grid;grid-template-columns:1fr 60px 90px 28px;gap:6px;margin-bottom:6px">
                 <input class="input inv-desc" placeholder="Description" value="\${esc(it.description || '')}">
                 <input class="input inv-qty" type="number" min="1" placeholder="Qty" value="\${it.qty || 1}" style="text-align:center">
-                <input class="input inv-rate" type="number" min="0" step="0.01" placeholder="Rate $" value="\${it.rate || ''}">
+                <input class="input inv-rate" type="number" min="0" step="0.01" placeholder="Rate \$" value="\${it.rate || ''}">
                 <button type="button" onclick="this.closest('.inv-item-row').remove();recalcInvoice()" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer">✕</button>
               </div>\`).join('')}
           </div>
@@ -1746,9 +1746,9 @@ async function renderClientPortalDashboard(container) {
             <input id="inv-tax-rate" class="input" type="number" min="0" max="100" step="0.1" value="\${inv?.tax_rate || 0}" oninput="recalcInvoice()">
           </div>
           <div style="text-align:right">
-            <div style="font-size:12px;color:var(--muted)">Subtotal: <span id="inv-subtotal">$0.00</span></div>
-            <div style="font-size:12px;color:var(--muted)">Tax: <span id="inv-tax-amt">$0.00</span></div>
-            <div style="font-size:16px;font-weight:700;margin-top:4px">Total: <span id="inv-total">$0.00</span></div>
+            <div style="font-size:12px;color:var(--muted)">Subtotal: <span id="inv-subtotal">\$0.00</span></div>
+            <div style="font-size:12px;color:var(--muted)">Tax: <span id="inv-tax-amt">\$0.00</span></div>
+            <div style="font-size:16px;font-weight:700;margin-top:4px">Total: <span id="inv-total">\$0.00</span></div>
           </div>
         </div>
         <div>
@@ -1777,7 +1777,7 @@ async function renderClientPortalDashboard(container) {
     row.innerHTML = \`
       <input class="input inv-desc" placeholder="Description" value="">
       <input class="input inv-qty" type="number" min="1" placeholder="Qty" value="1" style="text-align:center">
-      <input class="input inv-rate" type="number" min="0" step="0.01" placeholder="Rate $" value="">
+      <input class="input inv-rate" type="number" min="0" step="0.01" placeholder="Rate \$" value="">
       <button type="button" onclick="this.closest('.inv-item-row').remove();recalcInvoice()" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer">✕</button>\`;
     container.appendChild(row);
     recalcInvoice();
@@ -1793,7 +1793,7 @@ async function renderClientPortalDashboard(container) {
     const taxRate = parseFloat(document.getElementById('inv-tax-rate')?.value) || 0;
     const tax = subtotal * taxRate / 100;
     const total = subtotal + tax;
-    const fmt = n => '$' + n.toFixed(2);
+    const fmt = n => '\$' + n.toFixed(2);
     const sub = document.getElementById('inv-subtotal'); if (sub) sub.textContent = fmt(subtotal);
     const taxEl = document.getElementById('inv-tax-amt'); if (taxEl) taxEl.textContent = fmt(tax);
     const tot = document.getElementById('inv-total'); if (tot) tot.textContent = fmt(total);
@@ -1996,16 +1996,21 @@ async function renderClientPortalDashboard(container) {
 
     const statusColor = { draft:'#888', sent:'#d97706', paid:'#16a34a', void:'#dc2626' }[inv.status] || '#888';
     const lineItems = Array.isArray(inv.line_items) ? inv.line_items : [];
-    const fmtMoney = n => '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtMoney = n => '\$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const fmtDate = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }) : '—';
 
-    const lineRows = lineItems.map(it => \`
+    const lineRows = lineItems.map(it => {
+      const qty = it.quantity || it.qty || 1;
+      const unitPrice = it.unit_price != null ? it.unit_price : (it.rate != null ? it.rate : (it.amount != null ? it.amount / qty : null));
+      const amount = it.amount != null ? it.amount : (unitPrice != null ? unitPrice * qty : null);
+      return \`
       <tr>
         <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0">\${it.description || ''}</td>
-        <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;text-align:center">\${it.qty || 1}</td>
-        <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;text-align:right">\${fmtMoney(it.rate)}</td>
-        <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:600">\${fmtMoney(it.amount)}</td>
-      </tr>\`).join('');
+        <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;text-align:center">\${qty}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;text-align:right">\${fmtMoney(unitPrice)}</td>
+        <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;text-align:right;font-weight:600">\${fmtMoney(amount)}</td>
+      </tr>\`;
+    }).join('');
 
     const html = \`<!DOCTYPE html>
 <html>
@@ -2204,7 +2209,7 @@ function openClientDetail(c) {
   bd.className = 'modal-backdrop';
   bd.id = 'cdet-backdrop';
   const info = (label, val) => val ? "\\n    <div style=\\"display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)\\">\\n      <span style=\\"min-width:140px;font-size:12px;color:var(--muted)\\">".concat(label, "</span>\\n      <span style=\\"font-size:13px;font-weight:500\\">").concat(esc(val), "</span>\\n    </div>") : '';
-  bd.innerHTML = "\\n    <div class=\\"modal\\" role=\\"dialog\\" style=\\"max-width:520px\\">\\n      <div class=\\"modal-header\\">\\n        <h3>".concat(esc(c.full_name), "</h3>\\n        <button class=\\"modal-close\\" onclick=\\"closeModal('cdet-backdrop')\\" aria-label=\\"Close\\">×</button>\\n      </div>\\n      <div class=\\"modal-body\\">\\n        <div style=\\"margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap\\">\\n          <span class=\\"badge ").concat(c.status === 'active' ? 'badge-green' : 'badge-grey', "\\">").concat(esc(c.status || 'inactive'), "</span>\\n          <span style=\\"font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;").concat((c.client_type || 'personal') === 'business' ? 'background:rgba(234,179,8,.15);color:var(--gold)' : 'background:rgba(34,197,94,.12);color:var(--green)', "\\">").concat((c.client_type || 'personal') === 'business' ? '🏢 Business' : '👤 Personal', "</span>\\n          <span style=\\"font-size:13px;color:var(--muted)\\">").concat(esc(c.entity_type || ''), "</span>\\n          ").concat(c.regions?.name ? "<span style=\\\\\\"font-size:11px;font-weight:600;padding:2px 9px;border-radius:10px;background:rgba(79,99,210,.1);color:var(--accent)\\\\\\">📍 ".concat(esc(c.regions.name), "</span>") : '', "\\n        </div>\\n        ").concat(info('Email', c.email), "\\n        ").concat(info('Phone', c.phone), "\\n        ").concat(info('Address', c.address), "\\n        ").concat(info('EIN / ITIN', c.ein), "\\n        ").concat(info('State', c.state), "\\n        ").concat(info('Region', c.regions?.name || null), "\\n        ").concat(info('Industry', c.industry), "\\n        ").concat(info('Service Package', c.service_package ? ({starter:'⭐ Starter — $149/mo', essentials:'✨ Essentials — $299/mo', growth:'🚀 Growth — $499/mo', premium:'💎 Premium — $799/mo'})[c.service_package] || c.service_package : null), "\\n        ").concat(info('Notes', c.notes), "\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\\">QUICK ACTIONS</div>\\n          <div style=\\"display:flex;flex-wrap:wrap;gap:8px\\">\\n            <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('journal')\\">📒 Journal Entries</button>\\n            <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('payroll')\\">💼 Payroll</button>\\n            <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('tax')\\">🏛 Tax Returns</button>\\n            <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\\">📊 Dashboard</button>\\n            <button class=\\"btn btn-secondary\\" id=\\"cdet-apply-coa-btn\\" onclick=\\"openApplyCOAPanel('").concat(esc(c.id), "')\\">📂 Apply COA Template</button>\\n          </div>\\n        </div>\\n\\n        <div id=\\"cdet-coa-panel\\" style=\\"display:none;margin-top:12px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\\">\\n          <div style=\\"font-size:12px;font-weight:600;margin-bottom:8px\\">Select an industry template to load into this client's Chart of Accounts:</div>\\n          <select id=\\"cdet-coa-industry\\" style=\\"width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:10px\\">\\n            <option value=\\"\\">— Pick an industry —</option>\\n            <option>Professional Services</option><option>Medical / Healthcare</option>\\n            <option>Salon & Beauty</option><option>Cleaning Services</option>\\n            <option>Landscaping & Lawn Care</option><option>Auto Repair & Mechanic</option>\\n            <option>Restaurant / Food Service</option><option>Catering</option>\\n            <option>Food Truck</option><option>Bar & Nightclub</option>\\n            <option>General Contractor</option><option>Plumbing & HVAC</option>\\n            <option>Electrical</option><option>Painting & Flooring</option>\\n            <option>Retail Store</option><option>E-Commerce/Online Store</option>\\n            <option>Wholesale & Distribution</option><option>Trucking/Freight</option>\\n            <option>Rideshare/Gig Worker</option><option>Moving Company</option>\\n            <option>Real Estate Agent/Broker</option><option>Property Management</option>\\n            <option>Short-Term Rental (Airbnb)</option><option>Tech/Software Company</option>\\n            <option>IT Services & Consulting</option><option>Marketing & Design Agency</option>\\n            <option>Nonprofit Organization</option><option>Church/Religious Organization</option>\\n            <option>General/Other</option>\\n          </select>\\n          <div style=\\"font-size:11px;color:var(--muted);margin-bottom:10px\\">⚠️ This will add template accounts to this client. Existing accounts are kept.</div>\\n          <div style=\\"display:flex;gap:8px\\">\\n            <button class=\\"btn btn-primary\\" id=\\"cdet-coa-apply-btn\\" style=\\"font-size:12px;padding:6px 14px\\">Apply Template</button>\\n            <button class=\\"btn\\" onclick=\\"document.getElementById('cdet-coa-panel').style.display='none'\\" style=\\"font-size:12px;padding:6px 14px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Cancel</button>\\n          </div>\\n          <div id=\\"cdet-coa-msg\\" style=\\"font-size:12px;margin-top:8px;min-height:14px\\"></div>\\n        </div>\\n\\n        <div style=\\"margin-top:20px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\\">\\n          <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\\">🔑 CLIENT PORTAL ACCESS</div>\\n          ").concat(c.auth_user_id ? "<div style=\\"display:flex;align-items:center;gap:8px\\">\\n                <span style=\\"color:var(--green);font-size:16px\\">✓</span>\\n                <span style=\\"font-size:13px;font-weight:500\\">Portal access linked</span>\\n              </div>\\n              <div style=\\"font-size:12px;color:var(--muted);margin-top:4px\\">Client email: <strong>".concat(esc(c.email || ''), "</strong></div>\\n              <button class=\\"btn btn-secondary\\" id=\\"cdet-resend-btn\\" style=\\"margin-top:10px;font-size:12px;padding:6px 12px\\">↺ Resend password email</button>\\n              <div id=\\"cdet-resend-msg\\" style=\\"font-size:12px;margin-top:6px;min-height:16px\\"></div>") : "<div style=\\"font-size:13px;color:var(--muted);margin-bottom:10px\\">This client does not have portal access yet.</div>\\n              <div style=\\"display:flex;align-items:center;gap:8px\\">\\n                <input id=\\"cdet-portal-email\\" type=\\"email\\" placeholder=\\"Client email\\" value=\\"".concat(esc(c.email || ''), "\\" style=\\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\\">\\n                <button class=\\"btn btn-primary\\" id=\\"cdet-invite-btn\\" style=\\"white-space:nowrap;font-size:12px;padding:7px 14px\\">Create Login</button>\\n              </div>\\n              <div id=\\"cdet-invite-msg\\" style=\\"font-size:12px;margin-top:6px;min-height:16px\\"></div>"), "\\n        </div>\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"display:flex;align-items:center;justify-content:space-between;margin-bottom:10px\\">\\n            <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em\\">📋 TASKS</div>\\n            <div style=\\"display:flex;gap:6px\\">\\n              <button class=\\"btn\\" id=\\"cdet-assign-year-btn\\" style=\\"font-size:11px;padding:4px 10px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">📅 Assign Year Tasks</button>\\n              <button class=\\"btn btn-primary\\" id=\\"cdet-add-task-btn\\" style=\\"font-size:11px;padding:4px 10px\\">+ Add Task</button>\\n            </div>\\n          </div>\\n\\n          <div id=\\"cdet-year-task-panel\\" style=\\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:14px;margin-bottom:12px\\">\\n            <div style=\\"font-size:12px;font-weight:600;margin-bottom:8px\\">Select services to assign tasks for:</div>\\n            <div style=\\"display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px\\">\\n              <label style=\\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\\"><input type=\\"checkbox\\" id=\\"yt-svc-tax\\" style=\\"width:auto;accent-color:var(--gold)\\" onchange=\\"ytUpdatePreview()\\"> 🏛 Tax Returns</label>\\n              <label style=\\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\\"><input type=\\"checkbox\\" id=\\"yt-svc-bookkeeping\\" style=\\"width:auto;accent-color:var(--gold)\\" onchange=\\"ytUpdatePreview()\\"> 📒 Bookkeeping</label>\\n              <label style=\\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\\"><input type=\\"checkbox\\" id=\\"yt-svc-payroll\\" style=\\"width:auto;accent-color:var(--gold)\\" onchange=\\"ytUpdatePreview()\\"> 💼 Payroll</label>\\n            </div>\\n            <div id=\\"yt-tasks-preview\\"></div>\\n            <div style=\\"display:flex;gap:8px;margin-top:10px\\">\\n              <button class=\\"btn btn-primary\\" id=\\"yt-assign-btn\\" style=\\"font-size:12px;padding:6px 14px\\">Assign Selected Tasks</button>\\n              <button class=\\"btn\\" onclick=\\"document.getElementById('cdet-year-task-panel').style.display='none';document.getElementById('cdet-assign-year-btn').style.display=''\\" style=\\"font-size:12px;padding:6px 14px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Cancel</button>\\n            </div>\\n            <div id=\\"yt-err\\" style=\\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\\"></div>\\n          </div>\\n\\n          <div id=\\"cdet-task-form\\" style=\\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:12px;margin-bottom:12px\\">\\n            <input id=\\"cdet-task-title\\" type=\\"text\\" placeholder=\\"Task title\\" style=\\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\\">\\n            <textarea id=\\"cdet-task-desc\\" placeholder=\\"Description (optional)\\" rows=\\"2\\" style=\\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;resize:vertical;margin-bottom:8px\\"></textarea>\\n            <div style=\\"display:flex;gap:8px;align-items:center\\">\\n              <select id=\\"cdet-task-priority\\" style=\\"padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px\\">\\n                <option value=\\"normal\\">Normal</option>\\n                <option value=\\"urgent\\">🔴 Urgent</option>\\n                <option value=\\"low\\">⚪ Low</option>\\n              </select>\\n              <input id=\\"cdet-task-due\\" type=\\"date\\" style=\\"padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px\\">\\n              <button class=\\"btn btn-primary\\" id=\\"cdet-task-save\\" style=\\"font-size:12px;padding:6px 12px\\">Save</button>\\n              <button class=\\"btn\\" id=\\"cdet-task-cancel\\" style=\\"font-size:12px;padding:6px 12px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Cancel</button>\\n            </div>\\n            <div id=\\"cdet-task-err\\" style=\\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\\"></div>\\n          </div>\\n          <div id=\\"cdet-tasks-list\\"><span class=\\"spinner\\" style=\\"width:14px;height:14px\\"></span></div>\\n        </div>\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\\">📁 CLIENT DOCUMENTS</div>\\n          <div id=\\"cdet-docs-list\\"><span class=\\"spinner\\" style=\\"width:14px;height:14px\\"></span></div>\\n        </div>\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"display:flex;align-items:center;justify-content:space-between;margin-bottom:10px\\">\\n            <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em\\">💳 BILLING</div>\\n            <button class=\\"btn btn-primary\\" id=\\"cdet-add-bill-btn\\" style=\\"font-size:11px;padding:4px 10px\\">+ Add Charge</button>\\n          </div>\\n          <div id=\\"cdet-bill-form\\" style=\\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:12px;margin-bottom:12px\\">\\n            <input id=\\"cdet-bill-desc\\" type=\\"text\\" placeholder=\\"Description (e.g. Tax prep 2024)\\" style=\\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\\">\\n            <div style=\\"display:flex;gap:8px;margin-bottom:8px\\">\\n              <input id=\\"cdet-bill-amount\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"Amount $\\" style=\\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\\">\\n              <input id=\\"cdet-bill-due\\" type=\\"date\\" style=\\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\\">\\n              <select id=\\"cdet-bill-status\\" style=\\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\\">\\n                <option value=\\"unpaid\\">Unpaid</option>\\n                <option value=\\"paid\\">Paid</option>\\n                <option value=\\"void\\">Void</option>\\n              </select>\\n            </div>\\n            <input id=\\"cdet-bill-notes\\" type=\\"text\\" placeholder=\\"Notes (optional)\\" style=\\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\\">\\n            <div style=\\"display:flex;gap:8px\\">\\n              <button class=\\"btn btn-primary\\" id=\\"cdet-bill-save\\" style=\\"font-size:12px;padding:6px 12px\\">Save Charge</button>\\n              <button class=\\"btn\\" id=\\"cdet-bill-cancel\\" style=\\"font-size:12px;padding:6px 12px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Cancel</button>\\n            </div>\\n            <div id=\\"cdet-bill-err\\" style=\\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\\"></div>\\n          </div>\\n          <div id=\\"cdet-billing-list\\"><span class=\\"spinner\\" style=\\"width:14px;height:14px\\"></span></div>\\n        </div>\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\\">🧾 CLIENT INVOICES</div>\\n          <div id=\\"cdet-invoices-list\\"><span class=\\"spinner\\" style=\\"width:14px;height:14px\\"></span></div>\\n        </div>\\n\\n      </div>\\n      <div class=\\"modal-footer\\">\\n        <button class=\\"btn\\" onclick=\\"closeModal('cdet-backdrop')\\" style=\\"background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Close</button>\\n        <button class=\\"btn\\" id=\\"cdet-edit-btn\\" style=\\"margin-left:auto;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">✏️ Edit Info</button>\\n        <button class=\\"btn btn-primary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\\">Select Client →</button>\\n      </div>\\n    </div>");
+  bd.innerHTML = "\\n    <div class=\\"modal\\" role=\\"dialog\\" style=\\"max-width:520px\\">\\n      <div class=\\"modal-header\\">\\n        <h3>".concat(esc(c.full_name), "</h3>\\n        <button class=\\"modal-close\\" onclick=\\"closeModal('cdet-backdrop')\\" aria-label=\\"Close\\">×</button>\\n      </div>\\n      <div class=\\"modal-body\\">\\n        <div style=\\"margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap\\">\\n          <span class=\\"badge ").concat(c.status === 'active' ? 'badge-green' : 'badge-grey', "\\">").concat(esc(c.status || 'inactive'), "</span>\\n          <span style=\\"font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;").concat((c.client_type || 'personal') === 'business' ? 'background:rgba(234,179,8,.15);color:var(--gold)' : 'background:rgba(34,197,94,.12);color:var(--green)', "\\">").concat((c.client_type || 'personal') === 'business' ? '🏢 Business' : '👤 Personal', "</span>\\n          <span style=\\"font-size:13px;color:var(--muted)\\">").concat(esc(c.entity_type || ''), "</span>\\n          ").concat(c.regions?.name ? "<span style=\\\\\\"font-size:11px;font-weight:600;padding:2px 9px;border-radius:10px;background:rgba(79,99,210,.1);color:var(--accent)\\\\\\">📍 ".concat(esc(c.regions.name), "</span>") : '', "\\n        </div>\\n        ").concat(info('Email', c.email), "\\n        ").concat(info('Phone', c.phone), "\\n        ").concat(info('Address', c.address), "\\n        ").concat(info('EIN / ITIN', c.ein), "\\n        ").concat(info('State', c.state), "\\n        ").concat(info('Region', c.regions?.name || null), "\\n        ").concat(info('Industry', c.industry), "\\n        ").concat(info('Service Package', c.service_package ? ({starter:'⭐ Starter — \$149/mo', essentials:'✨ Essentials — \$299/mo', growth:'🚀 Growth — \$499/mo', premium:'💎 Premium — \$799/mo'})[c.service_package] || c.service_package : null), "\\n        ").concat(info('Notes', c.notes), "\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\\">QUICK ACTIONS</div>\\n          <div style=\\"display:flex;flex-wrap:wrap;gap:8px\\">\\n            <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('journal')\\">📒 Journal Entries</button>\\n            <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('payroll')\\">💼 Payroll</button>\\n            <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('tax')\\">🏛 Tax Returns</button>\\n            <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\\">📊 Dashboard</button>\\n            <button class=\\"btn btn-secondary\\" id=\\"cdet-apply-coa-btn\\" onclick=\\"openApplyCOAPanel('").concat(esc(c.id), "')\\">📂 Apply COA Template</button>\\n          </div>\\n        </div>\\n\\n        <div id=\\"cdet-coa-panel\\" style=\\"display:none;margin-top:12px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\\">\\n          <div style=\\"font-size:12px;font-weight:600;margin-bottom:8px\\">Select an industry template to load into this client's Chart of Accounts:</div>\\n          <select id=\\"cdet-coa-industry\\" style=\\"width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:10px\\">\\n            <option value=\\"\\">— Pick an industry —</option>\\n            <option>Professional Services</option><option>Medical / Healthcare</option>\\n            <option>Salon & Beauty</option><option>Cleaning Services</option>\\n            <option>Landscaping & Lawn Care</option><option>Auto Repair & Mechanic</option>\\n            <option>Restaurant / Food Service</option><option>Catering</option>\\n            <option>Food Truck</option><option>Bar & Nightclub</option>\\n            <option>General Contractor</option><option>Plumbing & HVAC</option>\\n            <option>Electrical</option><option>Painting & Flooring</option>\\n            <option>Retail Store</option><option>E-Commerce/Online Store</option>\\n            <option>Wholesale & Distribution</option><option>Trucking/Freight</option>\\n            <option>Rideshare/Gig Worker</option><option>Moving Company</option>\\n            <option>Real Estate Agent/Broker</option><option>Property Management</option>\\n            <option>Short-Term Rental (Airbnb)</option><option>Tech/Software Company</option>\\n            <option>IT Services & Consulting</option><option>Marketing & Design Agency</option>\\n            <option>Nonprofit Organization</option><option>Church/Religious Organization</option>\\n            <option>General/Other</option>\\n          </select>\\n          <div style=\\"font-size:11px;color:var(--muted);margin-bottom:10px\\">⚠️ This will add template accounts to this client. Existing accounts are kept.</div>\\n          <div style=\\"display:flex;gap:8px\\">\\n            <button class=\\"btn btn-primary\\" id=\\"cdet-coa-apply-btn\\" style=\\"font-size:12px;padding:6px 14px\\">Apply Template</button>\\n            <button class=\\"btn\\" onclick=\\"document.getElementById('cdet-coa-panel').style.display='none'\\" style=\\"font-size:12px;padding:6px 14px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Cancel</button>\\n          </div>\\n          <div id=\\"cdet-coa-msg\\" style=\\"font-size:12px;margin-top:8px;min-height:14px\\"></div>\\n        </div>\\n\\n        <div style=\\"margin-top:20px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\\">\\n          <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\\">🔑 CLIENT PORTAL ACCESS</div>\\n          ").concat(c.auth_user_id ? "<div style=\\"display:flex;align-items:center;gap:8px\\">\\n                <span style=\\"color:var(--green);font-size:16px\\">✓</span>\\n                <span style=\\"font-size:13px;font-weight:500\\">Portal access linked</span>\\n              </div>\\n              <div style=\\"font-size:12px;color:var(--muted);margin-top:4px\\">Client email: <strong>".concat(esc(c.email || ''), "</strong></div>\\n              <button class=\\"btn btn-secondary\\" id=\\"cdet-resend-btn\\" style=\\"margin-top:10px;font-size:12px;padding:6px 12px\\">↺ Resend password email</button>\\n              <div id=\\"cdet-resend-msg\\" style=\\"font-size:12px;margin-top:6px;min-height:16px\\"></div>") : "<div style=\\"font-size:13px;color:var(--muted);margin-bottom:10px\\">This client does not have portal access yet.</div>\\n              <div style=\\"display:flex;align-items:center;gap:8px\\">\\n                <input id=\\"cdet-portal-email\\" type=\\"email\\" placeholder=\\"Client email\\" value=\\"".concat(esc(c.email || ''), "\\" style=\\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\\">\\n                <button class=\\"btn btn-primary\\" id=\\"cdet-invite-btn\\" style=\\"white-space:nowrap;font-size:12px;padding:7px 14px\\">Create Login</button>\\n              </div>\\n              <div id=\\"cdet-invite-msg\\" style=\\"font-size:12px;margin-top:6px;min-height:16px\\"></div>"), "\\n        </div>\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"display:flex;align-items:center;justify-content:space-between;margin-bottom:10px\\">\\n            <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em\\">📋 TASKS</div>\\n            <div style=\\"display:flex;gap:6px\\">\\n              <button class=\\"btn\\" id=\\"cdet-assign-year-btn\\" style=\\"font-size:11px;padding:4px 10px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">📅 Assign Year Tasks</button>\\n              <button class=\\"btn btn-primary\\" id=\\"cdet-add-task-btn\\" style=\\"font-size:11px;padding:4px 10px\\">+ Add Task</button>\\n            </div>\\n          </div>\\n\\n          <div id=\\"cdet-year-task-panel\\" style=\\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:14px;margin-bottom:12px\\">\\n            <div style=\\"font-size:12px;font-weight:600;margin-bottom:8px\\">Select services to assign tasks for:</div>\\n            <div style=\\"display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px\\">\\n              <label style=\\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\\"><input type=\\"checkbox\\" id=\\"yt-svc-tax\\" style=\\"width:auto;accent-color:var(--gold)\\" onchange=\\"ytUpdatePreview()\\"> 🏛 Tax Returns</label>\\n              <label style=\\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\\"><input type=\\"checkbox\\" id=\\"yt-svc-bookkeeping\\" style=\\"width:auto;accent-color:var(--gold)\\" onchange=\\"ytUpdatePreview()\\"> 📒 Bookkeeping</label>\\n              <label style=\\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\\"><input type=\\"checkbox\\" id=\\"yt-svc-payroll\\" style=\\"width:auto;accent-color:var(--gold)\\" onchange=\\"ytUpdatePreview()\\"> 💼 Payroll</label>\\n            </div>\\n            <div id=\\"yt-tasks-preview\\"></div>\\n            <div style=\\"display:flex;gap:8px;margin-top:10px\\">\\n              <button class=\\"btn btn-primary\\" id=\\"yt-assign-btn\\" style=\\"font-size:12px;padding:6px 14px\\">Assign Selected Tasks</button>\\n              <button class=\\"btn\\" onclick=\\"document.getElementById('cdet-year-task-panel').style.display='none';document.getElementById('cdet-assign-year-btn').style.display=''\\" style=\\"font-size:12px;padding:6px 14px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Cancel</button>\\n            </div>\\n            <div id=\\"yt-err\\" style=\\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\\"></div>\\n          </div>\\n\\n          <div id=\\"cdet-task-form\\" style=\\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:12px;margin-bottom:12px\\">\\n            <input id=\\"cdet-task-title\\" type=\\"text\\" placeholder=\\"Task title\\" style=\\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\\">\\n            <textarea id=\\"cdet-task-desc\\" placeholder=\\"Description (optional)\\" rows=\\"2\\" style=\\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;resize:vertical;margin-bottom:8px\\"></textarea>\\n            <div style=\\"display:flex;gap:8px;align-items:center\\">\\n              <select id=\\"cdet-task-priority\\" style=\\"padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px\\">\\n                <option value=\\"normal\\">Normal</option>\\n                <option value=\\"urgent\\">🔴 Urgent</option>\\n                <option value=\\"low\\">⚪ Low</option>\\n              </select>\\n              <input id=\\"cdet-task-due\\" type=\\"date\\" style=\\"padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px\\">\\n              <button class=\\"btn btn-primary\\" id=\\"cdet-task-save\\" style=\\"font-size:12px;padding:6px 12px\\">Save</button>\\n              <button class=\\"btn\\" id=\\"cdet-task-cancel\\" style=\\"font-size:12px;padding:6px 12px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Cancel</button>\\n            </div>\\n            <div id=\\"cdet-task-err\\" style=\\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\\"></div>\\n          </div>\\n          <div id=\\"cdet-tasks-list\\"><span class=\\"spinner\\" style=\\"width:14px;height:14px\\"></span></div>\\n        </div>\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\\">📁 CLIENT DOCUMENTS</div>\\n          <div id=\\"cdet-docs-list\\"><span class=\\"spinner\\" style=\\"width:14px;height:14px\\"></span></div>\\n        </div>\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"display:flex;align-items:center;justify-content:space-between;margin-bottom:10px\\">\\n            <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em\\">💳 BILLING</div>\\n            <button class=\\"btn btn-primary\\" id=\\"cdet-add-bill-btn\\" style=\\"font-size:11px;padding:4px 10px\\">+ Add Charge</button>\\n          </div>\\n          <div id=\\"cdet-bill-form\\" style=\\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:12px;margin-bottom:12px\\">\\n            <input id=\\"cdet-bill-desc\\" type=\\"text\\" placeholder=\\"Description (e.g. Tax prep 2024)\\" style=\\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\\">\\n            <div style=\\"display:flex;gap:8px;margin-bottom:8px\\">\\n              <input id=\\"cdet-bill-amount\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"Amount \$\\" style=\\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\\">\\n              <input id=\\"cdet-bill-due\\" type=\\"date\\" style=\\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\\">\\n              <select id=\\"cdet-bill-status\\" style=\\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\\">\\n                <option value=\\"unpaid\\">Unpaid</option>\\n                <option value=\\"paid\\">Paid</option>\\n                <option value=\\"void\\">Void</option>\\n              </select>\\n            </div>\\n            <input id=\\"cdet-bill-notes\\" type=\\"text\\" placeholder=\\"Notes (optional)\\" style=\\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\\">\\n            <div style=\\"display:flex;gap:8px\\">\\n              <button class=\\"btn btn-primary\\" id=\\"cdet-bill-save\\" style=\\"font-size:12px;padding:6px 12px\\">Save Charge</button>\\n              <button class=\\"btn\\" id=\\"cdet-bill-cancel\\" style=\\"font-size:12px;padding:6px 12px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Cancel</button>\\n            </div>\\n            <div id=\\"cdet-bill-err\\" style=\\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\\"></div>\\n          </div>\\n          <div id=\\"cdet-billing-list\\"><span class=\\"spinner\\" style=\\"width:14px;height:14px\\"></span></div>\\n        </div>\\n\\n        <div style=\\"margin-top:20px\\">\\n          <div style=\\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\\">🧾 CLIENT INVOICES</div>\\n          <div id=\\"cdet-invoices-list\\"><span class=\\"spinner\\" style=\\"width:14px;height:14px\\"></span></div>\\n        </div>\\n\\n      </div>\\n      <div class=\\"modal-footer\\">\\n        <button class=\\"btn\\" onclick=\\"closeModal('cdet-backdrop')\\" style=\\"background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">Close</button>\\n        <button class=\\"btn\\" id=\\"cdet-edit-btn\\" style=\\"margin-left:auto;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\\">✏️ Edit Info</button>\\n        <button class=\\"btn btn-primary\\" onclick=\\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\\">Select Client →</button>\\n      </div>\\n    </div>");
   document.body.appendChild(bd);
   bd.addEventListener('click', e => {
     if (e.target === bd) closeModal('cdet-backdrop');
@@ -2420,7 +2425,7 @@ function openClientDetail(c) {
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:500">\${esc(b.description)}</div>
           \${b.notes ? \`<div style="font-size:11px;color:var(--muted)">\${esc(b.notes)}</div>\` : ''}
-          <div style="font-size:11px;color:var(--muted)">$\${parseFloat(b.amount).toFixed(2)}\${due} · <span style="font-weight:600;color:\${statusColor}">\${b.status.toUpperCase()}</span></div>
+          <div style="font-size:11px;color:var(--muted)">\$\${parseFloat(b.amount).toFixed(2)}\${due} · <span style="font-weight:600;color:\${statusColor}">\${b.status.toUpperCase()}</span></div>
         </div>
         <div style="display:flex;gap:5px;flex-shrink:0">
           \${b.status === 'unpaid' ? \`<button onclick="markBillPaid('\${esc(b.id)}')" style="border:1px solid var(--green);background:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--green)">Mark Paid</button>\` : ''}
@@ -2500,7 +2505,7 @@ function openClientDetail(c) {
     const totalInvoiced = invs.reduce((s, i) => s + parseFloat(i.total || 0), 0);
     const totalPaid = invs.filter(i => i.status === 'paid').reduce((s, i) => s + parseFloat(i.total || 0), 0);
     const totalOutstanding = invs.filter(i => i.status === 'sent' || i.status === 'draft').reduce((s, i) => s + parseFloat(i.total || 0), 0);
-    const fmt = v => '$' + parseFloat(v).toFixed(2).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',');
+    const fmt = v => '\$' + parseFloat(v).toFixed(2).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',');
     const statusColor = s => s === 'paid' ? 'var(--green)' : s === 'void' ? 'var(--muted)' : 'var(--gold)';
     el.innerHTML = \`
       <div style="display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap">
@@ -2555,8 +2560,8 @@ function openClientDetail(c) {
   const inviteBtn = document.getElementById('cdet-invite-btn');
   if (inviteBtn) {
     inviteBtn.addEventListener('click', async () => {
-      var _document$getElementB;
-      const email = (_document$getElementB = document.getElementById('cdet-portal-email')) === null || _document$getElementB === void 0 || (_document$getElementB = _document$getElementB.value) === null || _document$getElementB === void 0 ? void 0 : _document$getElementB.trim();
+      var _document\$getElementB;
+      const email = (_document\$getElementB = document.getElementById('cdet-portal-email')) === null || _document\$getElementB === void 0 || (_document\$getElementB = _document\$getElementB.value) === null || _document\$getElementB === void 0 ? void 0 : _document\$getElementB.trim();
       const msg = document.getElementById('cdet-invite-msg');
       if (!email) {
         msg.textContent = 'Enter an email address.';
@@ -2780,10 +2785,10 @@ function openClientDetail(c) {
             <label style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em">SERVICE PACKAGE</label>
             <select id="edit-package" style="width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px">
               <option value="" \${!c.service_package?'selected':''}>— None selected —</option>
-              <option value="starter"    \${c.service_package==='starter'?'selected':''}>Starter — $149/mo</option>
-              <option value="essentials" \${c.service_package==='essentials'?'selected':''}>Essentials — $299/mo</option>
-              <option value="growth"     \${c.service_package==='growth'?'selected':''}>Growth — $499/mo</option>
-              <option value="premium"    \${c.service_package==='premium'?'selected':''}>Premium — $799/mo</option>
+              <option value="starter"    \${c.service_package==='starter'?'selected':''}>Starter — \$149/mo</option>
+              <option value="essentials" \${c.service_package==='essentials'?'selected':''}>Essentials — \$299/mo</option>
+              <option value="growth"     \${c.service_package==='growth'?'selected':''}>Growth — \$499/mo</option>
+              <option value="premium"    \${c.service_package==='premium'?'selected':''}>Premium — \$799/mo</option>
             </select>
           </div>
           <div class="form-group" style="margin:0">
@@ -2796,7 +2801,7 @@ function openClientDetail(c) {
             <label style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em">CLIENT LOGO</label>
             <div style="display:flex;align-items:center;gap:14px;margin-top:4px">
               <div id="edit-logo-preview" style="width:72px;height:72px;border-radius:8px;border:1.5px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--surface);flex-shrink:0">
-                \${c.logo_url ? \`<img id="edit-logo-img" src="" style="width:100%;height:100%;object-fit:contain">\` : \`<span id="edit-logo-initials" style="font-size:22px;font-weight:800;color:#fff;background:\${\`#\${Math.abs((c.full_name||'?').split('').reduce((h,ch)=>((h<<5)-h)+ch.charCodeAt(0),0)&0xffffff).toString(16).padStart(6,'0').replace(/^(.)(.)(.)(.)(.)(.)$/,'$1$1$2$2$3$3').slice(0,6)}\`};width:100%;height:100%;display:flex;align-items:center;justify-content:center">\${(c.full_name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)}</span>\`}
+                \${c.logo_url ? \`<img id="edit-logo-img" src="" style="width:100%;height:100%;object-fit:contain">\` : \`<span id="edit-logo-initials" style="font-size:22px;font-weight:800;color:#fff;background:\${\`#\${Math.abs((c.full_name||'?').split('').reduce((h,ch)=>((h<<5)-h)+ch.charCodeAt(0),0)&0xffffff).toString(16).padStart(6,'0').replace(/^(.)(.)(.)(.)(.)(.)\$/,'\$1\$1\$2\$2\$3\$3').slice(0,6)}\`};width:100%;height:100%;display:flex;align-items:center;justify-content:center">\${(c.full_name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)}</span>\`}
               </div>
               <div style="flex:1">
                 <input type="file" id="edit-logo-file" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/svg+xml" style="display:none">
@@ -3091,7 +3096,7 @@ async function renderExpenses(container) {
             <td style="font-weight:500">\${esc(e.merchant||'')}\${e.notes ? \`<div style="font-size:11px;color:var(--muted)">\${esc(e.notes)}</div>\` : ''}</td>
             <td style="font-size:12px;color:var(--muted)">\${esc(e.category||'—')}</td>
             <td style="font-size:13px">\${methodIcon[e.payment_method]||''} \${esc(e.payment_method?.replace('_',' ')||'—')}</td>
-            <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">$\${parseFloat(e.amount||0).toFixed(2)}</td>
+            <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">\$\${parseFloat(e.amount||0).toFixed(2)}</td>
             <td><span style="font-size:11px;font-weight:700;color:\${statusColor[e.status]||'var(--muted)'}">\${esc(e.status||'')}</span>
                 \${e.entered_by_role==='client'?'<span style="font-size:10px;color:var(--muted);margin-left:4px">(client)</span>':''}</td>
             <td style="white-space:nowrap">
@@ -3108,11 +3113,11 @@ async function renderExpenses(container) {
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px">
       <div class="card"><div class="card-body" style="padding:16px">
         <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em">THIS MONTH</div>
-        <div style="font-size:28px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums">$\${monthTotal.toFixed(2)}</div>
+        <div style="font-size:28px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums">\$\${monthTotal.toFixed(2)}</div>
       </div></div>
       <div class="card"><div class="card-body" style="padding:16px">
         <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em">YEAR TO DATE</div>
-        <div style="font-size:28px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums">$\${yearTotal.toFixed(2)}</div>
+        <div style="font-size:28px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums">\$\${yearTotal.toFixed(2)}</div>
       </div></div>
       <div class="card"><div class="card-body" style="padding:16px">
         <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em">PENDING REVIEW</div>
@@ -3128,7 +3133,7 @@ async function renderExpenses(container) {
           <div style="flex:1;background:var(--border);border-radius:4px;height:8px;overflow:hidden">
             <div style="width:\${pct}%;background:var(--green);height:100%;border-radius:4px"></div>
           </div>
-          <div style="font-size:13px;font-variant-numeric:tabular-nums;font-weight:600;min-width:70px;text-align:right">$\${amt.toFixed(2)}</div>
+          <div style="font-size:13px;font-variant-numeric:tabular-nums;font-weight:600;min-width:70px;text-align:right">\$\${amt.toFixed(2)}</div>
           <div style="font-size:11px;color:var(--muted);min-width:30px">\${pct}%</div>
         </div>\`;
       }).join('')}
@@ -3183,7 +3188,7 @@ function openExpenseModal(expense) {
             <input id="exp-date" type="date" value="\${esc(expense?.expense_date||today)}">
           </div>
           <div class="form-group">
-            <label for="exp-amount">Amount ($) *</label>
+            <label for="exp-amount">Amount (\$) *</label>
             <input id="exp-amount" type="number" min="0" step="0.01" placeholder="0.00" value="\${expense?.amount||''}">
           </div>
         </div>
@@ -3477,7 +3482,7 @@ async function renderClientInvoices(container) {
             <td style="font-weight:500">\${esc(inv.customer_name||'—')}</td>
             <td style="font-size:12px;white-space:nowrap">\${esc(inv.issue_date||'')}</td>
             <td style="font-size:12px;white-space:nowrap;color:\${st==='overdue'?'var(--red)':'inherit'}">\${esc(inv.due_date||'—')}</td>
-            <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">$\${parseFloat(inv.total||0).toFixed(2)}</td>
+            <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">\$\${parseFloat(inv.total||0).toFixed(2)}</td>
             <td><span style="font-size:11px;font-weight:700;color:\${statusColor[st]||'var(--muted)'};">\${statusIcon[st]||''} \${st}</span></td>
             <td style="white-space:nowrap">
               <button onclick="openClientEditInvoiceModal('\${esc(inv.id)}')" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 6px" title="Edit">✏️</button>
@@ -3494,15 +3499,15 @@ async function renderClientInvoices(container) {
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px">
       <div class="card"><div class="card-body" style="padding:16px">
         <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em">TOTAL INVOICED</div>
-        <div style="font-size:28px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums">$\${total.toFixed(2)}</div>
+        <div style="font-size:28px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums">\$\${total.toFixed(2)}</div>
       </div></div>
       <div class="card"><div class="card-body" style="padding:16px">
         <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em">COLLECTED</div>
-        <div style="font-size:28px;font-weight:700;margin-top:4px;color:var(--green);font-variant-numeric:tabular-nums">$\${paid.toFixed(2)}</div>
+        <div style="font-size:28px;font-weight:700;margin-top:4px;color:var(--green);font-variant-numeric:tabular-nums">\$\${paid.toFixed(2)}</div>
       </div></div>
       <div class="card"><div class="card-body" style="padding:16px">
         <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em">OUTSTANDING\${overdueCount ? \` <span style="color:var(--red)">(\${overdueCount} overdue)</span>\` : ''}</div>
-        <div style="font-size:28px;font-weight:700;margin-top:4px;color:\${outstanding>0?'var(--gold)':'var(--text)'};font-variant-numeric:tabular-nums">$\${outstanding.toFixed(2)}</div>
+        <div style="font-size:28px;font-weight:700;margin-top:4px;color:\${outstanding>0?'var(--gold)':'var(--text)'};font-variant-numeric:tabular-nums">\$\${outstanding.toFixed(2)}</div>
       </div></div>
     </div>
 
@@ -3531,8 +3536,8 @@ window.openClientNewInvoiceModal = async function() {
   const { data } = await sb.from('client_invoices').select('invoice_number').eq('client_id', clientId).order('created_at', { ascending: false }).limit(1);
   let nextNum = 'INV-001';
   if (data?.[0]?.invoice_number) {
-    const m = data[0].invoice_number.match(/(\\d+)$/);
-    if (m) nextNum = data[0].invoice_number.replace(/\\d+$/, String(parseInt(m[1])+1).padStart(3,'0'));
+    const m = data[0].invoice_number.match(/(\\d+)\$/);
+    if (m) nextNum = data[0].invoice_number.replace(/\\d+\$/, String(parseInt(m[1])+1).padStart(3,'0'));
   }
   document.getElementById('ci-modal-body').innerHTML = clientInvoiceFormHtml(null, nextNum);
   modal.hidden = false;
@@ -3612,9 +3617,9 @@ function clientInvoiceFormHtml(inv, autoNum) {
       <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Tax Rate (%)</label>
         <input id="ci-tax" class="input" type="number" min="0" max="100" step="0.1" value="\${inv?.tax_rate||0}" oninput="recalcCIInvoice()"></div>
       <div style="text-align:right;padding-top:20px">
-        <div style="font-size:12px;color:var(--muted)">Subtotal: <span id="ci-subtotal">$0.00</span></div>
-        <div style="font-size:12px;color:var(--muted)">Tax: <span id="ci-tax-amt">$0.00</span></div>
-        <div style="font-size:16px;font-weight:700;margin-top:4px">Total: <span id="ci-total">$0.00</span></div>
+        <div style="font-size:12px;color:var(--muted)">Subtotal: <span id="ci-subtotal">\$0.00</span></div>
+        <div style="font-size:12px;color:var(--muted)">Tax: <span id="ci-tax-amt">\$0.00</span></div>
+        <div style="font-size:16px;font-weight:700;margin-top:4px">Total: <span id="ci-total">\$0.00</span></div>
       </div>
     </div>
     <div style="margin-bottom:16px"><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Notes / Terms</label>
@@ -3662,9 +3667,9 @@ window.recalcCIInvoice = function() {
   const taxRate = parseFloat(document.getElementById('ci-tax')?.value) || 0;
   const taxAmt  = subtotal * taxRate / 100;
   const total   = subtotal + taxAmt;
-  const s = document.getElementById('ci-subtotal'); if (s) s.textContent = '$'+subtotal.toFixed(2);
-  const t = document.getElementById('ci-tax-amt');  if (t) t.textContent = '$'+taxAmt.toFixed(2);
-  const tt= document.getElementById('ci-total');    if (tt) tt.textContent = '$'+total.toFixed(2);
+  const s = document.getElementById('ci-subtotal'); if (s) s.textContent = '\$'+subtotal.toFixed(2);
+  const t = document.getElementById('ci-tax-amt');  if (t) t.textContent = '\$'+taxAmt.toFixed(2);
+  const tt= document.getElementById('ci-total');    if (tt) tt.textContent = '\$'+total.toFixed(2);
 };
 
 window.saveCIInvoice = async function(existingId) {
@@ -3798,7 +3803,7 @@ async function renderIncome(container) {
           <td style="white-space:nowrap;font-size:12px">\${esc(r.income_date||'')}</td>
           <td style="font-weight:500">\${esc(r.source||'')}</td>
           <td style="font-size:12px;color:var(--muted)">\${esc(r.category||'')}</td>
-          <td style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums;color:var(--green)">$\${parseFloat(r.amount||0).toFixed(2)}</td>
+          <td style="text-align:right;font-weight:600;font-variant-numeric:tabular-nums;color:var(--green)">\$\${parseFloat(r.amount||0).toFixed(2)}</td>
           <td><span style="font-size:11px;font-weight:700;color:\${statusColor[r.status]||'var(--muted)'}">● \${r.status}</span></td>
           <td style="white-space:nowrap">
             \${STATE.isStaff ? \`
@@ -3822,11 +3827,11 @@ async function renderIncome(container) {
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px">
       <div class="card"><div class="card-body" style="padding:16px">
         <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em">TOTAL INCOME (ALL TIME)</div>
-        <div style="font-size:28px;font-weight:700;margin-top:4px;color:var(--green);font-variant-numeric:tabular-nums">$\${total.toFixed(2)}</div>
+        <div style="font-size:28px;font-weight:700;margin-top:4px;color:var(--green);font-variant-numeric:tabular-nums">\$\${total.toFixed(2)}</div>
       </div></div>
       <div class="card"><div class="card-body" style="padding:16px">
         <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em">THIS MONTH</div>
-        <div style="font-size:28px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums">$\${monthTotal.toFixed(2)}</div>
+        <div style="font-size:28px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums">\$\${monthTotal.toFixed(2)}</div>
       </div></div>
       <div class="card"><div class="card-body" style="padding:16px">
         <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.06em">PENDING REVIEW</div>
@@ -4182,12 +4187,12 @@ window.toggleCoaActive = async function(id, newState) {
 
 // ── JOURNAL ENTRIES ───────────────────────────────────────
 async function renderJournal(container) {
-  var _STATE$clientRow2;
+  var _STATE\$clientRow2;
   if (STATE.isStaff && !STATE.selectedClientId) {
     container.innerHTML = pageShell('Journal Entries', '', '', '<div class="alert alert-red" style="margin:28px">Please select a client first.</div>');
     return;
   }
-  container.innerHTML = pageShell('Journal Entries', STATE.isStaff ? selectedClientName() : ((_STATE$clientRow2 = STATE.clientRow) === null || _STATE$clientRow2 === void 0 ? void 0 : _STATE$clientRow2.full_name) || '', STATE.isStaff ? "\\n    <button class=\\"btn btn-secondary\\" onclick=\\"openJEModal()\\">+ New Entry</button>\\n  " : '', '<div class="loading-block"><span class="spinner"></span> Loading…</div>');
+  container.innerHTML = pageShell('Journal Entries', STATE.isStaff ? selectedClientName() : ((_STATE\$clientRow2 = STATE.clientRow) === null || _STATE\$clientRow2 === void 0 ? void 0 : _STATE\$clientRow2.full_name) || '', STATE.isStaff ? "\\n    <button class=\\"btn btn-secondary\\" onclick=\\"openJEModal()\\">+ New Entry</button>\\n  " : '', '<div class="loading-block"><span class="spinner"></span> Loading…</div>');
 
   // join accounts + client name
   const q = applyClientFilter(sb.from('journal_entries').select('*, clients(full_name), journal_lines(*, accounts(account_number, name))').order('entry_date', {
@@ -4207,11 +4212,11 @@ async function renderJournal(container) {
     return;
   }
   main.innerHTML = data.map(je => {
-    var _je$clients;
+    var _je\$clients;
     const lines = je.journal_lines || [];
     const totalDr = lines.reduce((s, l) => s + (parseFloat(l.debit) || 0), 0);
     const canEdit = je.status !== 'posted';
-    const clientName = ((_je$clients = je.clients) === null || _je$clients === void 0 ? void 0 : _je$clients.full_name) || '';
+    const clientName = ((_je\$clients = je.clients) === null || _je\$clients === void 0 ? void 0 : _je\$clients.full_name) || '';
     return "\\n      <div class=\\"card\\" style=\\"margin-bottom:14px\\">\\n        <div class=\\"card-h\\">\\n          <div style=\\"display:flex;flex-direction:column;gap:3px\\">\\n            ".concat(clientName ? "<span style=\\"font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:.06em\\">👤 ".concat(esc(clientName), "</span>") : '', "\\n            <div>\\n              <span style=\\"font-family:monospace;font-size:12px;color:var(--muted)\\">").concat(esc(je.reference || ''), "</span>\\n              <span style=\\"font-weight:700;margin-left:8px\\">").concat(esc(je.description || 'No description'), "</span>\\n            </div>\\n          </div>\\n          <div style=\\"display:flex;align-items:center;gap:10px\\">\\n            <span style=\\"font-variant-numeric:tabular-nums;font-weight:600\\">").concat(fmt(totalDr), "</span>\\n            <span class=\\"badge ").concat(je.status === 'posted' ? 'badge-green' : 'badge-gold', "\\">").concat(esc(je.status), "</span>\\n            <span style=\\"font-size:12px;color:var(--muted)\\">").concat(fmtDate(je.entry_date), "</span>\\n            ").concat(canEdit ? "<button class=\\"btn btn-secondary\\" style=\\"padding:4px 10px;font-size:12px\\" onclick=\\"openEditJEModal('".concat(je.id, "')\\">Edit</button>") : '', "\\n          </div>\\n        </div>\\n        <table class=\\"je-line-table\\">\\n          <thead><tr><th>Account</th><th>Memo</th><th style=\\"text-align:right\\">Debit</th><th style=\\"text-align:right\\">Credit</th></tr></thead>\\n          <tbody>").concat(lines.map(l => "\\n            <tr>\\n              <td style=\\"font-size:12px;color:var(--muted)\\">".concat(esc(((l.accounts ? l.accounts.account_number : '') || '') + ' ' + ((l.accounts ? l.accounts.name : '') || '')), "</td>\\n              <td>").concat(esc(l.memo || ''), "</td>\\n              <td style=\\"text-align:right;font-variant-numeric:tabular-nums\\">").concat(parseFloat(l.debit) > 0 ? fmt(l.debit) : '', "</td>\\n              <td style=\\"text-align:right;font-variant-numeric:tabular-nums\\">").concat(parseFloat(l.credit) > 0 ? fmt(l.credit) : '', "</td>\\n            </tr>\\n          ")).join(''), "</tbody>\\n        </table>\\n      </div>\\n    ");
   }).join('');
 }
@@ -4263,14 +4268,14 @@ async function updateJE(jeId, status) {
   // Read live from DOM
   const rows = document.querySelectorAll('#jem-lines tr');
   const liveLines = Array.from(rows).map(row => {
-    var _inputs$, _inputs$2;
+    var _inputs\$, _inputs\$2;
     const sel = row.querySelector('select');
     const inputs = row.querySelectorAll('input[type=number]');
     const memo = row.querySelector('input[type=text]');
     return {
       account_id: (sel === null || sel === void 0 ? void 0 : sel.value) || '',
-      debit: ((_inputs$ = inputs[0]) === null || _inputs$ === void 0 ? void 0 : _inputs$.value) || '',
-      credit: ((_inputs$2 = inputs[1]) === null || _inputs$2 === void 0 ? void 0 : _inputs$2.value) || '',
+      debit: ((_inputs\$ = inputs[0]) === null || _inputs\$ === void 0 ? void 0 : _inputs\$.value) || '',
+      credit: ((_inputs\$2 = inputs[1]) === null || _inputs\$2 === void 0 ? void 0 : _inputs\$2.value) || '',
       memo: (memo === null || memo === void 0 ? void 0 : memo.value) || ''
     };
   });
@@ -4335,13 +4340,13 @@ async function updateJE(jeId, status) {
 
 // ── PAYROLL ───────────────────────────────────────────────
 async function renderPayroll(container) {
-  var _STATE$clientRow3;
+  var _STATE\$clientRow3;
   if (STATE.isStaff && !STATE.selectedClientId) {
     container.innerHTML = pageShell('Payroll', '', '', '<div class="alert alert-red" style="margin:28px">Please select a client first.</div>');
     return;
   }
   const isClient = !STATE.isStaff;
-  const subtitle = isClient ? ((_STATE$clientRow3 = STATE.clientRow) === null || _STATE$clientRow3 === void 0 ? void 0 : _STATE$clientRow3.full_name) || '' : selectedClientName();
+  const subtitle = isClient ? ((_STATE\$clientRow3 = STATE.clientRow) === null || _STATE\$clientRow3 === void 0 ? void 0 : _STATE\$clientRow3.full_name) || '' : selectedClientName();
   const tabs = isClient ? "<button class=\\"tab-btn active\\" data-tab=\\"pay-runs\\">Pay History</button>\\n       <button class=\\"tab-btn\\" data-tab=\\"tax-filings\\">Tax Filings</button>" : "<button class=\\"tab-btn active\\" data-tab=\\"employees\\">Employees</button>\\n       <button class=\\"tab-btn\\" data-tab=\\"pay-runs\\">Pay Runs</button>\\n       <button class=\\"tab-btn\\" data-tab=\\"tax-filings\\">Tax Filings</button>";
   container.innerHTML = pageShell('Payroll', subtitle, '', "\\n    <div id=\\"payroll-tabs-wrap\\">\\n      <div class=\\"tab-bar\\" id=\\"payroll-tab-bar\\">".concat(tabs, "</div>\\n      <div id=\\"payroll-tab-content\\"></div>\\n    </div>\\n  "), false);
   document.getElementById('payroll-tab-bar').addEventListener('click', e => {
@@ -4399,12 +4404,12 @@ async function loadPayrollTab(tab) {
 
 // ── TAX RETURNS ───────────────────────────────────────────
 async function renderTax(container) {
-  var _STATE$clientRow4;
+  var _STATE\$clientRow4;
   if (STATE.isStaff && !STATE.selectedClientId) {
     container.innerHTML = pageShell('Tax Returns', '', '', '<div class="alert alert-red" style="margin:28px">Please select a client first.</div>');
     return;
   }
-  container.innerHTML = pageShell('Tax Returns', STATE.isStaff ? selectedClientName() : ((_STATE$clientRow4 = STATE.clientRow) === null || _STATE$clientRow4 === void 0 ? void 0 : _STATE$clientRow4.full_name) || '', STATE.isStaff ? "\\n    <button class=\\"btn btn-secondary\\">+ New Return</button>\\n  " : '', '<div class="loading-block"><span class="spinner"></span> Loading…</div>');
+  container.innerHTML = pageShell('Tax Returns', STATE.isStaff ? selectedClientName() : ((_STATE\$clientRow4 = STATE.clientRow) === null || _STATE\$clientRow4 === void 0 ? void 0 : _STATE\$clientRow4.full_name) || '', STATE.isStaff ? "\\n    <button class=\\"btn btn-secondary\\">+ New Return</button>\\n  " : '', '<div class="loading-block"><span class="spinner"></span> Loading…</div>');
   const q = applyClientFilter(sb.from('tax_returns').select('*').order('tax_year', {
     ascending: false
   }));
@@ -5106,7 +5111,7 @@ function parseBankCSV(text) {
   // Wells Fargo: no header, detect by content
   const firstRow = parseRow(lines[0]);
   let isWells = false;
-  if (!firstRow[0]?.toLowerCase().includes('date') && /^\\d{1,2}\\/\\d{1,2}\\/\\d{4}$/.test(firstRow[0]?.trim())) {
+  if (!firstRow[0]?.toLowerCase().includes('date') && /^\\d{1,2}\\/\\d{1,2}\\/\\d{4}\$/.test(firstRow[0]?.trim())) {
     isWells = true;
   }
 
@@ -5158,7 +5163,7 @@ function parseBankCSV(text) {
     const dateStr = format.date ? (f[colIdx[format.date]] || '').trim() : f[0]?.trim();
     // Normalize date to YYYY-MM-DD
     let date = dateStr;
-    const dm = dateStr?.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{2,4})$/);
+    const dm = dateStr?.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{2,4})\$/);
     if (dm) {
       const yr = dm[3].length === 2 ? '20' + dm[3] : dm[3];
       date = \`\${yr}-\${dm[1].padStart(2,'0')}-\${dm[2].padStart(2,'0')}\`;
@@ -5600,7 +5605,7 @@ async function renderAdminInvoices(container) {
     return \`<span class="badge \${map[s] || 'badge-grey'}">\${esc(s || 'draft')}</span>\`;
   };
 
-  const fmt = v => v == null ? '—' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = v => v == null ? '—' : '\$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   // Totals summary
   const total = invoices.reduce((s, r) => s + (Number(r.total) || 0), 0);
@@ -5682,7 +5687,7 @@ function openAdminInvoiceDetail(inv, container) {
   const bd = document.createElement('div');
   bd.className = 'modal-backdrop';
   bd.id = 'adm-inv-backdrop';
-  const fmt = v => v == null ? '—' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = v => v == null ? '—' : '\$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const statusBadge = s => {
     const map = { draft: 'badge-grey', sent: 'badge-blue', paid: 'badge-green', void: 'badge-grey', overdue: 'badge-red' };
     return \`<span class="badge \${map[s] || 'badge-grey'}">\${esc(s || 'draft')}</span>\`;
@@ -5855,9 +5860,9 @@ function openEditAdminInvoiceModal(inv, container) {
 
         <div style="display:flex;justify-content:flex-end;margin-bottom:4px">
           <div style="min-width:220px;font-size:13px">
-            <div style="display:flex;justify-content:space-between;padding:4px 0"><span style="color:var(--muted)">Subtotal</span><span id="eai-subtotal">$0.00</span></div>
-            <div style="display:flex;justify-content:space-between;padding:4px 0"><span style="color:var(--muted)">Tax</span><span id="eai-taxamt">$0.00</span></div>
-            <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:15px;font-weight:700;border-top:2px solid var(--border)"><span>Total</span><span id="eai-total" style="color:var(--green)">$0.00</span></div>
+            <div style="display:flex;justify-content:space-between;padding:4px 0"><span style="color:var(--muted)">Subtotal</span><span id="eai-subtotal">\$0.00</span></div>
+            <div style="display:flex;justify-content:space-between;padding:4px 0"><span style="color:var(--muted)">Tax</span><span id="eai-taxamt">\$0.00</span></div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:15px;font-weight:700;border-top:2px solid var(--border)"><span>Total</span><span id="eai-total" style="color:var(--green)">\$0.00</span></div>
           </div>
         </div>
 
@@ -5873,7 +5878,7 @@ function openEditAdminInvoiceModal(inv, container) {
   bd.addEventListener('click', e => { if (e.target === bd) closeModal('edit-adm-inv-backdrop'); });
 
   const linesBody = bd.querySelector('#eai-lines');
-  const fmt2 = v => '$' + Number(v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmt2 = v => '\$' + Number(v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 
   function addLine(desc='', qty=1, unit=0) {
     const tr = document.createElement('tr');
@@ -5961,7 +5966,7 @@ function openEditAdminInvoiceModal(inv, container) {
 
 async function openInvoicePreview(inv) {
   const lineItems = Array.isArray(inv.line_items) ? inv.line_items : [];
-  const fmtMoney = v => v == null ? '$0.00' : '$' + Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmtMoney = v => v == null ? '\$0.00' : '\$' + Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   const clientName = inv.customer_name || inv.clients?.full_name || '—';
   const clientEmail = inv.customer_email || '';
   // FROM = selected client (the entity issuing this invoice)
@@ -6081,8 +6086,8 @@ async function openInvoicePreview(inv) {
         \${lineItems.length ? lineItems.map(li => \`<tr>
           <td>\${li.description || ''}</td>
           <td style="text-align:right">\${li.quantity || 1}</td>
-          <td style="text-align:right">\${fmtMoney(li.unit_price)}</td>
-          <td style="text-align:right"><strong>\${fmtMoney(li.amount || (li.unit_price * (li.quantity||1)))}</strong></td>
+          <td style="text-align:right">\${fmtMoney(li.unit_price != null ? li.unit_price : (li.amount != null ? li.amount / (li.quantity || 1) : null))}</td>
+          <td style="text-align:right"><strong>\${fmtMoney(li.amount != null ? li.amount : (li.unit_price != null ? li.unit_price * (li.quantity||1) : null))}</strong></td>
         </tr>\`).join('') : \`<tr>
           <td colspan="3">Services</td>
           <td style="text-align:right"><strong>\${fmtMoney(inv.total)}</strong></td>
@@ -6141,7 +6146,7 @@ function openNewAdminInvoiceModal() {
             <input id="nai-num" type="text" placeholder="e.g. INV-2026-001" autocomplete="off">
           </div>
           <div class="form-group">
-            <label for="nai-amount">Amount ($) *</label>
+            <label for="nai-amount">Amount (\$) *</label>
             <input id="nai-amount" type="number" min="0" step="0.01" placeholder="0.00">
           </div>
         </div>
@@ -6876,7 +6881,7 @@ function pageShell(title, sub, actionsHtml, bodyHtml, withTabs = true) {
 }
 function fmt(n) {
   if (n === null || n === undefined) return '—';
-  return '$' + Number(n).toLocaleString('en-US', {
+  return '\$' + Number(n).toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
@@ -7053,10 +7058,10 @@ function openAddClientModal() {
               <label for="acm-package">Service Package</label>
               <select id="acm-package">
                 <option value="">— None selected —</option>
-                <option value="starter">Starter — $149/mo</option>
-                <option value="essentials">Essentials — $299/mo</option>
-                <option value="growth">Growth — $499/mo</option>
-                <option value="premium">Premium — $799/mo</option>
+                <option value="starter">Starter — \$149/mo</option>
+                <option value="essentials">Essentials — \$299/mo</option>
+                <option value="growth">Growth — \$499/mo</option>
+                <option value="premium">Premium — \$799/mo</option>
               </select>
             </div>
             <div class="form-group">
@@ -7384,13 +7389,13 @@ function updateJETotals() {
   balEl.className = balanced ? 'je-bal-ok' : 'je-bal-err';
 }
 async function saveJE(status) {
-  var _document$getElementB2, _STATE$staffRow;
+  var _document\$getElementB2, _STATE\$staffRow;
   const date = document.getElementById('jem-date').value;
   const ref = document.getElementById('jem-ref').value.trim();
   const desc = document.getElementById('jem-desc').value.trim();
   const errEl = document.getElementById('jem-error');
   errEl.textContent = '';
-  const clientId = ((_document$getElementB2 = document.getElementById('jem-client')) === null || _document$getElementB2 === void 0 ? void 0 : _document$getElementB2.value) || STATE.selectedClientId || null;
+  const clientId = ((_document\$getElementB2 = document.getElementById('jem-client')) === null || _document\$getElementB2 === void 0 ? void 0 : _document\$getElementB2.value) || STATE.selectedClientId || null;
   if (!clientId) {
     errEl.textContent = 'Please select a client.';
     return;
@@ -7440,7 +7445,7 @@ async function saveJE(status) {
     reference: ref || null,
     description: desc,
     status,
-    created_by: ((_STATE$staffRow = STATE.staffRow) === null || _STATE$staffRow === void 0 ? void 0 : _STATE$staffRow.id) || null
+    created_by: ((_STATE\$staffRow = STATE.staffRow) === null || _STATE\$staffRow === void 0 ? void 0 : _STATE\$staffRow.id) || null
   }).select('id').single();
   if (jeErr) {
     errEl.textContent = 'Error: ' + jeErr.message;
@@ -7492,7 +7497,7 @@ function openAddEmployeeModal() {
   bd.className = 'modal-backdrop';
   bd.id = 'emp-backdrop';
   const clientOpts = (STATE.clientRows || []).map(c => "<option value=\\"".concat(esc(c.id), "\\" ").concat(STATE.selectedClientId === c.id ? 'selected' : '', ">").concat(esc(c.full_name), "</option>")).join('');
-  bd.innerHTML = "\\n    <div class=\\"modal\\" role=\\"dialog\\" style=\\"max-width:580px\\">\\n      <div class=\\"modal-header\\"><h3>Add Employee</h3><button class=\\"modal-close\\" onclick=\\"closeModal('emp-backdrop')\\" aria-label=\\"Close\\">×</button></div>\\n      <div class=\\"modal-body\\" style=\\"padding-top:0\\">\\n\\n        <!-- Tab bar -->\\n        <div style=\\"display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px\\">\\n          <button class=\\"emp-tab-btn\\" data-tab=\\"emp-tab-employment\\" onclick=\\"empSwitchTab('emp-tab-employment')\\"\\n            style=\\"background:none;border:none;padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid var(--gold);color:var(--fg)\\">\\n            Employment\\n          </button>\\n          <button class=\\"emp-tab-btn\\" data-tab=\\"emp-tab-w4\\" onclick=\\"empSwitchTab('emp-tab-w4')\\"\\n            style=\\"background:none;border:none;padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid transparent;color:var(--muted)\\">\\n            W-4 Withholding\\n          </button>\\n        </div>\\n\\n        <!-- Tab 1: Employment Info -->\\n        <div id=\\"emp-tab-employment\\">\\n          <div class=\\"form-group\\"><label>Client *</label><select id=\\"emp-client\\"><option value=\\"\\">— Select client —</option>".concat(clientOpts, "</select></div>\\n          <div class=\\"form-group\\"><label>Full Name *</label><input id=\\"emp-name\\" type=\\"text\\" autocomplete=\\"off\\" placeholder=\\"e.g. Maria Lopez\\"></div>\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\"><label>Job Title</label><input id=\\"emp-title\\" type=\\"text\\" autocomplete=\\"off\\"></div>\\n            <div class=\\"form-group\\"><label>Department</label><input id=\\"emp-dept\\" type=\\"text\\" autocomplete=\\"off\\"></div>\\n          </div>\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\"><label>Employment Type</label>\\n              <select id=\\"emp-emptype\\"><option value=\\"FT\\">Full Time</option><option value=\\"PT\\">Part Time</option><option value=\\"Contractor\\">Contractor</option><option value=\\"Seasonal\\">Seasonal</option></select>\\n            </div>\\n            <div class=\\"form-group\\"><label>Pay Type *</label>\\n              <select id=\\"emp-paytype\\"><option value=\\"hourly\\">Hourly</option><option value=\\"salary\\">Salary</option></select>\\n            </div>\\n          </div>\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\"><label id=\\"emp-rate-label\\">Pay Rate * <span style=\\"font-size:11px;color:var(--muted)\\">(hourly $)</span></label>\\n              <input id=\\"emp-rate\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\">\\n            </div>\\n            <div class=\\"form-group\\"><label>Pay Frequency</label>\\n              <select id=\\"emp-payfreq\\"><option value=\\"weekly\\">Weekly</option><option value=\\"bi-weekly\\" selected>Bi-weekly</option><option value=\\"semi-monthly\\">Semi-monthly</option><option value=\\"monthly\\">Monthly</option></select>\\n            </div>\\n          </div>\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\"><label>Hire Date</label><input id=\\"emp-start\\" type=\\"date\\"></div>\\n            <div class=\\"form-group\\"><label>Email</label><input id=\\"emp-email\\" type=\\"email\\" autocomplete=\\"off\\"></div>\\n          </div>\\n        </div>\\n\\n        <!-- Tab 2: W-4 Info -->\\n        <div id=\\"emp-tab-w4\\" hidden>\\n          <p style=\\"font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5\\">\\n            Enter information from the employee's <strong>W-4 form</strong>. This is used to calculate federal income tax withholding each pay period.\\n          </p>\\n\\n          <div class=\\"form-group\\">\\n            <label>Step 1 — Filing Status</label>\\n            <select id=\\"emp-w4-status\\">\\n              <option value=\\"single\\">Single or Married Filing Separately</option>\\n              <option value=\\"mfj\\">Married Filing Jointly (or Qualifying Widow(er))</option>\\n              <option value=\\"hoh\\">Head of Household</option>\\n            </select>\\n          </div>\\n\\n          <div class=\\"form-group\\">\\n            <label style=\\"display:flex;align-items:center;gap:8px;cursor:pointer\\">\\n              <input type=\\"checkbox\\" id=\\"emp-w4-multijob\\" style=\\"width:16px;height:16px\\">\\n              <span>Step 2 — Multiple Jobs / Spouse also works</span>\\n            </label>\\n            <p style=\\"font-size:11px;color:var(--muted);margin-top:4px;margin-left:24px\\">Check if the employee has more than one job or if filing jointly and both spouses work. This increases withholding.</p>\\n          </div>\\n\\n          <div class=\\"form-group\\">\\n            <label>Step 3 — Dependents Amount ($)</label>\\n            <input id=\\"emp-w4-dependents\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\">\\n            <p style=\\"font-size:11px;color:var(--muted);margin-top:4px\\">Annual dollar amount claimed for dependents (e.g. $2,000 per qualifying child under 17).</p>\\n          </div>\\n\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\">\\n              <label>Step 4a — Other Income ($)</label>\\n              <input id=\\"emp-w4-other-income\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\">\\n              <p style=\\"font-size:11px;color:var(--muted);margin-top:4px\\">Annual other income not from jobs (interest, dividends, etc.).</p>\\n            </div>\\n            <div class=\\"form-group\\">\\n              <label>Step 4b — Deductions ($)</label>\\n              <input id=\\"emp-w4-deductions\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\">\\n              <p style=\\"font-size:11px;color:var(--muted);margin-top:4px\\">Annual deductions beyond the standard deduction.</p>\\n            </div>\\n          </div>\\n\\n          <div class=\\"form-group\\">\\n            <label>Step 4c — Extra Withholding per Period ($)</label>\\n            <input id=\\"emp-w4-extra\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\">\\n            <p style=\\"font-size:11px;color:var(--muted);margin-top:4px\\">Additional amount to withhold each pay period if the employee requested it.</p>\\n          </div>\\n        </div>\\n\\n        <div class=\\"modal-error\\" id=\\"emp-error\\"></div>\\n      </div>\\n      <div class=\\"modal-footer\\">\\n        <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('emp-backdrop')\\">Cancel</button>\\n        <button class=\\"btn btn-primary\\" id=\\"emp-save\\" onclick=\\"saveEmployee()\\">Save Employee</button>\\n      </div>\\n    </div>");
+  bd.innerHTML = "\\n    <div class=\\"modal\\" role=\\"dialog\\" style=\\"max-width:580px\\">\\n      <div class=\\"modal-header\\"><h3>Add Employee</h3><button class=\\"modal-close\\" onclick=\\"closeModal('emp-backdrop')\\" aria-label=\\"Close\\">×</button></div>\\n      <div class=\\"modal-body\\" style=\\"padding-top:0\\">\\n\\n        <!-- Tab bar -->\\n        <div style=\\"display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px\\">\\n          <button class=\\"emp-tab-btn\\" data-tab=\\"emp-tab-employment\\" onclick=\\"empSwitchTab('emp-tab-employment')\\"\\n            style=\\"background:none;border:none;padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid var(--gold);color:var(--fg)\\">\\n            Employment\\n          </button>\\n          <button class=\\"emp-tab-btn\\" data-tab=\\"emp-tab-w4\\" onclick=\\"empSwitchTab('emp-tab-w4')\\"\\n            style=\\"background:none;border:none;padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid transparent;color:var(--muted)\\">\\n            W-4 Withholding\\n          </button>\\n        </div>\\n\\n        <!-- Tab 1: Employment Info -->\\n        <div id=\\"emp-tab-employment\\">\\n          <div class=\\"form-group\\"><label>Client *</label><select id=\\"emp-client\\"><option value=\\"\\">— Select client —</option>".concat(clientOpts, "</select></div>\\n          <div class=\\"form-group\\"><label>Full Name *</label><input id=\\"emp-name\\" type=\\"text\\" autocomplete=\\"off\\" placeholder=\\"e.g. Maria Lopez\\"></div>\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\"><label>Job Title</label><input id=\\"emp-title\\" type=\\"text\\" autocomplete=\\"off\\"></div>\\n            <div class=\\"form-group\\"><label>Department</label><input id=\\"emp-dept\\" type=\\"text\\" autocomplete=\\"off\\"></div>\\n          </div>\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\"><label>Employment Type</label>\\n              <select id=\\"emp-emptype\\"><option value=\\"FT\\">Full Time</option><option value=\\"PT\\">Part Time</option><option value=\\"Contractor\\">Contractor</option><option value=\\"Seasonal\\">Seasonal</option></select>\\n            </div>\\n            <div class=\\"form-group\\"><label>Pay Type *</label>\\n              <select id=\\"emp-paytype\\"><option value=\\"hourly\\">Hourly</option><option value=\\"salary\\">Salary</option></select>\\n            </div>\\n          </div>\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\"><label id=\\"emp-rate-label\\">Pay Rate * <span style=\\"font-size:11px;color:var(--muted)\\">(hourly \$)</span></label>\\n              <input id=\\"emp-rate\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\">\\n            </div>\\n            <div class=\\"form-group\\"><label>Pay Frequency</label>\\n              <select id=\\"emp-payfreq\\"><option value=\\"weekly\\">Weekly</option><option value=\\"bi-weekly\\" selected>Bi-weekly</option><option value=\\"semi-monthly\\">Semi-monthly</option><option value=\\"monthly\\">Monthly</option></select>\\n            </div>\\n          </div>\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\"><label>Hire Date</label><input id=\\"emp-start\\" type=\\"date\\"></div>\\n            <div class=\\"form-group\\"><label>Email</label><input id=\\"emp-email\\" type=\\"email\\" autocomplete=\\"off\\"></div>\\n          </div>\\n        </div>\\n\\n        <!-- Tab 2: W-4 Info -->\\n        <div id=\\"emp-tab-w4\\" hidden>\\n          <p style=\\"font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5\\">\\n            Enter information from the employee's <strong>W-4 form</strong>. This is used to calculate federal income tax withholding each pay period.\\n          </p>\\n\\n          <div class=\\"form-group\\">\\n            <label>Step 1 — Filing Status</label>\\n            <select id=\\"emp-w4-status\\">\\n              <option value=\\"single\\">Single or Married Filing Separately</option>\\n              <option value=\\"mfj\\">Married Filing Jointly (or Qualifying Widow(er))</option>\\n              <option value=\\"hoh\\">Head of Household</option>\\n            </select>\\n          </div>\\n\\n          <div class=\\"form-group\\">\\n            <label style=\\"display:flex;align-items:center;gap:8px;cursor:pointer\\">\\n              <input type=\\"checkbox\\" id=\\"emp-w4-multijob\\" style=\\"width:16px;height:16px\\">\\n              <span>Step 2 — Multiple Jobs / Spouse also works</span>\\n            </label>\\n            <p style=\\"font-size:11px;color:var(--muted);margin-top:4px;margin-left:24px\\">Check if the employee has more than one job or if filing jointly and both spouses work. This increases withholding.</p>\\n          </div>\\n\\n          <div class=\\"form-group\\">\\n            <label>Step 3 — Dependents Amount (\$)</label>\\n            <input id=\\"emp-w4-dependents\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\">\\n            <p style=\\"font-size:11px;color:var(--muted);margin-top:4px\\">Annual dollar amount claimed for dependents (e.g. \$2,000 per qualifying child under 17).</p>\\n          </div>\\n\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\">\\n              <label>Step 4a — Other Income (\$)</label>\\n              <input id=\\"emp-w4-other-income\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\">\\n              <p style=\\"font-size:11px;color:var(--muted);margin-top:4px\\">Annual other income not from jobs (interest, dividends, etc.).</p>\\n            </div>\\n            <div class=\\"form-group\\">\\n              <label>Step 4b — Deductions (\$)</label>\\n              <input id=\\"emp-w4-deductions\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\">\\n              <p style=\\"font-size:11px;color:var(--muted);margin-top:4px\\">Annual deductions beyond the standard deduction.</p>\\n            </div>\\n          </div>\\n\\n          <div class=\\"form-group\\">\\n            <label>Step 4c — Extra Withholding per Period (\$)</label>\\n            <input id=\\"emp-w4-extra\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\">\\n            <p style=\\"font-size:11px;color:var(--muted);margin-top:4px\\">Additional amount to withhold each pay period if the employee requested it.</p>\\n          </div>\\n        </div>\\n\\n        <div class=\\"modal-error\\" id=\\"emp-error\\"></div>\\n      </div>\\n      <div class=\\"modal-footer\\">\\n        <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('emp-backdrop')\\">Cancel</button>\\n        <button class=\\"btn btn-primary\\" id=\\"emp-save\\" onclick=\\"saveEmployee()\\">Save Employee</button>\\n      </div>\\n    </div>");
   document.body.appendChild(bd);
   bd.addEventListener('click', e => {
     if (e.target === bd) closeModal('emp-backdrop');
@@ -7501,7 +7506,7 @@ function openAddEmployeeModal() {
   // Update rate label when pay type changes
   document.getElementById('emp-paytype').addEventListener('change', function () {
     const lbl = document.getElementById('emp-rate-label');
-    if (lbl) lbl.innerHTML = this.value === 'salary' ? 'Pay Rate * <span style="font-size:11px;color:var(--muted)">(annual salary $)</span>' : 'Pay Rate * <span style="font-size:11px;color:var(--muted)">(hourly $)</span>';
+    if (lbl) lbl.innerHTML = this.value === 'salary' ? 'Pay Rate * <span style="font-size:11px;color:var(--muted)">(annual salary \$)</span>' : 'Pay Rate * <span style="font-size:11px;color:var(--muted)">(hourly \$)</span>';
   });
 }
 
@@ -7576,11 +7581,11 @@ async function saveEmployee() {
   const errEl = document.getElementById('emp-error');
   errEl.textContent = '';
   try {
-    var _document$getElementB3, _document$getElementB4;
+    var _document\$getElementB3, _document\$getElementB4;
     const name = document.getElementById('emp-name').value.trim();
     const rateEl = document.getElementById('emp-rate');
     const rate = rateEl.valueAsNumber || parseFloat(rateEl.value) || 0;
-    const clientId = ((_document$getElementB3 = document.getElementById('emp-client')) === null || _document$getElementB3 === void 0 ? void 0 : _document$getElementB3.value) || STATE.selectedClientId || null;
+    const clientId = ((_document\$getElementB3 = document.getElementById('emp-client')) === null || _document\$getElementB3 === void 0 ? void 0 : _document\$getElementB3.value) || STATE.selectedClientId || null;
     if (!clientId) {
       errEl.textContent = 'Please select a client.';
       return;
@@ -7603,7 +7608,7 @@ async function saveEmployee() {
       full_name: name,
       job_title: document.getElementById('emp-title').value.trim() || null,
       department: document.getElementById('emp-dept').value.trim() || null,
-      employment_type: ['FT', 'PT', 'Contractor', 'Seasonal'].includes((_document$getElementB4 = document.getElementById('emp-emptype')) === null || _document$getElementB4 === void 0 ? void 0 : _document$getElementB4.value) ? document.getElementById('emp-emptype').value : 'FT',
+      employment_type: ['FT', 'PT', 'Contractor', 'Seasonal'].includes((_document\$getElementB4 = document.getElementById('emp-emptype')) === null || _document\$getElementB4 === void 0 ? void 0 : _document\$getElementB4.value) ? document.getElementById('emp-emptype').value : 'FT',
       pay_type: document.getElementById('emp-paytype').value || 'hourly',
       pay_frequency: document.getElementById('emp-payfreq').value || 'bi-weekly',
       pay_rate: rate || null,
@@ -7639,14 +7644,14 @@ function openEditEmployeeModal(emp) {
   const bd = document.createElement('div');
   bd.className = 'modal-backdrop';
   bd.id = 'empedit-backdrop';
-  bd.innerHTML = "\\n    <div class=\\"modal\\" role=\\"dialog\\" style=\\"max-width:580px\\">\\n      <div class=\\"modal-header\\"><h3>Edit Employee</h3><button class=\\"modal-close\\" onclick=\\"closeModal('empedit-backdrop')\\" aria-label=\\"Close\\">×</button></div>\\n      <div class=\\"modal-body\\" style=\\"padding-top:0\\">\\n\\n        <!-- Tab bar -->\\n        <div style=\\"display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px\\">\\n          <button class=\\"empedit-tab-btn\\" data-tab=\\"empedit-tab-employment\\" onclick=\\"empEditSwitchTab('empedit-tab-employment')\\"\\n            style=\\"background:none;border:none;padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid var(--gold);color:var(--fg)\\">\\n            Employment\\n          </button>\\n          <button class=\\"empedit-tab-btn\\" data-tab=\\"empedit-tab-w4\\" onclick=\\"empEditSwitchTab('empedit-tab-w4')\\"\\n            style=\\"background:none;border:none;padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid transparent;color:var(--muted)\\">\\n            W-4 Withholding\\n          </button>\\n        </div>\\n\\n        <!-- Tab 1: Employment -->\\n        <div id=\\"empedit-tab-employment\\">\\n          <div class=\\"form-group\\"><label>Full Name *</label><input id=\\"empedit-name\\" type=\\"text\\" autocomplete=\\"off\\" value=\\"".concat(esc(emp.full_name || ''), "\\"></div>\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\"><label>Job Title</label><input id=\\"empedit-title\\" type=\\"text\\" autocomplete=\\"off\\" value=\\"").concat(esc(emp.job_title || ''), "\\"></div>\\n            <div class=\\"form-group\\"><label>Department</label><input id=\\"empedit-dept\\" type=\\"text\\" autocomplete=\\"off\\" value=\\"").concat(esc(emp.department || ''), "\\"></div>\\n          </div>\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\"><label>Employment Type</label>\\n              <select id=\\"empedit-emptype\\">\\n                ").concat(['FT', 'PT', 'Contractor', 'Seasonal'].map(t => "<option value=\\"".concat(t, "\\" ").concat(emp.employment_type === t ? 'selected' : '', ">").concat(t === 'FT' ? 'Full Time' : t === 'PT' ? 'Part Time' : t, "</option>")).join(''), "\\n              </select>\\n            </div>\\n            <div class=\\"form-group\\"><label>Pay Type</label>\\n              <select id=\\"empedit-paytype\\">\\n                <option value=\\"hourly\\" ").concat(emp.pay_type === 'hourly' ? 'selected' : '', ">Hourly</option>\\n                <option value=\\"salary\\" ").concat(emp.pay_type === 'salary' ? 'selected' : '', ">Salary</option>\\n              </select>\\n            </div>\\n          </div>\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\">\\n              <label id=\\"empedit-rate-label\\">Pay Rate <span style=\\"font-size:11px;color:var(--muted)\\">(").concat(emp.pay_type === 'salary' ? 'annual salary' : 'hourly', " $)</span></label>\\n              <input id=\\"empedit-rate\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" value=\\"").concat(parseFloat(emp.pay_rate || 0).toFixed(2), "\\">\\n            </div>\\n            <div class=\\"form-group\\"><label>Pay Frequency</label>\\n              <select id=\\"empedit-payfreq\\">\\n                ").concat(['weekly', 'bi-weekly', 'semi-monthly', 'monthly'].map(f => "<option value=\\"".concat(f, "\\" ").concat(emp.pay_frequency === f ? 'selected' : '', ">").concat(f.charAt(0).toUpperCase() + f.slice(1), "</option>")).join(''), "\\n              </select>\\n            </div>\\n          </div>\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\"><label>Hire Date</label><input id=\\"empedit-start\\" type=\\"date\\" value=\\"").concat(emp.hire_date || '', "\\"></div>\\n            <div class=\\"form-group\\"><label>Email</label><input id=\\"empedit-email\\" type=\\"email\\" autocomplete=\\"off\\" value=\\"").concat(esc(emp.email || ''), "\\"></div>\\n          </div>\\n          <div class=\\"form-group\\"><label>Status</label>\\n            <select id=\\"empedit-status\\">\\n              <option value=\\"active\\" ").concat(emp.status === 'active' ? 'selected' : '', ">Active</option>\\n              <option value=\\"inactive\\" ").concat(emp.status === 'inactive' ? 'selected' : '', ">Inactive</option>\\n              <option value=\\"terminated\\" ").concat(emp.status === 'terminated' ? 'selected' : '', ">Terminated</option>\\n            </select>\\n          </div>\\n        </div>\\n\\n        <!-- Tab 2: W-4 -->\\n        <div id=\\"empedit-tab-w4\\" hidden>\\n          <p style=\\"font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5\\">\\n            Enter information from the employee's <strong>W-4 form</strong>. Used to estimate federal income tax withholding each pay period.\\n          </p>\\n          <div class=\\"form-group\\"><label>Step 1 — Filing Status</label>\\n            <select id=\\"empedit-w4-status\\">\\n              <option value=\\"single\\" ").concat((emp.w4_filing_status || 'single') === 'single' ? 'selected' : '', ">Single or Married Filing Separately</option>\\n              <option value=\\"mfj\\" ").concat(emp.w4_filing_status === 'mfj' ? 'selected' : '', ">Married Filing Jointly (or Qualifying Widow(er))</option>\\n              <option value=\\"hoh\\" ").concat(emp.w4_filing_status === 'hoh' ? 'selected' : '', ">Head of Household</option>\\n            </select>\\n          </div>\\n          <div class=\\"form-group\\">\\n            <label style=\\"display:flex;align-items:center;gap:8px;cursor:pointer\\">\\n              <input type=\\"checkbox\\" id=\\"empedit-w4-multijob\\" style=\\"width:16px;height:16px\\" ").concat(emp.w4_multiple_jobs ? 'checked' : '', ">\\n              <span>Step 2 — Multiple Jobs / Spouse also works</span>\\n            </label>\\n          </div>\\n          <div class=\\"form-group\\"><label>Step 3 — Dependents Amount ($)</label>\\n            <input id=\\"empedit-w4-dependents\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" value=\\"").concat(parseFloat(emp.w4_dependents_amt || 0).toFixed(2), "\\">\\n          </div>\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\"><label>Step 4a — Other Income ($)</label>\\n              <input id=\\"empedit-w4-other-income\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" value=\\"").concat(parseFloat(emp.w4_other_income || 0).toFixed(2), "\\">\\n            </div>\\n            <div class=\\"form-group\\"><label>Step 4b — Deductions ($)</label>\\n              <input id=\\"empedit-w4-deductions\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" value=\\"").concat(parseFloat(emp.w4_deductions || 0).toFixed(2), "\\">\\n            </div>\\n          </div>\\n          <div class=\\"form-group\\"><label>Step 4c — Extra Withholding per Period ($)</label>\\n            <input id=\\"empedit-w4-extra\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" value=\\"").concat(parseFloat(emp.w4_extra_wh || 0).toFixed(2), "\\">\\n          </div>\\n        </div>\\n\\n        <div class=\\"modal-error\\" id=\\"empedit-error\\"></div>\\n      </div>\\n      <div class=\\"modal-footer\\">\\n        <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('empedit-backdrop')\\">Cancel</button>\\n        <button class=\\"btn btn-primary\\" id=\\"empedit-save\\" onclick=\\"saveEditEmployee('").concat(esc(emp.id), "')\\">Save Changes</button>\\n      </div>\\n    </div>");
+  bd.innerHTML = "\\n    <div class=\\"modal\\" role=\\"dialog\\" style=\\"max-width:580px\\">\\n      <div class=\\"modal-header\\"><h3>Edit Employee</h3><button class=\\"modal-close\\" onclick=\\"closeModal('empedit-backdrop')\\" aria-label=\\"Close\\">×</button></div>\\n      <div class=\\"modal-body\\" style=\\"padding-top:0\\">\\n\\n        <!-- Tab bar -->\\n        <div style=\\"display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px\\">\\n          <button class=\\"empedit-tab-btn\\" data-tab=\\"empedit-tab-employment\\" onclick=\\"empEditSwitchTab('empedit-tab-employment')\\"\\n            style=\\"background:none;border:none;padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid var(--gold);color:var(--fg)\\">\\n            Employment\\n          </button>\\n          <button class=\\"empedit-tab-btn\\" data-tab=\\"empedit-tab-w4\\" onclick=\\"empEditSwitchTab('empedit-tab-w4')\\"\\n            style=\\"background:none;border:none;padding:10px 16px;cursor:pointer;font-size:13px;font-weight:600;border-bottom:2px solid transparent;color:var(--muted)\\">\\n            W-4 Withholding\\n          </button>\\n        </div>\\n\\n        <!-- Tab 1: Employment -->\\n        <div id=\\"empedit-tab-employment\\">\\n          <div class=\\"form-group\\"><label>Full Name *</label><input id=\\"empedit-name\\" type=\\"text\\" autocomplete=\\"off\\" value=\\"".concat(esc(emp.full_name || ''), "\\"></div>\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\"><label>Job Title</label><input id=\\"empedit-title\\" type=\\"text\\" autocomplete=\\"off\\" value=\\"").concat(esc(emp.job_title || ''), "\\"></div>\\n            <div class=\\"form-group\\"><label>Department</label><input id=\\"empedit-dept\\" type=\\"text\\" autocomplete=\\"off\\" value=\\"").concat(esc(emp.department || ''), "\\"></div>\\n          </div>\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\"><label>Employment Type</label>\\n              <select id=\\"empedit-emptype\\">\\n                ").concat(['FT', 'PT', 'Contractor', 'Seasonal'].map(t => "<option value=\\"".concat(t, "\\" ").concat(emp.employment_type === t ? 'selected' : '', ">").concat(t === 'FT' ? 'Full Time' : t === 'PT' ? 'Part Time' : t, "</option>")).join(''), "\\n              </select>\\n            </div>\\n            <div class=\\"form-group\\"><label>Pay Type</label>\\n              <select id=\\"empedit-paytype\\">\\n                <option value=\\"hourly\\" ").concat(emp.pay_type === 'hourly' ? 'selected' : '', ">Hourly</option>\\n                <option value=\\"salary\\" ").concat(emp.pay_type === 'salary' ? 'selected' : '', ">Salary</option>\\n              </select>\\n            </div>\\n          </div>\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\">\\n              <label id=\\"empedit-rate-label\\">Pay Rate <span style=\\"font-size:11px;color:var(--muted)\\">(").concat(emp.pay_type === 'salary' ? 'annual salary' : 'hourly', " \$)</span></label>\\n              <input id=\\"empedit-rate\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" value=\\"").concat(parseFloat(emp.pay_rate || 0).toFixed(2), "\\">\\n            </div>\\n            <div class=\\"form-group\\"><label>Pay Frequency</label>\\n              <select id=\\"empedit-payfreq\\">\\n                ").concat(['weekly', 'bi-weekly', 'semi-monthly', 'monthly'].map(f => "<option value=\\"".concat(f, "\\" ").concat(emp.pay_frequency === f ? 'selected' : '', ">").concat(f.charAt(0).toUpperCase() + f.slice(1), "</option>")).join(''), "\\n              </select>\\n            </div>\\n          </div>\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\"><label>Hire Date</label><input id=\\"empedit-start\\" type=\\"date\\" value=\\"").concat(emp.hire_date || '', "\\"></div>\\n            <div class=\\"form-group\\"><label>Email</label><input id=\\"empedit-email\\" type=\\"email\\" autocomplete=\\"off\\" value=\\"").concat(esc(emp.email || ''), "\\"></div>\\n          </div>\\n          <div class=\\"form-group\\"><label>Status</label>\\n            <select id=\\"empedit-status\\">\\n              <option value=\\"active\\" ").concat(emp.status === 'active' ? 'selected' : '', ">Active</option>\\n              <option value=\\"inactive\\" ").concat(emp.status === 'inactive' ? 'selected' : '', ">Inactive</option>\\n              <option value=\\"terminated\\" ").concat(emp.status === 'terminated' ? 'selected' : '', ">Terminated</option>\\n            </select>\\n          </div>\\n        </div>\\n\\n        <!-- Tab 2: W-4 -->\\n        <div id=\\"empedit-tab-w4\\" hidden>\\n          <p style=\\"font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5\\">\\n            Enter information from the employee's <strong>W-4 form</strong>. Used to estimate federal income tax withholding each pay period.\\n          </p>\\n          <div class=\\"form-group\\"><label>Step 1 — Filing Status</label>\\n            <select id=\\"empedit-w4-status\\">\\n              <option value=\\"single\\" ").concat((emp.w4_filing_status || 'single') === 'single' ? 'selected' : '', ">Single or Married Filing Separately</option>\\n              <option value=\\"mfj\\" ").concat(emp.w4_filing_status === 'mfj' ? 'selected' : '', ">Married Filing Jointly (or Qualifying Widow(er))</option>\\n              <option value=\\"hoh\\" ").concat(emp.w4_filing_status === 'hoh' ? 'selected' : '', ">Head of Household</option>\\n            </select>\\n          </div>\\n          <div class=\\"form-group\\">\\n            <label style=\\"display:flex;align-items:center;gap:8px;cursor:pointer\\">\\n              <input type=\\"checkbox\\" id=\\"empedit-w4-multijob\\" style=\\"width:16px;height:16px\\" ").concat(emp.w4_multiple_jobs ? 'checked' : '', ">\\n              <span>Step 2 — Multiple Jobs / Spouse also works</span>\\n            </label>\\n          </div>\\n          <div class=\\"form-group\\"><label>Step 3 — Dependents Amount (\$)</label>\\n            <input id=\\"empedit-w4-dependents\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" value=\\"").concat(parseFloat(emp.w4_dependents_amt || 0).toFixed(2), "\\">\\n          </div>\\n          <div class=\\"form-row\\">\\n            <div class=\\"form-group\\"><label>Step 4a — Other Income (\$)</label>\\n              <input id=\\"empedit-w4-other-income\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" value=\\"").concat(parseFloat(emp.w4_other_income || 0).toFixed(2), "\\">\\n            </div>\\n            <div class=\\"form-group\\"><label>Step 4b — Deductions (\$)</label>\\n              <input id=\\"empedit-w4-deductions\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" value=\\"").concat(parseFloat(emp.w4_deductions || 0).toFixed(2), "\\">\\n            </div>\\n          </div>\\n          <div class=\\"form-group\\"><label>Step 4c — Extra Withholding per Period (\$)</label>\\n            <input id=\\"empedit-w4-extra\\" type=\\"number\\" min=\\"0\\" step=\\"0.01\\" value=\\"").concat(parseFloat(emp.w4_extra_wh || 0).toFixed(2), "\\">\\n          </div>\\n        </div>\\n\\n        <div class=\\"modal-error\\" id=\\"empedit-error\\"></div>\\n      </div>\\n      <div class=\\"modal-footer\\">\\n        <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('empedit-backdrop')\\">Cancel</button>\\n        <button class=\\"btn btn-primary\\" id=\\"empedit-save\\" onclick=\\"saveEditEmployee('").concat(esc(emp.id), "')\\">Save Changes</button>\\n      </div>\\n    </div>");
   document.body.appendChild(bd);
   bd.addEventListener('click', e => {
     if (e.target === bd) closeModal('empedit-backdrop');
   });
   document.getElementById('empedit-paytype').addEventListener('change', function () {
     const lbl = document.getElementById('empedit-rate-label');
-    if (lbl) lbl.innerHTML = "Pay Rate <span style=\\"font-size:11px;color:var(--muted)\\">(".concat(this.value === 'salary' ? 'annual salary' : 'hourly', " $)</span>");
+    if (lbl) lbl.innerHTML = "Pay Rate <span style=\\"font-size:11px;color:var(--muted)\\">(".concat(this.value === 'salary' ? 'annual salary' : 'hourly', " \$)</span>");
   });
 }
 function empEditSwitchTab(tab) {
@@ -7720,7 +7725,7 @@ async function openRunPayrollModal() {
   const bd = document.createElement('div');
   bd.className = 'modal-backdrop';
   bd.id = 'pr-backdrop';
-  bd.innerHTML = "\\n    <div class=\\"modal\\" role=\\"dialog\\" style=\\"max-width:860px;width:98vw\\">\\n      <div class=\\"modal-header\\"><h3>Run Payroll</h3><button class=\\"modal-close\\" onclick=\\"closeModal('pr-backdrop')\\" aria-label=\\"Close\\">×</button></div>\\n      <div class=\\"modal-body\\">\\n        <div class=\\"form-row\\">\\n          <div class=\\"form-group\\"><label>Client *</label>\\n            <select id=\\"pr-client\\" onchange=\\"prLoadEmployees()\\">\\n              <option value=\\"\\">— Select client —</option>".concat(clientOpts, "\\n            </select>\\n          </div>\\n          <div class=\\"form-group\\"><label>Frequency / Label</label>\\n            <select id=\\"pr-freq\\">\\n              <option value=\\"Weekly\\">Weekly</option>\\n              <option value=\\"Bi-weekly\\" selected>Bi-weekly</option>\\n              <option value=\\"Semi-monthly\\">Semi-monthly</option>\\n              <option value=\\"Monthly\\">Monthly</option>\\n            </select>\\n          </div>\\n        </div>\\n        <div class=\\"form-row\\">\\n          <div class=\\"form-group\\"><label>Period Start *</label><input id=\\"pr-start\\" type=\\"date\\" value=\\"").concat(today, "\\"></div>\\n          <div class=\\"form-group\\"><label>Period End *</label><input id=\\"pr-end\\" type=\\"date\\" value=\\"").concat(today, "\\"></div>\\n          <div class=\\"form-group\\"><label>Pay Date</label><input id=\\"pr-paydate\\" type=\\"date\\" value=\\"").concat(today, "\\"></div>\\n        </div>\\n\\n        <div id=\\"pr-emp-section\\" style=\\"margin-top:8px\\">\\n          <p style=\\"color:var(--muted);font-size:13px\\">Select a client above to load employees.</p>\\n        </div>\\n\\n        <div style=\\"margin-top:12px;padding:10px 14px;background:var(--surface2,var(--surface));border-radius:8px;display:flex;gap:32px;font-size:13px\\">\\n          <span>Total Gross: <strong id=\\"pr-tot-gross\\" style=\\"font-variant-numeric:tabular-nums\\">$0.00</strong></span>\\n          <span>Total Deductions: <strong id=\\"pr-tot-ded\\" style=\\"font-variant-numeric:tabular-nums\\">$0.00</strong></span>\\n          <span>Total Net: <strong id=\\"pr-tot-net\\" style=\\"color:var(--green);font-variant-numeric:tabular-nums\\">$0.00</strong></span>\\n        </div>\\n        <div class=\\"modal-error\\" id=\\"pr-error\\"></div>\\n      </div>\\n      <div class=\\"modal-footer\\">\\n        <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('pr-backdrop')\\">Cancel</button>\\n        <button class=\\"btn btn-primary\\" id=\\"pr-draft\\" onclick=\\"savePayRun('draft')\\">Save Draft</button>\\n        <button class=\\"btn btn-primary\\" style=\\"background:var(--green)\\" id=\\"pr-paid\\" onclick=\\"savePayRun('paid')\\">Mark as Paid</button>\\n      </div>\\n    </div>");
+  bd.innerHTML = "\\n    <div class=\\"modal\\" role=\\"dialog\\" style=\\"max-width:860px;width:98vw\\">\\n      <div class=\\"modal-header\\"><h3>Run Payroll</h3><button class=\\"modal-close\\" onclick=\\"closeModal('pr-backdrop')\\" aria-label=\\"Close\\">×</button></div>\\n      <div class=\\"modal-body\\">\\n        <div class=\\"form-row\\">\\n          <div class=\\"form-group\\"><label>Client *</label>\\n            <select id=\\"pr-client\\" onchange=\\"prLoadEmployees()\\">\\n              <option value=\\"\\">— Select client —</option>".concat(clientOpts, "\\n            </select>\\n          </div>\\n          <div class=\\"form-group\\"><label>Frequency / Label</label>\\n            <select id=\\"pr-freq\\">\\n              <option value=\\"Weekly\\">Weekly</option>\\n              <option value=\\"Bi-weekly\\" selected>Bi-weekly</option>\\n              <option value=\\"Semi-monthly\\">Semi-monthly</option>\\n              <option value=\\"Monthly\\">Monthly</option>\\n            </select>\\n          </div>\\n        </div>\\n        <div class=\\"form-row\\">\\n          <div class=\\"form-group\\"><label>Period Start *</label><input id=\\"pr-start\\" type=\\"date\\" value=\\"").concat(today, "\\"></div>\\n          <div class=\\"form-group\\"><label>Period End *</label><input id=\\"pr-end\\" type=\\"date\\" value=\\"").concat(today, "\\"></div>\\n          <div class=\\"form-group\\"><label>Pay Date</label><input id=\\"pr-paydate\\" type=\\"date\\" value=\\"").concat(today, "\\"></div>\\n        </div>\\n\\n        <div id=\\"pr-emp-section\\" style=\\"margin-top:8px\\">\\n          <p style=\\"color:var(--muted);font-size:13px\\">Select a client above to load employees.</p>\\n        </div>\\n\\n        <div style=\\"margin-top:12px;padding:10px 14px;background:var(--surface2,var(--surface));border-radius:8px;display:flex;gap:32px;font-size:13px\\">\\n          <span>Total Gross: <strong id=\\"pr-tot-gross\\" style=\\"font-variant-numeric:tabular-nums\\">\$0.00</strong></span>\\n          <span>Total Deductions: <strong id=\\"pr-tot-ded\\" style=\\"font-variant-numeric:tabular-nums\\">\$0.00</strong></span>\\n          <span>Total Net: <strong id=\\"pr-tot-net\\" style=\\"color:var(--green);font-variant-numeric:tabular-nums\\">\$0.00</strong></span>\\n        </div>\\n        <div class=\\"modal-error\\" id=\\"pr-error\\"></div>\\n      </div>\\n      <div class=\\"modal-footer\\">\\n        <button class=\\"btn btn-secondary\\" onclick=\\"closeModal('pr-backdrop')\\">Cancel</button>\\n        <button class=\\"btn btn-primary\\" id=\\"pr-draft\\" onclick=\\"savePayRun('draft')\\">Save Draft</button>\\n        <button class=\\"btn btn-primary\\" style=\\"background:var(--green)\\" id=\\"pr-paid\\" onclick=\\"savePayRun('paid')\\">Mark as Paid</button>\\n      </div>\\n    </div>");
   document.body.appendChild(bd);
   bd.addEventListener('click', e => {
     if (e.target === bd) closeModal('pr-backdrop');
@@ -7730,8 +7735,8 @@ async function openRunPayrollModal() {
   if (STATE.selectedClientId) await prLoadEmployees();
 }
 async function prLoadEmployees() {
-  var _document$getElementB5;
-  const clientId = ((_document$getElementB5 = document.getElementById('pr-client')) === null || _document$getElementB5 === void 0 ? void 0 : _document$getElementB5.value) || STATE.selectedClientId;
+  var _document\$getElementB5;
+  const clientId = ((_document\$getElementB5 = document.getElementById('pr-client')) === null || _document\$getElementB5 === void 0 ? void 0 : _document\$getElementB5.value) || STATE.selectedClientId;
   const sec = document.getElementById('pr-emp-section');
   if (!clientId) {
     sec.innerHTML = '<p style="color:var(--muted);font-size:13px">Select a client above to load employees.</p>';
@@ -7751,8 +7756,8 @@ async function prLoadEmployees() {
     const rate = parseFloat(emp.pay_rate) || 0;
     // Salary: default gross = annual / 26 (bi-weekly). Hourly: gross auto-fills when hours entered.
     const defaultGross = isSalary && rate ? (rate / 26).toFixed(2) : '';
-    const rateLabel = !isSalary && rate ? "<span style=\\"font-size:10px;color:var(--muted);display:block\\">$".concat(rate.toFixed(2), "/hr</span>") : '';
-    return "<tr\\n              data-emp-id=\\"".concat(esc(emp.id), "\\" data-rate=\\"").concat(rate, "\\" data-pay-type=\\"").concat(esc(emp.pay_type), "\\"\\n              data-pay-frequency=\\"").concat(esc(emp.pay_frequency || 'bi-weekly'), "\\"\\n              data-w4-status=\\"").concat(esc(emp.w4_filing_status || 'single'), "\\"\\n              data-w4-multi-jobs=\\"").concat(emp.w4_multiple_jobs ? 'true' : 'false', "\\"\\n              data-w4-dependents=\\"").concat(parseFloat(emp.w4_dependents_amt) || 0, "\\"\\n              data-w4-other-inc=\\"").concat(parseFloat(emp.w4_other_income) || 0, "\\"\\n              data-w4-deductions=\\"").concat(parseFloat(emp.w4_deductions) || 0, "\\"\\n              data-w4-extra-wh=\\"").concat(parseFloat(emp.w4_extra_wh) || 0, "\\"\\n              style=\\"border-bottom:1px solid var(--border)\\">\\n            <td style=\\"padding:5px 8px;font-weight:600;white-space:nowrap\\">").concat(esc(emp.full_name)).concat(rateLabel, "</td>\\n            <td style=\\"padding:5px 8px;color:var(--muted)\\">").concat(isSalary ? 'Salary' : 'Hourly', "</td>\\n            <td style=\\"padding:4px\\"><input type=\\"number\\" min=\\"0\\" step=\\"0.5\\" value=\\"").concat(isSalary ? '' : '', "\\" placeholder=\\"").concat(isSalary ? '—' : 'hrs', "\\" ").concat(isSalary ? 'disabled' : '', " style=\\"width:60px;text-align:right\\" oninput=\\"prRecalcRow(this)\\" class=\\"pr-hours\\"></td>\\n            <td style=\\"padding:4px\\"><input type=\\"number\\" min=\\"0\\" step=\\"0.01\\" value=\\"").concat(defaultGross, "\\" placeholder=\\"0.00\\" style=\\"width:90px;text-align:right\\" oninput=\\"prRecalcRow(this)\\" class=\\"pr-gross\\"></td>\\n            <td style=\\"padding:4px\\"><input type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\" style=\\"width:75px;text-align:right\\" oninput=\\"prRecalcTotals()\\" class=\\"pr-fedwh\\"></td>\\n            <td style=\\"padding:4px\\"><input type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\" style=\\"width:65px;text-align:right\\" oninput=\\"prRecalcTotals()\\" class=\\"pr-ss\\"></td>\\n            <td style=\\"padding:4px\\"><input type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\" style=\\"width:75px;text-align:right\\" oninput=\\"prRecalcTotals()\\" class=\\"pr-medicare\\"></td>\\n            <td style=\\"padding:4px\\"><input type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\" style=\\"width:75px;text-align:right\\" oninput=\\"prRecalcTotals()\\" class=\\"pr-statewh\\"></td>\\n            <td style=\\"padding:4px\\"><input type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\" style=\\"width:75px;text-align:right\\" oninput=\\"prRecalcTotals()\\" class=\\"pr-otherded\\"></td>\\n            <td style=\\"padding:5px 8px;text-align:right;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums\\" class=\\"pr-net-cell\\">$0.00</td>\\n          </tr>");
+    const rateLabel = !isSalary && rate ? "<span style=\\"font-size:10px;color:var(--muted);display:block\\">\$".concat(rate.toFixed(2), "/hr</span>") : '';
+    return "<tr\\n              data-emp-id=\\"".concat(esc(emp.id), "\\" data-rate=\\"").concat(rate, "\\" data-pay-type=\\"").concat(esc(emp.pay_type), "\\"\\n              data-pay-frequency=\\"").concat(esc(emp.pay_frequency || 'bi-weekly'), "\\"\\n              data-w4-status=\\"").concat(esc(emp.w4_filing_status || 'single'), "\\"\\n              data-w4-multi-jobs=\\"").concat(emp.w4_multiple_jobs ? 'true' : 'false', "\\"\\n              data-w4-dependents=\\"").concat(parseFloat(emp.w4_dependents_amt) || 0, "\\"\\n              data-w4-other-inc=\\"").concat(parseFloat(emp.w4_other_income) || 0, "\\"\\n              data-w4-deductions=\\"").concat(parseFloat(emp.w4_deductions) || 0, "\\"\\n              data-w4-extra-wh=\\"").concat(parseFloat(emp.w4_extra_wh) || 0, "\\"\\n              style=\\"border-bottom:1px solid var(--border)\\">\\n            <td style=\\"padding:5px 8px;font-weight:600;white-space:nowrap\\">").concat(esc(emp.full_name)).concat(rateLabel, "</td>\\n            <td style=\\"padding:5px 8px;color:var(--muted)\\">").concat(isSalary ? 'Salary' : 'Hourly', "</td>\\n            <td style=\\"padding:4px\\"><input type=\\"number\\" min=\\"0\\" step=\\"0.5\\" value=\\"").concat(isSalary ? '' : '', "\\" placeholder=\\"").concat(isSalary ? '—' : 'hrs', "\\" ").concat(isSalary ? 'disabled' : '', " style=\\"width:60px;text-align:right\\" oninput=\\"prRecalcRow(this)\\" class=\\"pr-hours\\"></td>\\n            <td style=\\"padding:4px\\"><input type=\\"number\\" min=\\"0\\" step=\\"0.01\\" value=\\"").concat(defaultGross, "\\" placeholder=\\"0.00\\" style=\\"width:90px;text-align:right\\" oninput=\\"prRecalcRow(this)\\" class=\\"pr-gross\\"></td>\\n            <td style=\\"padding:4px\\"><input type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\" style=\\"width:75px;text-align:right\\" oninput=\\"prRecalcTotals()\\" class=\\"pr-fedwh\\"></td>\\n            <td style=\\"padding:4px\\"><input type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\" style=\\"width:65px;text-align:right\\" oninput=\\"prRecalcTotals()\\" class=\\"pr-ss\\"></td>\\n            <td style=\\"padding:4px\\"><input type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\" style=\\"width:75px;text-align:right\\" oninput=\\"prRecalcTotals()\\" class=\\"pr-medicare\\"></td>\\n            <td style=\\"padding:4px\\"><input type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\" style=\\"width:75px;text-align:right\\" oninput=\\"prRecalcTotals()\\" class=\\"pr-statewh\\"></td>\\n            <td style=\\"padding:4px\\"><input type=\\"number\\" min=\\"0\\" step=\\"0.01\\" placeholder=\\"0.00\\" style=\\"width:75px;text-align:right\\" oninput=\\"prRecalcTotals()\\" class=\\"pr-otherded\\"></td>\\n            <td style=\\"padding:5px 8px;text-align:right;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums\\" class=\\"pr-net-cell\\">\$0.00</td>\\n          </tr>");
   }).join(''), "\\n      </tbody>\\n    </table>\\n    </div>");
 
   // Auto-calc deductions for salary employees whose gross was pre-filled
@@ -7835,7 +7840,7 @@ function prRecalcRow(changedInput) {
   const other = prGetNum(row.querySelector('.pr-otherded'));
   const net = gross - fedwh - ss - med - stWh - other;
   const netCell = row.querySelector('.pr-net-cell');
-  if (netCell) netCell.textContent = '$' + Math.max(0, net).toFixed(2);
+  if (netCell) netCell.textContent = '\$' + Math.max(0, net).toFixed(2);
   prRecalcTotals();
 }
 function prRecalcTotals() {
@@ -7854,12 +7859,12 @@ function prRecalcTotals() {
     const net = gross - ded;
     // update net cell
     const netCell = row.querySelector('.pr-net-cell');
-    if (netCell) netCell.textContent = '$' + Math.max(0, net).toFixed(2);
+    if (netCell) netCell.textContent = '\$' + Math.max(0, net).toFixed(2);
     totGross += gross;
     totDed += ded;
     totNet += Math.max(0, net);
   });
-  const fmtN = n => '$' + n.toFixed(2);
+  const fmtN = n => '\$' + n.toFixed(2);
   const tg = document.getElementById('pr-tot-gross');
   if (tg) tg.textContent = fmtN(totGross);
   const td = document.getElementById('pr-tot-ded');
@@ -7969,7 +7974,7 @@ async function openPayRunDetail(runId, periodStart, periodEnd) {
     body.innerHTML = '<p style="color:var(--muted);text-align:center;padding:24px">No employee lines found for this pay run.</p>';
     return;
   }
-  const fmtN = n => '$' + parseFloat(n || 0).toFixed(2);
+  const fmtN = n => '\$' + parseFloat(n || 0).toFixed(2);
   const statusBadge = run ? "<span class=\\"badge badge-".concat(run.status === 'paid' ? 'green' : 'gold', "\\" style=\\"margin-left:8px\\">").concat(run.status, "</span>") : '';
   body.innerHTML = "\\n    <div style=\\"margin-bottom:12px;font-size:13px;color:var(--muted)\\">\\n      ".concat(run && run.label ? "<strong>".concat(esc(run.label), "</strong> · ") : '', "Status: ").concat(statusBadge, "\\n    </div>\\n    <div style=\\"overflow-x:auto\\">\\n    <table style=\\"width:100%;font-size:13px;border-collapse:collapse\\">\\n      <thead><tr style=\\"border-bottom:2px solid var(--border)\\">\\n        <th style=\\"text-align:left;padding:7px 8px\\">Employee</th>\\n        <th style=\\"padding:7px 4px;text-align:right\\">Hours</th>\\n        <th style=\\"padding:7px 4px;text-align:right\\">Gross</th>\\n        <th style=\\"padding:7px 4px;text-align:right\\">Fed WH</th>\\n        <th style=\\"padding:7px 4px;text-align:right\\">SS</th>\\n        <th style=\\"padding:7px 4px;text-align:right\\">Medicare</th>\\n        <th style=\\"padding:7px 4px;text-align:right\\">State WH</th>\\n        <th style=\\"padding:7px 4px;text-align:right\\">Other</th>\\n        <th style=\\"padding:7px 8px;text-align:right;color:var(--green)\\">Net Pay</th>\\n      </tr></thead>\\n      <tbody>\\n        ").concat(lines.map(l => "<tr style=\\"border-bottom:1px solid var(--border)\\">\\n          <td style=\\"padding:6px 8px;font-weight:600\\">".concat(esc((l.employees ? l.employees.full_name : '') || '—'), "</td>\\n          <td style=\\"padding:6px 4px;text-align:right;color:var(--muted)\\">").concat(l.hours ? l.hours : '—', "</td>\\n          <td style=\\"padding:6px 4px;text-align:right;font-variant-numeric:tabular-nums\\">").concat(fmtN(l.gross_pay), "</td>\\n          <td style=\\"padding:6px 4px;text-align:right;font-variant-numeric:tabular-nums\\">").concat(fmtN(l.fed_wh), "</td>\\n          <td style=\\"padding:6px 4px;text-align:right;font-variant-numeric:tabular-nums\\">").concat(fmtN(l.ss_ee), "</td>\\n          <td style=\\"padding:6px 4px;text-align:right;font-variant-numeric:tabular-nums\\">").concat(fmtN(l.medicare_ee), "</td>\\n          <td style=\\"padding:6px 4px;text-align:right;font-variant-numeric:tabular-nums\\">").concat(fmtN(l.state_wh), "</td>\\n          <td style=\\"padding:6px 4px;text-align:right;font-variant-numeric:tabular-nums\\">").concat(fmtN(l.other_deduct), "</td>\\n          <td style=\\"padding:6px 8px;text-align:right;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums\\">").concat(fmtN(l.net_pay), "</td>\\n        </tr>")).join(''), "\\n      </tbody>\\n      <tfoot><tr style=\\"border-top:2px solid var(--border);font-weight:700\\">\\n        <td style=\\"padding:7px 8px\\">Totals</td>\\n        <td></td>\\n        <td style=\\"padding:7px 4px;text-align:right;font-variant-numeric:tabular-nums\\">").concat(fmtN(lines.reduce((s, l) => s + parseFloat(l.gross_pay || 0), 0)), "</td>\\n        <td style=\\"padding:7px 4px;text-align:right;font-variant-numeric:tabular-nums\\">").concat(fmtN(lines.reduce((s, l) => s + parseFloat(l.fed_wh || 0), 0)), "</td>\\n        <td style=\\"padding:7px 4px;text-align:right;font-variant-numeric:tabular-nums\\">").concat(fmtN(lines.reduce((s, l) => s + parseFloat(l.ss_ee || 0), 0)), "</td>\\n        <td style=\\"padding:7px 4px;text-align:right;font-variant-numeric:tabular-nums\\">").concat(fmtN(lines.reduce((s, l) => s + parseFloat(l.medicare_ee || 0), 0)), "</td>\\n        <td style=\\"padding:7px 4px;text-align:right;font-variant-numeric:tabular-nums\\">").concat(fmtN(lines.reduce((s, l) => s + parseFloat(l.state_wh || 0), 0)), "</td>\\n        <td style=\\"padding:7px 4px;text-align:right;font-variant-numeric:tabular-nums\\">").concat(fmtN(lines.reduce((s, l) => s + parseFloat(l.other_deduct || 0), 0)), "</td>\\n        <td style=\\"padding:7px 8px;text-align:right;color:var(--green);font-variant-numeric:tabular-nums\\">").concat(fmtN(lines.reduce((s, l) => s + parseFloat(l.net_pay || 0), 0)), "</td>\\n      </tr></tfoot>\\n    </table></div>");
 }
@@ -7977,10 +7982,10 @@ async function savePayRun(status) {
   const errEl = document.getElementById('pr-error');
   errEl.textContent = '';
   try {
-    var _document$getElementB6, _STATE$staffRow2;
+    var _document\$getElementB6, _STATE\$staffRow2;
     const start = document.getElementById('pr-start').value;
     const end = document.getElementById('pr-end').value;
-    const clientId = ((_document$getElementB6 = document.getElementById('pr-client')) === null || _document$getElementB6 === void 0 ? void 0 : _document$getElementB6.value) || STATE.selectedClientId || null;
+    const clientId = ((_document\$getElementB6 = document.getElementById('pr-client')) === null || _document\$getElementB6 === void 0 ? void 0 : _document\$getElementB6.value) || STATE.selectedClientId || null;
     if (!clientId) {
       errEl.textContent = 'Please select a client.';
       return;
@@ -8042,7 +8047,7 @@ async function savePayRun(status) {
       label: document.getElementById('pr-freq').value,
       total_gross: totalGross,
       total_net: totalNet,
-      created_by: ((_STATE$staffRow2 = STATE.staffRow) === null || _STATE$staffRow2 === void 0 ? void 0 : _STATE$staffRow2.id) || null,
+      created_by: ((_STATE\$staffRow2 = STATE.staffRow) === null || _STATE\$staffRow2 === void 0 ? void 0 : _STATE\$staffRow2.id) || null,
       status
     }).select('id').single();
     if (runErr) {
@@ -8079,7 +8084,7 @@ async function savePayRun(status) {
 `;
 
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === '/health') {
       return new Response('ok', { status: 200 });
@@ -8087,10 +8092,8 @@ export default {
     return new Response(HTML, {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'no-store',
-        'X-Frame-Options': 'DENY',
-        'X-Content-Type-Options': 'nosniff',
-        'Referrer-Policy': 'strict-origin-when-cross-origin',
+        'Cache-Control': 'no-cache',
+        'X-Frame-Options': 'SAMEORIGIN',
       },
     });
   },
