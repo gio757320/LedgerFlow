@@ -1615,6 +1615,62 @@ async function renderClientPortalDashboard(container) {
       await loadChecklist();
     };
 
+    // ── Load tasks (individual) ──
+    async function loadTasks() {
+      const { data: tasks } = await sb.from('client_tasks')
+        .select('*').eq('client_id', c.id).order('completed').order('priority', { ascending: false }).order('due_date', { nullsFirst: false });
+      const el = document.getElementById('tasks-list');
+      const badge = document.getElementById('tasks-badge');
+      if (!el) return;
+      if (!tasks || !tasks.length) {
+        el.innerHTML = '<div class="empty" style="padding:20px 0"><div class="empty-icon">✅</div>No tasks assigned yet.</div>';
+        if (badge) badge.textContent = '';
+        return;
+      }
+      const pending = tasks.filter(t => !t.completed).length;
+      if (badge) badge.textContent = pending ? `${pending} pending` : 'All done ✓';
+      el.innerHTML = tasks.map(t => {
+        const priorityColor = { urgent: 'var(--red)', normal: 'var(--gold)', low: 'var(--muted)' }[t.priority] || 'var(--muted)';
+        const priorityLabel = { urgent: '🔴 Urgent', normal: '🟡 Normal', low: '⚪ Low' }[t.priority] || '';
+        const due = t.due_date ? `· Due ${new Date(t.due_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : '';
+        return `<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);${t.completed ? 'opacity:.5' : ''}">
+          <input type="checkbox" data-task-id="${esc(t.id)}" ${t.completed ? 'checked' : ''}
+            style="width:18px;height:18px;margin-top:2px;cursor:pointer;accent-color:var(--green)"
+            onchange="toggleClientTask(this)">
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:14px;${t.completed ? 'text-decoration:line-through' : ''}">${esc(t.title)}</div>
+            ${t.description ? `<div style="font-size:12px;color:var(--muted);margin-top:3px">${esc(t.description)}</div>` : ''}
+            <div style="font-size:11px;color:${priorityColor};margin-top:4px;font-weight:600">${priorityLabel} ${due}</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // ── Load documents (individual) ──
+    async function loadDocs() {
+      const { data: docs } = await sb.from('client_documents')
+        .select('*').eq('client_id', c.id).order('uploaded_at', { ascending: false });
+      const el = document.getElementById('docs-list');
+      if (!el) return;
+      if (!docs || !docs.length) {
+        el.innerHTML = '<div class="empty" style="padding:20px 0"><div class="empty-icon">📂</div>No documents uploaded yet.</div>';
+        return;
+      }
+      el.innerHTML = docs.map(d => {
+        const icon = d.mime_type?.startsWith('image/') ? '🖼️' : d.mime_type === 'application/pdf' ? '📄' : '📎';
+        const size = d.file_size ? `${(d.file_size/1024).toFixed(0)} KB` : '';
+        const date = d.uploaded_at ? new Date(d.uploaded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+        return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:20px">${icon}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.file_name)}</div>
+            <div style="font-size:11px;color:var(--muted)">${size}${size && date ? ' · ' : ''}${date}</div>
+          </div>
+          <button class="btn" style="font-size:11px;padding:4px 10px" onclick="openClientDoc('${esc(d.file_path)}')">View</button>
+        </div>`;
+      }).join('');
+    }
+
     await loadChecklist();
     await loadTasks();
     await loadDocs();
