@@ -4624,6 +4624,59 @@ async function loadPayrollTab(tab) {
 }
 
 // ── TAX RETURNS ───────────────────────────────────────────
+// Open a client document via signed URL
+async function openClientDoc(filePath) {
+  const { data, error } = await sb.storage.from('client-documents').createSignedUrl(filePath, 300);
+  if (error || !data?.signedUrl) { alert('Could not open file. Please try again.'); return; }
+  window.open(data.signedUrl, '_blank');
+}
+
+// Upload a prior-year return from the Tax Returns page
+async function uploadPriorReturn(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const btn = input.closest('label');
+  if (btn) btn.style.opacity = '0.6';
+  const c = STATE.clientRow;
+  const ext = file.name.split('.').pop();
+  const path = `${c.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error: upErr } = await sb.storage.from('client-documents').upload(path, file);
+  if (upErr) {
+    alert('Upload failed: ' + upErr.message);
+    if (btn) btn.style.opacity = '1';
+    return;
+  }
+  await sb.from('client_documents').insert({
+    client_id: c.id, file_name: file.name, file_path: path,
+    file_size: file.size, mime_type: file.type,
+    doc_type: 'prior_return',
+    uploaded_by: (await sb.auth.getUser()).data.user?.id
+  });
+  input.value = '';
+  if (btn) btn.style.opacity = '1';
+  // Refresh the list
+  const { data: priorDocs } = await sb.from('client_documents')
+    .select('*').eq('client_id', c.id).eq('doc_type', 'prior_return')
+    .order('uploaded_at', { ascending: false });
+  const listEl = document.getElementById('prior-returns-list');
+  if (!listEl) return;
+  if (!priorDocs || !priorDocs.length) {
+    listEl.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0">No prior year returns uploaded yet.</div>';
+    return;
+  }
+  listEl.innerHTML = priorDocs.map(d => {
+    const date = d.uploaded_at ? new Date(d.uploaded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:20px">📄</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.file_name)}</div>
+        <div style="font-size:11px;color:var(--muted)">${date}</div>
+      </div>
+      <button class="btn" style="font-size:11px;padding:4px 10px" onclick="openClientDoc('${esc(d.file_path)}')">View</button>
+    </div>`;
+  }).join('');
+}
+
 async function renderTax(container) {
   var _STATE$clientRow4;
   if (STATE.isStaff && !STATE.selectedClientId) {
@@ -4643,6 +4696,68 @@ async function renderTax(container) {
     main.innerHTML = "<div class=\"alert alert-red\">".concat(esc(error.message), "</div>");
     return;
   }
+  // Client view: show firm-uploaded returns + prior year upload section
+  if (!STATE.isStaff) {
+    let returnsHtml = '';
+    if (!data || !data.length) {
+      returnsHtml = '<div class="empty" style="padding:28px 0"><div class="empty-icon">🏛</div>No completed returns on file yet.</div>';
+    } else {
+      returnsHtml = `<div class="card"><table>
+        <thead><tr><th>Year</th><th>Form</th><th>Filed Date</th><th style="text-align:right">Refund</th><th style="text-align:right">Balance Due</th><th>Status</th></tr></thead>
+        <tbody>${(data || []).map(r => `
+          <tr>
+            <td style="font-weight:600">${r.tax_year}</td>
+            <td style="font-family:monospace;font-size:12px">${esc(r.form || '—')}</td>
+            <td style="font-size:12px">${r.filed_date ? fmtDate(r.filed_date) : '—'}</td>
+            <td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--green)">${r.refund_amount > 0 ? fmt(r.refund_amount) : '—'}</td>
+            <td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--red)">${r.balance_due > 0 ? fmt(r.balance_due) : '—'}</td>
+            <td><span class="badge ${r.status === 'filed' ? 'badge-green' : r.status === 'in_review' ? 'badge-blue' : r.status === 'draft' ? 'badge-gold' : 'badge-grey'}">${esc((r.status || '').replace('_', ' '))}</span></td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>`;
+    }
+
+    // Prior year returns uploaded by client
+    const { data: priorDocs } = await sb.from('client_documents')
+      .select('*').eq('client_id', STATE.clientRow.id)
+      .eq('doc_type', 'prior_return')
+      .order('uploaded_at', { ascending: false });
+
+    let priorHtml = '';
+    if (priorDocs && priorDocs.length) {
+      priorHtml = priorDocs.map(d => {
+        const date = d.uploaded_at ? new Date(d.uploaded_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+        return `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:20px">📄</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.file_name)}</div>
+            <div style="font-size:11px;color:var(--muted)">${date}</div>
+          </div>
+          <button class="btn" style="font-size:11px;padding:4px 10px" onclick="openClientDoc('${esc(d.file_path)}')">View</button>
+        </div>`;
+      }).join('');
+    } else {
+      priorHtml = '<div style="color:var(--muted);font-size:13px;padding:12px 0">No prior year returns uploaded yet.</div>';
+    }
+
+    main.innerHTML = `
+      ${returnsHtml}
+      <div class="card" style="margin-top:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div>
+            <div style="font-weight:700;font-size:15px">📂 Prior Year Returns</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px">Upload copies of your previous tax returns so we have them on file.</div>
+          </div>
+          <label class="btn btn-secondary" style="cursor:pointer;font-size:12px;padding:7px 14px">
+            ⬆ Upload Return
+            <input type="file" accept=".pdf,.jpg,.jpeg,.png" hidden onchange="uploadPriorReturn(this)">
+          </label>
+        </div>
+        <div id="prior-returns-list">${priorHtml}</div>
+      </div>`;
+    return;
+  }
+
   if (!data || !data.length) {
     main.innerHTML = '<div class="empty"><div class="empty-icon">🏛</div>No tax returns yet.</div>';
     return;
