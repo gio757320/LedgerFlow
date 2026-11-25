@@ -5721,8 +5721,8 @@ function openAdminInvoiceDetail(inv, container) {
           <tbody>${lineItems.map(li => `<tr style="border-bottom:1px solid var(--border)">
             <td style="padding:6px 8px">${esc(li.description||'')}</td>
             <td style="padding:6px 8px;text-align:right">${esc(String(li.quantity||1))}</td>
-            <td style="padding:6px 8px;text-align:right">${fmt(li.unit_price)}</td>
-            <td style="padding:6px 8px;text-align:right;font-weight:600">${fmt(li.amount||li.unit_price)}</td>
+            <td style="padding:6px 8px;text-align:right">${fmt(li.unit_price != null ? li.unit_price : (li.amount != null ? li.amount / (li.quantity || 1) : null))}</td>
+            <td style="padding:6px 8px;text-align:right;font-weight:600">${fmt(li.amount != null ? li.amount : (li.unit_price != null ? li.unit_price * (li.quantity || 1) : null))}</td>
           </tr>`).join('')}</tbody>
         </table>
         <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
