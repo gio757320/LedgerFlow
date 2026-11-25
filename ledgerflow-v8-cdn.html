@@ -1004,15 +1004,15 @@ function showApp() {
     const hasPayroll = svcs.includes('payroll');
     const hasTax = svcs.includes('tax');
 
-    // Expenses — visible to all clients (everyone has expenses)
+    // Expenses, My Invoices, Income — hidden for Individual (personal) clients
+    const isBusiness = (STATE.clientData.client_type || 'personal') === 'business';
     const expensesBtn = document.getElementById('nav-expenses-btn');
-    if (expensesBtn) expensesBtn.hidden = false;
+    if (expensesBtn) expensesBtn.hidden = !isBusiness;
 
-    // My Invoices, Income — client only
     const invoicesBtn = document.getElementById('nav-invoices-btn');
-    if (invoicesBtn) invoicesBtn.hidden = false;
+    if (invoicesBtn) invoicesBtn.hidden = !isBusiness;
     const incomeBtn = document.getElementById('nav-income-btn');
-    if (incomeBtn) incomeBtn.hidden = false;
+    if (incomeBtn) incomeBtn.hidden = !isBusiness;
 
     // Journal Entries — only for bookkeeping or payroll clients
     const journalBtn = document.getElementById('nav-journal-btn');
