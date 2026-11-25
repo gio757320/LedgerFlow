@@ -477,6 +477,9 @@ tr:hover td { background: rgba(46,158,107,.04); }
         <button class="nav-item" data-screen="staff" id="nav-staff-btn">
           <span class="icon">🔐</span> Staff &amp; Access
         </button>
+        <button class="nav-item" data-screen="checklistTemplates" id="nav-checklist-btn">
+          <span class="icon">📋</span> Checklist Templates
+        </button>
       </div>
 
       <!-- Client portal footer info -->
@@ -974,6 +977,7 @@ function showApp() {
   document.getElementById('nav-clients-btn').hidden = !STATE.isStaff;
   document.getElementById('nav-staff-only').hidden = !STATE.isStaff;
   document.getElementById('nav-staff-btn').hidden = !STATE.isAdmin;
+  document.getElementById('nav-checklist-btn').hidden = !STATE.isAdmin;
   document.getElementById('client-select-wrap').hidden = !STATE.isStaff;
   // Client-specific nav: hide accounts/clients from client portal
   document.getElementById('nav-accounts-btn').hidden = !STATE.isStaff;
@@ -1113,6 +1117,9 @@ function renderScreen(screen) {
       break;
     case 'staff':
       renderStaffAccess(container);
+      break;
+    case 'checklistTemplates':
+      renderChecklistTemplates(container);
       break;
     case 'messages':
       STATE.isStaff ? renderAdminMessages(container) : renderClientMessages(container);
@@ -1479,11 +1486,169 @@ async function renderClientPortalDashboard(container) {
   }
 
   const isBusiness = (c.client_type || 'personal') === 'business';
+  const hasRouteWorth = (c.services || []).includes('routeworth');
   const typeTag = isBusiness
-    ? `<span style="background:var(--gold);color:#000;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:10px">Business</span>`
-    : `<span style="background:var(--green);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:10px">Personal</span>`;
+    ? `<span style="background:var(--gold);color:#000;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:10px">🏢 Business</span>`
+    : `<span style="background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-left:10px">👤 Individual</span>`;
 
-  const businessSections = isBusiness ? `
+  if (!isBusiness) {
+    // ── INDIVIDUAL / TAX CLIENT PORTAL ──────────────────────────────
+    container.innerHTML = pageShell('My Account', `<div class="page-sub" style="display:flex;align-items:center;gap:8px">${esc(c.full_name)}${typeTag}</div>`, '', `
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-h" style="display:flex;justify-content:space-between;align-items:center">
+          <span>📋 Tax Document Checklist</span>
+          <span id="checklist-badge" style="font-size:12px;color:var(--muted)"></span>
+        </div>
+        <div style="padding:12px 22px 6px;font-size:13px;color:var(--muted)">
+          Please gather and upload each document below so we can prepare your ${new Date().getFullYear() - 1} tax return.
+          Check each item off as you complete it.
+        </div>
+        <div class="card-body" id="checklist-list"><span class="spinner"></span></div>
+      </div>
+
+      ${hasRouteWorth ? `
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-h">🚗 RouteWorth — Mileage &amp; Gig Income</div>
+        <div class="card-body">
+          <div style="font-size:13px;color:var(--muted);margin-bottom:12px">
+            Your mileage and gig income records are tracked in the RouteWorth app.
+            Please make sure your RouteWorth data is up to date — we'll pull your annual summary directly.
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div style="padding:10px 16px;background:var(--bg);border-radius:8px;border:1px solid var(--border);font-size:12px">
+              📱 Keep the RouteWorth app updated with all your trips
+            </div>
+            <div style="padding:10px 16px;background:var(--bg);border-radius:8px;border:1px solid var(--border);font-size:12px">
+              🧾 Upload any platform income summaries (Uber, Lyft, DoorDash, etc.)
+            </div>
+          </div>
+        </div>
+      </div>` : ''}
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-h" style="display:flex;justify-content:space-between;align-items:center">
+          <span>📁 My Documents</span>
+          <label class="btn btn-primary" style="font-size:12px;padding:6px 14px;cursor:pointer">
+            ⬆️ Upload File
+            <input type="file" id="doc-upload-input" style="display:none" multiple
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp">
+          </label>
+        </div>
+        <div id="doc-upload-progress" style="padding:0 22px;min-height:0"></div>
+        <div class="card-body" id="docs-list"><span class="spinner"></span></div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-h" style="display:flex;justify-content:space-between;align-items:center">
+          <span>📋 To-Do List</span>
+          <span id="tasks-badge" style="font-size:12px;color:var(--muted)"></span>
+        </div>
+        <div class="card-body" id="tasks-list"><span class="spinner"></span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">Your Firm</div>
+        <div class="card-body">
+          <div style="font-weight:600;font-size:15px">Manrique &amp; Associates LLC</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:4px">Questions about your return? Reply to any email from our office or visit manriqueassociates.com.</div>
+        </div>
+      </div>
+    `);
+
+    // ── Load checklist ──
+    async function loadChecklist() {
+      const el = document.getElementById('checklist-list');
+      const badge = document.getElementById('checklist-badge');
+      if (!el) return;
+      let { data: items } = await sb.from('client_checklist_items')
+        .select('*').eq('client_id', c.id).order('sort_order').order('created_at');
+      // If client has no checklist items yet, seed from template
+      if (!items || !items.length) {
+        const { data: tmpl } = await sb.from('checklist_templates')
+          .select('*').eq('portal_type', 'personal').eq('is_active', true).order('sort_order');
+        if (tmpl && tmpl.length) {
+          const rows = tmpl.map(t => ({
+            client_id: c.id, title: t.title, description: t.description, sort_order: t.sort_order
+          }));
+          const { data: seeded } = await sb.from('client_checklist_items').insert(rows).select();
+          items = seeded || [];
+        }
+      }
+      if (!items || !items.length) {
+        el.innerHTML = '<div class="empty" style="padding:20px 0"><div class="empty-icon">📋</div>No checklist items yet. Your firm will set these up for you.</div>';
+        return;
+      }
+      const done = items.filter(i => i.is_checked).length;
+      if (badge) badge.textContent = `${done}/${items.length} complete`;
+      const pct = Math.round((done / items.length) * 100);
+      el.innerHTML = `
+        <div style="padding:0 0 16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:12px;font-weight:600;color:var(--muted)">${done} of ${items.length} items complete</span>
+            <span style="font-size:12px;font-weight:700;color:${pct===100?'var(--green)':'var(--accent)'}">${pct}%</span>
+          </div>
+          <div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden;border:1px solid var(--border)">
+            <div style="height:100%;width:${pct}%;background:${pct===100?'var(--green)':'var(--accent)'};border-radius:3px;transition:width .4s"></div>
+          </div>
+        </div>
+        ${items.map(it => `
+          <div style="display:flex;align-items:flex-start;gap:12px;padding:14px 0;border-bottom:1px solid var(--border);${it.is_checked ? 'opacity:.6' : ''}">
+            <input type="checkbox" data-item-id="${esc(it.id)}" ${it.is_checked ? 'checked' : ''}
+              style="width:20px;height:20px;margin-top:1px;cursor:pointer;accent-color:var(--green);flex-shrink:0"
+              onchange="toggleChecklist(this)">
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;${it.is_checked ? 'text-decoration:line-through;color:var(--muted)' : ''}">${esc(it.title)}</div>
+              ${it.description ? `<div style="font-size:12px;color:var(--muted);margin-top:3px">${esc(it.description)}</div>` : ''}
+              ${it.is_checked && it.checked_at ? `<div style="font-size:11px;color:var(--green);margin-top:4px;font-weight:600">✓ Marked complete ${new Date(it.checked_at).toLocaleDateString()}</div>` : ''}
+            </div>
+          </div>`).join('')}`;
+    }
+
+    window.toggleChecklist = async function(cb) {
+      const id = cb.dataset.itemId;
+      const checked = cb.checked;
+      cb.disabled = true;
+      await sb.from('client_checklist_items').update({
+        is_checked: checked,
+        checked_at: checked ? new Date().toISOString() : null
+      }).eq('id', id);
+      await loadChecklist();
+    };
+
+    await loadChecklist();
+    await loadTasks();
+    await loadDocs();
+
+    // Wire up doc upload for individual portal
+    const uploadInput = document.getElementById('doc-upload-input');
+    if (uploadInput) uploadInput.addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files);
+      if (!files.length) return;
+      const prog = document.getElementById('doc-upload-progress');
+      if (prog) prog.innerHTML = `<div style="padding:8px 0;font-size:13px;color:var(--muted)">Uploading ${files.length} file(s)…</div>`;
+      let uploaded = 0, failed = 0;
+      for (const file of files) {
+        const ext = file.name.split('.').pop();
+        const path = `${c.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+        const { error: upErr } = await sb.storage.from('client-documents').upload(path, file);
+        if (upErr) { failed++; continue; }
+        await sb.from('client_documents').insert({
+          client_id: c.id, file_name: file.name, file_path: path,
+          file_size: file.size, mime_type: file.type,
+          uploaded_by: (await sb.auth.getUser()).data.user?.id
+        });
+        uploaded++;
+      }
+      if (prog) prog.innerHTML = `<div style="padding:8px 0;font-size:13px;color:var(--green)">✓ ${uploaded} file(s) uploaded${failed ? ` · ${failed} failed` : ''}.</div>`;
+      e.target.value = '';
+      setTimeout(() => { if (prog) prog.innerHTML = ''; }, 3000);
+      await loadDocs();
+    });
+    return;
+  }
+
+  // ── BUSINESS CLIENT PORTAL ───────────────────────────────────────
+  const businessSections = `
     <div class="card" style="margin-bottom:20px">
       <div class="card-h" style="display:flex;justify-content:space-between;align-items:center">
         <span>💳 Billing</span>
@@ -1498,7 +1663,7 @@ async function renderClientPortalDashboard(container) {
         <button class="btn btn-primary" style="font-size:12px;padding:6px 14px" onclick="openNewInvoiceModal()">+ New Invoice</button>
       </div>
       <div class="card-body" id="invoices-list"><span class="spinner"></span></div>
-    </div>` : '';
+    </div>`;
 
   container.innerHTML = pageShell('My Account', `<div class="page-sub" style="display:flex;align-items:center;gap:8px">${esc(c.full_name)}${typeTag}</div>`, '', `
     <div class="card" style="margin-bottom:20px">
@@ -2209,7 +2374,7 @@ function openClientDetail(c) {
   bd.className = 'modal-backdrop';
   bd.id = 'cdet-backdrop';
   const info = (label, val) => val ? "\n    <div style=\"display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)\">\n      <span style=\"min-width:140px;font-size:12px;color:var(--muted)\">".concat(label, "</span>\n      <span style=\"font-size:13px;font-weight:500\">").concat(esc(val), "</span>\n    </div>") : '';
-  bd.innerHTML = "\n    <div class=\"modal\" role=\"dialog\" style=\"max-width:520px\">\n      <div class=\"modal-header\">\n        <h3>".concat(esc(c.full_name), "</h3>\n        <button class=\"modal-close\" onclick=\"closeModal('cdet-backdrop')\" aria-label=\"Close\">×</button>\n      </div>\n      <div class=\"modal-body\">\n        <div style=\"margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap\">\n          <span class=\"badge ").concat(c.status === 'active' ? 'badge-green' : 'badge-grey', "\">").concat(esc(c.status || 'inactive'), "</span>\n          <span style=\"font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;").concat((c.client_type || 'personal') === 'business' ? 'background:rgba(234,179,8,.15);color:var(--gold)' : 'background:rgba(34,197,94,.12);color:var(--green)', "\">").concat((c.client_type || 'personal') === 'business' ? '🏢 Business' : '👤 Personal', "</span>\n          <span style=\"font-size:13px;color:var(--muted)\">").concat(esc(c.entity_type || ''), "</span>\n          ").concat(c.regions?.name ? "<span style=\\\"font-size:11px;font-weight:600;padding:2px 9px;border-radius:10px;background:rgba(79,99,210,.1);color:var(--accent)\\\">📍 ".concat(esc(c.regions.name), "</span>") : '', "\n        </div>\n        ").concat(info('Email', c.email), "\n        ").concat(info('Phone', c.phone), "\n        ").concat(info('Address', c.address), "\n        ").concat(info('EIN / ITIN', c.ein), "\n        ").concat(info('State', c.state), "\n        ").concat(info('Region', c.regions?.name || null), "\n        ").concat(info('Industry', c.industry), "\n        ").concat(info('Service Package', c.service_package ? ({starter:'⭐ Starter — $149/mo', essentials:'✨ Essentials — $299/mo', growth:'🚀 Growth — $499/mo', premium:'💎 Premium — $799/mo'})[c.service_package] || c.service_package : null), "\n        ").concat(info('Notes', c.notes), "\n\n        <div style=\"margin-top:20px\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">QUICK ACTIONS</div>\n          <div style=\"display:flex;flex-wrap:wrap;gap:8px\">\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('journal')\">📒 Journal Entries</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('payroll')\">💼 Payroll</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('tax')\">🏛 Tax Returns</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\">📊 Dashboard</button>\n            <button class=\"btn btn-secondary\" id=\"cdet-apply-coa-btn\" onclick=\"openApplyCOAPanel('").concat(esc(c.id), "')\">📂 Apply COA Template</button>\n          </div>\n        </div>\n\n        <div id=\"cdet-coa-panel\" style=\"display:none;margin-top:12px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\">\n          <div style=\"font-size:12px;font-weight:600;margin-bottom:8px\">Select an industry template to load into this client's Chart of Accounts:</div>\n          <select id=\"cdet-coa-industry\" style=\"width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:10px\">\n            <option value=\"\">— Pick an industry —</option>\n            <option>Professional Services</option><option>Medical / Healthcare</option>\n            <option>Salon & Beauty</option><option>Cleaning Services</option>\n            <option>Landscaping & Lawn Care</option><option>Auto Repair & Mechanic</option>\n            <option>Restaurant / Food Service</option><option>Catering</option>\n            <option>Food Truck</option><option>Bar & Nightclub</option>\n            <option>General Contractor</option><option>Plumbing & HVAC</option>\n            <option>Electrical</option><option>Painting & Flooring</option>\n            <option>Retail Store</option><option>E-Commerce/Online Store</option>\n            <option>Wholesale & Distribution</option><option>Trucking/Freight</option>\n            <option>Rideshare/Gig Worker</option><option>Moving Company</option>\n            <option>Real Estate Agent/Broker</option><option>Property Management</option>\n            <option>Short-Term Rental (Airbnb)</option><option>Tech/Software Company</option>\n            <option>IT Services & Consulting</option><option>Marketing & Design Agency</option>\n            <option>Nonprofit Organization</option><option>Church/Religious Organization</option>\n            <option>General/Other</option>\n          </select>\n          <div style=\"font-size:11px;color:var(--muted);margin-bottom:10px\">⚠️ This will add template accounts to this client. Existing accounts are kept.</div>\n          <div style=\"display:flex;gap:8px\">\n            <button class=\"btn btn-primary\" id=\"cdet-coa-apply-btn\" style=\"font-size:12px;padding:6px 14px\">Apply Template</button>\n            <button class=\"btn\" onclick=\"document.getElementById('cdet-coa-panel').style.display='none'\" style=\"font-size:12px;padding:6px 14px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Cancel</button>\n          </div>\n          <div id=\"cdet-coa-msg\" style=\"font-size:12px;margin-top:8px;min-height:14px\"></div>\n        </div>\n\n        <div style=\"margin-top:20px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">🔑 CLIENT PORTAL ACCESS</div>\n          ").concat(c.auth_user_id ? "<div style=\"display:flex;align-items:center;gap:8px\">\n                <span style=\"color:var(--green);font-size:16px\">✓</span>\n                <span style=\"font-size:13px;font-weight:500\">Portal access linked</span>\n              </div>\n              <div style=\"font-size:12px;color:var(--muted);margin-top:4px\">Client email: <strong>".concat(esc(c.email || ''), "</strong></div>\n              <button class=\"btn btn-secondary\" id=\"cdet-resend-btn\" style=\"margin-top:10px;font-size:12px;padding:6px 12px\">↺ Resend password email</button>\n              <div id=\"cdet-resend-msg\" style=\"font-size:12px;margin-top:6px;min-height:16px\"></div>") : "<div style=\"font-size:13px;color:var(--muted);margin-bottom:10px\">This client does not have portal access yet.</div>\n              <div style=\"display:flex;align-items:center;gap:8px\">\n                <input id=\"cdet-portal-email\" type=\"email\" placeholder=\"Client email\" value=\"".concat(esc(c.email || ''), "\" style=\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\">\n                <button class=\"btn btn-primary\" id=\"cdet-invite-btn\" style=\"white-space:nowrap;font-size:12px;padding:7px 14px\">Create Login</button>\n              </div>\n              <div id=\"cdet-invite-msg\" style=\"font-size:12px;margin-top:6px;min-height:16px\"></div>"), "\n        </div>\n\n        <div style=\"margin-top:20px\">\n          <div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:10px\">\n            <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em\">📋 TASKS</div>\n            <div style=\"display:flex;gap:6px\">\n              <button class=\"btn\" id=\"cdet-assign-year-btn\" style=\"font-size:11px;padding:4px 10px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">📅 Assign Year Tasks</button>\n              <button class=\"btn btn-primary\" id=\"cdet-add-task-btn\" style=\"font-size:11px;padding:4px 10px\">+ Add Task</button>\n            </div>\n          </div>\n\n          <div id=\"cdet-year-task-panel\" style=\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:14px;margin-bottom:12px\">\n            <div style=\"font-size:12px;font-weight:600;margin-bottom:8px\">Select services to assign tasks for:</div>\n            <div style=\"display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px\">\n              <label style=\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\"><input type=\"checkbox\" id=\"yt-svc-tax\" style=\"width:auto;accent-color:var(--gold)\" onchange=\"ytUpdatePreview()\"> 🏛 Tax Returns</label>\n              <label style=\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\"><input type=\"checkbox\" id=\"yt-svc-bookkeeping\" style=\"width:auto;accent-color:var(--gold)\" onchange=\"ytUpdatePreview()\"> 📒 Bookkeeping</label>\n              <label style=\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\"><input type=\"checkbox\" id=\"yt-svc-payroll\" style=\"width:auto;accent-color:var(--gold)\" onchange=\"ytUpdatePreview()\"> 💼 Payroll</label>\n            </div>\n            <div id=\"yt-tasks-preview\"></div>\n            <div style=\"display:flex;gap:8px;margin-top:10px\">\n              <button class=\"btn btn-primary\" id=\"yt-assign-btn\" style=\"font-size:12px;padding:6px 14px\">Assign Selected Tasks</button>\n              <button class=\"btn\" onclick=\"document.getElementById('cdet-year-task-panel').style.display='none';document.getElementById('cdet-assign-year-btn').style.display=''\" style=\"font-size:12px;padding:6px 14px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Cancel</button>\n            </div>\n            <div id=\"yt-err\" style=\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\"></div>\n          </div>\n\n          <div id=\"cdet-task-form\" style=\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:12px;margin-bottom:12px\">\n            <input id=\"cdet-task-title\" type=\"text\" placeholder=\"Task title\" style=\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\">\n            <textarea id=\"cdet-task-desc\" placeholder=\"Description (optional)\" rows=\"2\" style=\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;resize:vertical;margin-bottom:8px\"></textarea>\n            <div style=\"display:flex;gap:8px;align-items:center\">\n              <select id=\"cdet-task-priority\" style=\"padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px\">\n                <option value=\"normal\">Normal</option>\n                <option value=\"urgent\">🔴 Urgent</option>\n                <option value=\"low\">⚪ Low</option>\n              </select>\n              <input id=\"cdet-task-due\" type=\"date\" style=\"padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px\">\n              <button class=\"btn btn-primary\" id=\"cdet-task-save\" style=\"font-size:12px;padding:6px 12px\">Save</button>\n              <button class=\"btn\" id=\"cdet-task-cancel\" style=\"font-size:12px;padding:6px 12px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Cancel</button>\n            </div>\n            <div id=\"cdet-task-err\" style=\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\"></div>\n          </div>\n          <div id=\"cdet-tasks-list\"><span class=\"spinner\" style=\"width:14px;height:14px\"></span></div>\n        </div>\n\n        <div style=\"margin-top:20px\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">📁 CLIENT DOCUMENTS</div>\n          <div id=\"cdet-docs-list\"><span class=\"spinner\" style=\"width:14px;height:14px\"></span></div>\n        </div>\n\n        <div style=\"margin-top:20px\">\n          <div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:10px\">\n            <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em\">💳 BILLING</div>\n            <button class=\"btn btn-primary\" id=\"cdet-add-bill-btn\" style=\"font-size:11px;padding:4px 10px\">+ Add Charge</button>\n          </div>\n          <div id=\"cdet-bill-form\" style=\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:12px;margin-bottom:12px\">\n            <input id=\"cdet-bill-desc\" type=\"text\" placeholder=\"Description (e.g. Tax prep 2024)\" style=\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\">\n            <div style=\"display:flex;gap:8px;margin-bottom:8px\">\n              <input id=\"cdet-bill-amount\" type=\"number\" min=\"0\" step=\"0.01\" placeholder=\"Amount $\" style=\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\">\n              <input id=\"cdet-bill-due\" type=\"date\" style=\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\">\n              <select id=\"cdet-bill-status\" style=\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\">\n                <option value=\"unpaid\">Unpaid</option>\n                <option value=\"paid\">Paid</option>\n                <option value=\"void\">Void</option>\n              </select>\n            </div>\n            <input id=\"cdet-bill-notes\" type=\"text\" placeholder=\"Notes (optional)\" style=\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\">\n            <div style=\"display:flex;gap:8px\">\n              <button class=\"btn btn-primary\" id=\"cdet-bill-save\" style=\"font-size:12px;padding:6px 12px\">Save Charge</button>\n              <button class=\"btn\" id=\"cdet-bill-cancel\" style=\"font-size:12px;padding:6px 12px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Cancel</button>\n            </div>\n            <div id=\"cdet-bill-err\" style=\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\"></div>\n          </div>\n          <div id=\"cdet-billing-list\"><span class=\"spinner\" style=\"width:14px;height:14px\"></span></div>\n        </div>\n\n        <div style=\"margin-top:20px\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">🧾 CLIENT INVOICES</div>\n          <div id=\"cdet-invoices-list\"><span class=\"spinner\" style=\"width:14px;height:14px\"></span></div>\n        </div>\n\n      </div>\n      <div class=\"modal-footer\">\n        <button class=\"btn\" onclick=\"closeModal('cdet-backdrop')\" style=\"background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Close</button>\n        <button class=\"btn\" id=\"cdet-edit-btn\" style=\"margin-left:auto;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">✏️ Edit Info</button>\n        <button class=\"btn btn-primary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\">Select Client →</button>\n      </div>\n    </div>");
+  bd.innerHTML = "\n    <div class=\"modal\" role=\"dialog\" style=\"max-width:520px\">\n      <div class=\"modal-header\">\n        <h3>".concat(esc(c.full_name), "</h3>\n        <button class=\"modal-close\" onclick=\"closeModal('cdet-backdrop')\" aria-label=\"Close\">×</button>\n      </div>\n      <div class=\"modal-body\">\n        <div style=\"margin-bottom:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap\">\n          <span class=\"badge ").concat(c.status === 'active' ? 'badge-green' : 'badge-grey', "\">").concat(esc(c.status || 'inactive'), "</span>\n          <span style=\"font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;").concat((c.client_type || 'personal') === 'business' ? 'background:rgba(234,179,8,.15);color:var(--gold)' : 'background:rgba(34,197,94,.12);color:var(--green)', "\">").concat((c.client_type || 'personal') === 'business' ? '🏢 Business' : '👤 Individual', "</span>\n          <span style=\"font-size:13px;color:var(--muted)\">").concat(esc(c.entity_type || ''), "</span>\n          ").concat(c.regions?.name ? "<span style=\\\"font-size:11px;font-weight:600;padding:2px 9px;border-radius:10px;background:rgba(79,99,210,.1);color:var(--accent)\\\">📍 ".concat(esc(c.regions.name), "</span>") : '', "\n        </div>\n        ").concat(info('Email', c.email), "\n        ").concat(info('Phone', c.phone), "\n        ").concat(info('Address', c.address), "\n        ").concat(info('EIN / ITIN', c.ein), "\n        ").concat(info('State', c.state), "\n        ").concat(info('Region', c.regions?.name || null), "\n        ").concat(info('Industry', c.industry), "\n        ").concat(info('Service Package', c.service_package ? ({starter:'⭐ Starter — $149/mo', essentials:'✨ Essentials — $299/mo', growth:'🚀 Growth — $499/mo', premium:'💎 Premium — $799/mo'})[c.service_package] || c.service_package : null), "\n        ").concat(info('Notes', c.notes), "\n\n        <div style=\"margin-top:20px\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">QUICK ACTIONS</div>\n          <div style=\"display:flex;flex-wrap:wrap;gap:8px\">\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('journal')\">📒 Journal Entries</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('payroll')\">💼 Payroll</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('tax')\">🏛 Tax Returns</button>\n            <button class=\"btn btn-secondary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\">📊 Dashboard</button>\n            <button class=\"btn btn-secondary\" id=\"cdet-apply-coa-btn\" onclick=\"openApplyCOAPanel('").concat(esc(c.id), "')\">📂 Apply COA Template</button>\n          </div>\n        </div>\n\n        <div id=\"cdet-coa-panel\" style=\"display:none;margin-top:12px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\">\n          <div style=\"font-size:12px;font-weight:600;margin-bottom:8px\">Select an industry template to load into this client's Chart of Accounts:</div>\n          <select id=\"cdet-coa-industry\" style=\"width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:10px\">\n            <option value=\"\">— Pick an industry —</option>\n            <option>Professional Services</option><option>Medical / Healthcare</option>\n            <option>Salon & Beauty</option><option>Cleaning Services</option>\n            <option>Landscaping & Lawn Care</option><option>Auto Repair & Mechanic</option>\n            <option>Restaurant / Food Service</option><option>Catering</option>\n            <option>Food Truck</option><option>Bar & Nightclub</option>\n            <option>General Contractor</option><option>Plumbing & HVAC</option>\n            <option>Electrical</option><option>Painting & Flooring</option>\n            <option>Retail Store</option><option>E-Commerce/Online Store</option>\n            <option>Wholesale & Distribution</option><option>Trucking/Freight</option>\n            <option>Rideshare/Gig Worker</option><option>Moving Company</option>\n            <option>Real Estate Agent/Broker</option><option>Property Management</option>\n            <option>Short-Term Rental (Airbnb)</option><option>Tech/Software Company</option>\n            <option>IT Services & Consulting</option><option>Marketing & Design Agency</option>\n            <option>Nonprofit Organization</option><option>Church/Religious Organization</option>\n            <option>General/Other</option>\n          </select>\n          <div style=\"font-size:11px;color:var(--muted);margin-bottom:10px\">⚠️ This will add template accounts to this client. Existing accounts are kept.</div>\n          <div style=\"display:flex;gap:8px\">\n            <button class=\"btn btn-primary\" id=\"cdet-coa-apply-btn\" style=\"font-size:12px;padding:6px 14px\">Apply Template</button>\n            <button class=\"btn\" onclick=\"document.getElementById('cdet-coa-panel').style.display='none'\" style=\"font-size:12px;padding:6px 14px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Cancel</button>\n          </div>\n          <div id=\"cdet-coa-msg\" style=\"font-size:12px;margin-top:8px;min-height:14px\"></div>\n        </div>\n\n        <div style=\"margin-top:20px;padding:14px;background:var(--bg);border-radius:8px;border:1px solid var(--border)\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">🔑 CLIENT PORTAL ACCESS</div>\n          ").concat(c.auth_user_id ? "<div style=\"display:flex;align-items:center;gap:8px\">\n                <span style=\"color:var(--green);font-size:16px\">✓</span>\n                <span style=\"font-size:13px;font-weight:500\">Portal access linked</span>\n              </div>\n              <div style=\"font-size:12px;color:var(--muted);margin-top:4px\">Client email: <strong>".concat(esc(c.email || ''), "</strong></div>\n              <button class=\"btn btn-secondary\" id=\"cdet-resend-btn\" style=\"margin-top:10px;font-size:12px;padding:6px 12px\">↺ Resend password email</button>\n              <div id=\"cdet-resend-msg\" style=\"font-size:12px;margin-top:6px;min-height:16px\"></div>") : "<div style=\"font-size:13px;color:var(--muted);margin-bottom:10px\">This client does not have portal access yet.</div>\n              <div style=\"display:flex;align-items:center;gap:8px\">\n                <input id=\"cdet-portal-email\" type=\"email\" placeholder=\"Client email\" value=\"".concat(esc(c.email || ''), "\" style=\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\">\n                <button class=\"btn btn-primary\" id=\"cdet-invite-btn\" style=\"white-space:nowrap;font-size:12px;padding:7px 14px\">Create Login</button>\n              </div>\n              <div id=\"cdet-invite-msg\" style=\"font-size:12px;margin-top:6px;min-height:16px\"></div>"), "\n        </div>\n\n        <div style=\"margin-top:20px\">\n          <div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:10px\">\n            <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em\">📋 TASKS</div>\n            <div style=\"display:flex;gap:6px\">\n              <button class=\"btn\" id=\"cdet-assign-year-btn\" style=\"font-size:11px;padding:4px 10px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">📅 Assign Year Tasks</button>\n              <button class=\"btn btn-primary\" id=\"cdet-add-task-btn\" style=\"font-size:11px;padding:4px 10px\">+ Add Task</button>\n            </div>\n          </div>\n\n          <div id=\"cdet-year-task-panel\" style=\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:14px;margin-bottom:12px\">\n            <div style=\"font-size:12px;font-weight:600;margin-bottom:8px\">Select services to assign tasks for:</div>\n            <div style=\"display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px\">\n              <label style=\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\"><input type=\"checkbox\" id=\"yt-svc-tax\" style=\"width:auto;accent-color:var(--gold)\" onchange=\"ytUpdatePreview()\"> 🏛 Tax Returns</label>\n              <label style=\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\"><input type=\"checkbox\" id=\"yt-svc-bookkeeping\" style=\"width:auto;accent-color:var(--gold)\" onchange=\"ytUpdatePreview()\"> 📒 Bookkeeping</label>\n              <label style=\"display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer\"><input type=\"checkbox\" id=\"yt-svc-payroll\" style=\"width:auto;accent-color:var(--gold)\" onchange=\"ytUpdatePreview()\"> 💼 Payroll</label>\n            </div>\n            <div id=\"yt-tasks-preview\"></div>\n            <div style=\"display:flex;gap:8px;margin-top:10px\">\n              <button class=\"btn btn-primary\" id=\"yt-assign-btn\" style=\"font-size:12px;padding:6px 14px\">Assign Selected Tasks</button>\n              <button class=\"btn\" onclick=\"document.getElementById('cdet-year-task-panel').style.display='none';document.getElementById('cdet-assign-year-btn').style.display=''\" style=\"font-size:12px;padding:6px 14px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Cancel</button>\n            </div>\n            <div id=\"yt-err\" style=\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\"></div>\n          </div>\n\n          <div id=\"cdet-task-form\" style=\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:12px;margin-bottom:12px\">\n            <input id=\"cdet-task-title\" type=\"text\" placeholder=\"Task title\" style=\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\">\n            <textarea id=\"cdet-task-desc\" placeholder=\"Description (optional)\" rows=\"2\" style=\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;resize:vertical;margin-bottom:8px\"></textarea>\n            <div style=\"display:flex;gap:8px;align-items:center\">\n              <select id=\"cdet-task-priority\" style=\"padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px\">\n                <option value=\"normal\">Normal</option>\n                <option value=\"urgent\">🔴 Urgent</option>\n                <option value=\"low\">⚪ Low</option>\n              </select>\n              <input id=\"cdet-task-due\" type=\"date\" style=\"padding:6px 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px\">\n              <button class=\"btn btn-primary\" id=\"cdet-task-save\" style=\"font-size:12px;padding:6px 12px\">Save</button>\n              <button class=\"btn\" id=\"cdet-task-cancel\" style=\"font-size:12px;padding:6px 12px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Cancel</button>\n            </div>\n            <div id=\"cdet-task-err\" style=\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\"></div>\n          </div>\n          <div id=\"cdet-tasks-list\"><span class=\"spinner\" style=\"width:14px;height:14px\"></span></div>\n        </div>\n\n        <div style=\"margin-top:20px\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">📁 CLIENT DOCUMENTS</div>\n          <div id=\"cdet-docs-list\"><span class=\"spinner\" style=\"width:14px;height:14px\"></span></div>\n        </div>\n\n        <div style=\"margin-top:20px\">\n          <div style=\"display:flex;align-items:center;justify-content:space-between;margin-bottom:10px\">\n            <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em\">💳 BILLING</div>\n            <button class=\"btn btn-primary\" id=\"cdet-add-bill-btn\" style=\"font-size:11px;padding:4px 10px\">+ Add Charge</button>\n          </div>\n          <div id=\"cdet-bill-form\" style=\"display:none;background:var(--bg);border-radius:8px;border:1px solid var(--border);padding:12px;margin-bottom:12px\">\n            <input id=\"cdet-bill-desc\" type=\"text\" placeholder=\"Description (e.g. Tax prep 2024)\" style=\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\">\n            <div style=\"display:flex;gap:8px;margin-bottom:8px\">\n              <input id=\"cdet-bill-amount\" type=\"number\" min=\"0\" step=\"0.01\" placeholder=\"Amount $\" style=\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\">\n              <input id=\"cdet-bill-due\" type=\"date\" style=\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\">\n              <select id=\"cdet-bill-status\" style=\"flex:1;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px\">\n                <option value=\"unpaid\">Unpaid</option>\n                <option value=\"paid\">Paid</option>\n                <option value=\"void\">Void</option>\n              </select>\n            </div>\n            <input id=\"cdet-bill-notes\" type=\"text\" placeholder=\"Notes (optional)\" style=\"width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;margin-bottom:8px\">\n            <div style=\"display:flex;gap:8px\">\n              <button class=\"btn btn-primary\" id=\"cdet-bill-save\" style=\"font-size:12px;padding:6px 12px\">Save Charge</button>\n              <button class=\"btn\" id=\"cdet-bill-cancel\" style=\"font-size:12px;padding:6px 12px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Cancel</button>\n            </div>\n            <div id=\"cdet-bill-err\" style=\"font-size:12px;color:var(--red);margin-top:6px;min-height:14px\"></div>\n          </div>\n          <div id=\"cdet-billing-list\"><span class=\"spinner\" style=\"width:14px;height:14px\"></span></div>\n        </div>\n\n        <div style=\"margin-top:20px\">\n          <div style=\"font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em;margin-bottom:10px\">🧾 CLIENT INVOICES</div>\n          <div id=\"cdet-invoices-list\"><span class=\"spinner\" style=\"width:14px;height:14px\"></span></div>\n        </div>\n\n      </div>\n      <div class=\"modal-footer\">\n        <button class=\"btn\" onclick=\"closeModal('cdet-backdrop')\" style=\"background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">Close</button>\n        <button class=\"btn\" id=\"cdet-edit-btn\" style=\"margin-left:auto;background:var(--surface);color:var(--text);border:1.5px solid var(--border)\">✏️ Edit Info</button>\n        <button class=\"btn btn-primary\" onclick=\"closeModal('cdet-backdrop');STATE.selectedClientId='").concat(esc(c.id), "';updateClientDropdown();navigateTo('dashboard')\">Select Client →</button>\n      </div>\n    </div>");
   document.body.appendChild(bd);
   bd.addEventListener('click', e => {
     if (e.target === bd) closeModal('cdet-backdrop');
@@ -2755,7 +2920,7 @@ function openClientDetail(c) {
             <div class="form-group" style="margin:0;flex:1">
               <label style="font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.05em">CLIENT TYPE</label>
               <select id="edit-client-type" style="width:100%;padding:8px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:14px">
-                <option value="personal" ${(c.client_type||'personal')==='personal'?'selected':''}>👤 Personal</option>
+                <option value="personal" ${(c.client_type||'personal')==='personal'?'selected':''}>👤 Individual / Tax</option>
                 <option value="business" ${c.client_type==='business'?'selected':''}>🏢 Business</option>
               </select>
             </div>
@@ -4517,6 +4682,184 @@ function staffAvatarColor(email) {
   let hash = 0;
   for (let i = 0; i < email.length; i++) hash = email.charCodeAt(i) + ((hash << 5) - hash);
   return colors[Math.abs(hash) % colors.length];
+}
+
+// ── CHECKLIST TEMPLATES MANAGER ─────────────────────────────
+async function renderChecklistTemplates(container) {
+  if (!STATE.isAdmin) {
+    container.innerHTML = pageShell('Checklist Templates', 'Admin only', '', '<div class="empty"><div class="empty-icon">🔒</div>Admin access required.</div>');
+    return;
+  }
+  container.innerHTML = pageShell('Checklist Templates', 'Manage the document checklists clients see in their portal', '', `
+    <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="showChecklistTab('personal')" id="ctl-tab-personal">👤 Individual / Tax</button>
+      <button class="btn" onclick="showChecklistTab('business')" id="ctl-tab-business" style="background:var(--surface);color:var(--text);border:1.5px solid var(--border)">🏢 Business</button>
+    </div>
+    <div id="ctl-personal" class="card" style="margin-bottom:20px">
+      <div class="card-h" style="display:flex;justify-content:space-between;align-items:center">
+        <span>👤 Individual / Tax Checklist</span>
+        <button class="btn btn-primary" style="font-size:12px;padding:6px 14px" onclick="openAddChecklistItem('personal')">+ Add Item</button>
+      </div>
+      <div class="card-body" id="ctl-personal-list"><span class="spinner"></span></div>
+    </div>
+    <div id="ctl-business" class="card" style="display:none;margin-bottom:20px">
+      <div class="card-h" style="display:flex;justify-content:space-between;align-items:center">
+        <span>🏢 Business Checklist</span>
+        <button class="btn btn-primary" style="font-size:12px;padding:6px 14px" onclick="openAddChecklistItem('business')">+ Add Item</button>
+      </div>
+      <div class="card-body" id="ctl-business-list"><span class="spinner"></span></div>
+    </div>
+    <div class="card">
+      <div class="card-h">About Checklist Templates</div>
+      <div class="card-body" style="font-size:13px;color:var(--muted);line-height:1.6">
+        Items here are automatically assigned to new clients when their portal is created.
+        Existing clients keep their current checklist — changes here apply to new clients only.
+        You can also manually add or remove items from an individual client's checklist in their profile.
+      </div>
+    </div>
+
+    <!-- Add/Edit Item Modal -->
+    <div id="ctl-modal" hidden style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px">
+      <div style="background:var(--surface);border-radius:12px;width:100%;max-width:480px">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)">
+          <div style="font-weight:700;font-size:16px" id="ctl-modal-title">Add Checklist Item</div>
+          <button onclick="closeChecklistModal()" style="font-size:20px;color:var(--muted);background:none;border:none;cursor:pointer">✕</button>
+        </div>
+        <div style="padding:24px;display:flex;flex-direction:column;gap:14px">
+          <input type="hidden" id="ctl-item-id">
+          <input type="hidden" id="ctl-portal-type">
+          <div>
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Item Title *</label>
+            <input id="ctl-title" class="input" placeholder="e.g. W-2 Forms">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Description (optional)</label>
+            <input id="ctl-desc" class="input" placeholder="e.g. All W-2s from employers for the tax year">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Sort Order</label>
+            <input id="ctl-sort" class="input" type="number" value="0" min="0">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="checkbox" id="ctl-active" checked style="width:auto;accent-color:var(--green)">
+            <label for="ctl-active" style="font-size:13px">Active (shown to clients)</label>
+          </div>
+          <div id="ctl-modal-error" style="color:var(--red);font-size:13px"></div>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="btn" onclick="closeChecklistModal()" style="background:var(--surface);color:var(--text);border:1.5px solid var(--border)">Cancel</button>
+            <button class="btn btn-primary" onclick="saveChecklistItem()">Save Item</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `);
+
+  async function loadChecklistTemplates(type) {
+    const el = document.getElementById(`ctl-${type}-list`);
+    if (!el) return;
+    const { data: items, error } = await sb.from('checklist_templates')
+      .select('*').eq('portal_type', type).order('sort_order').order('title');
+    if (error) { el.innerHTML = `<div class="alert alert-red">${esc(error.message)}</div>`; return; }
+    if (!items?.length) {
+      el.innerHTML = '<div class="empty" style="padding:16px 0"><div class="empty-icon">📋</div>No items yet. Add the first one above.</div>';
+      return;
+    }
+    el.innerHTML = items.map(it => `
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:18px;color:var(--muted);min-width:24px;text-align:center">#${it.sort_order}</span>
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:14px;${!it.is_active ? 'text-decoration:line-through;color:var(--muted)' : ''}">${esc(it.title)}</div>
+          ${it.description ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">${esc(it.description)}</div>` : ''}
+          ${!it.is_active ? `<div style="font-size:11px;color:var(--red);font-weight:600;margin-top:2px">Inactive</div>` : ''}
+        </div>
+        <div style="display:flex;gap:6px">
+          <button onclick="openEditChecklistItem(${JSON.stringify(JSON.stringify(it))})"
+            style="border:1px solid var(--border);background:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--text)">Edit</button>
+          <button onclick="deleteChecklistItem('${esc(it.id)}','${type}')"
+            style="border:1px solid var(--red);background:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--red)">Delete</button>
+        </div>
+      </div>`).join('');
+  }
+
+  window.showChecklistTab = function(type) {
+    ['personal','business'].forEach(t => {
+      const panel = document.getElementById(`ctl-${t}`);
+      const btn = document.getElementById(`ctl-tab-${t}`);
+      if (panel) panel.style.display = t === type ? '' : 'none';
+      if (btn) {
+        if (t === type) {
+          btn.className = 'btn btn-primary';
+          btn.style = '';
+        } else {
+          btn.className = 'btn';
+          btn.style.cssText = 'background:var(--surface);color:var(--text);border:1.5px solid var(--border)';
+        }
+      }
+    });
+  };
+
+  window.openAddChecklistItem = function(type) {
+    document.getElementById('ctl-item-id').value = '';
+    document.getElementById('ctl-portal-type').value = type;
+    document.getElementById('ctl-title').value = '';
+    document.getElementById('ctl-desc').value = '';
+    document.getElementById('ctl-sort').value = '0';
+    document.getElementById('ctl-active').checked = true;
+    document.getElementById('ctl-modal-error').textContent = '';
+    document.getElementById('ctl-modal-title').textContent = `Add Item — ${type === 'personal' ? 'Individual / Tax' : 'Business'} Portal`;
+    document.getElementById('ctl-modal').hidden = false;
+  };
+
+  window.openEditChecklistItem = function(jsonStr) {
+    const it = JSON.parse(jsonStr);
+    document.getElementById('ctl-item-id').value = it.id;
+    document.getElementById('ctl-portal-type').value = it.portal_type;
+    document.getElementById('ctl-title').value = it.title;
+    document.getElementById('ctl-desc').value = it.description || '';
+    document.getElementById('ctl-sort').value = it.sort_order;
+    document.getElementById('ctl-active').checked = it.is_active;
+    document.getElementById('ctl-modal-error').textContent = '';
+    document.getElementById('ctl-modal-title').textContent = 'Edit Checklist Item';
+    document.getElementById('ctl-modal').hidden = false;
+  };
+
+  window.closeChecklistModal = function() {
+    document.getElementById('ctl-modal').hidden = true;
+  };
+
+  window.saveChecklistItem = async function() {
+    const id = document.getElementById('ctl-item-id').value;
+    const portalType = document.getElementById('ctl-portal-type').value;
+    const title = document.getElementById('ctl-title').value.trim();
+    const description = document.getElementById('ctl-desc').value.trim() || null;
+    const sortOrder = parseInt(document.getElementById('ctl-sort').value) || 0;
+    const isActive = document.getElementById('ctl-active').checked;
+    const errEl = document.getElementById('ctl-modal-error');
+    if (!title) { errEl.textContent = 'Title is required.'; return; }
+    const payload = { portal_type: portalType, title, description, sort_order: sortOrder, is_active: isActive };
+    let err;
+    if (id) {
+      const { error } = await sb.from('checklist_templates').update(payload).eq('id', id);
+      err = error;
+    } else {
+      const { error } = await sb.from('checklist_templates').insert(payload);
+      err = error;
+    }
+    if (err) { errEl.textContent = err.message; return; }
+    closeChecklistModal();
+    await loadChecklistTemplates(portalType);
+    showToast(id ? 'Item updated' : 'Item added', 'green');
+  };
+
+  window.deleteChecklistItem = async function(id, type) {
+    if (!confirm('Delete this checklist item? This cannot be undone.')) return;
+    const { error } = await sb.from('checklist_templates').delete().eq('id', id);
+    if (error) { showToast('Delete failed: ' + error.message, 'red'); return; }
+    await loadChecklistTemplates(type);
+    showToast('Item deleted', 'green');
+  };
+
+  await Promise.all([loadChecklistTemplates('personal'), loadChecklistTemplates('business')]);
 }
 
 async function renderStaffAccess(container) {
@@ -7101,6 +7444,7 @@ function openAddClientModal() {
               🚗 RouteWorth
             </label>
           </div>
+          <div style="margin-top:10px" id="acm-portal-type"></div>
         </div>
 
         <div style="background:var(--bg);border-radius:8px;padding:14px;margin-bottom:20px;border:1px solid var(--border)">
@@ -7181,6 +7525,14 @@ function acmUpdateServices() {
     const lbl = document.getElementById(lid);
     if (lbl) lbl.style.borderColor = document.getElementById(cid)?.checked ? 'var(--gold)' : 'var(--border)';
   });
+  // Show portal type indicator
+  const isBusiness = hasBk || hasPr;
+  const portalIndicator = document.getElementById('acm-portal-type');
+  if (portalIndicator) {
+    portalIndicator.innerHTML = isBusiness
+      ? `<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,193,7,.15);color:var(--gold);border:1px solid var(--gold);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:600">🏢 Business Portal — billing, invoices &amp; bookkeeping</span>`
+      : `<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(0,180,120,.1);color:var(--green);border:1px solid var(--green);border-radius:8px;padding:4px 10px;font-size:12px;font-weight:600">👤 Individual / Tax Portal — tax document checklist</span>`;
+  }
   // Build task preview
   const preview = document.getElementById('acm-tasks-preview');
   if (!preview) return;
@@ -7255,7 +7607,19 @@ async function saveNewClient() {
     return;
   }
 
-  // 2. Seed Chart of Accounts from industry template
+  // 2. Auto-set client_type and seed checklist
+  const clientType = (hasBk || hasPr) ? 'business' : 'personal';
+  await sb.from('clients').update({ client_type: clientType }).eq('id', newClient.id);
+  btn.textContent = 'Seeding checklist…';
+  const { data: tmplItems } = await sb.from('checklist_templates')
+    .select('title,description,sort_order').eq('portal_type', clientType).eq('is_active', true).order('sort_order');
+  if (tmplItems?.length) {
+    await sb.from('client_checklist_items').insert(
+      tmplItems.map(t => ({ client_id: newClient.id, title: t.title, description: t.description, sort_order: t.sort_order }))
+    );
+  }
+
+  // 3. Seed Chart of Accounts from industry template
   if (industry) {
     btn.textContent = 'Loading chart of accounts…';
     const { data: templates, error: tmplErr } = await sb
