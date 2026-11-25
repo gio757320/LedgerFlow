@@ -1575,7 +1575,7 @@ async function renderClientPortalDashboard(container) {
         }
       }
       if (!items || !items.length) {
-        el.innerHTML = '<div class="empty" style="padding:20px 0"><div class="empty-icon">📋</div>No checklist items yet. Your firm will set these up for you.</div>';
+        el.innerHTML = '<div class="empty" style="padding:20px 0"><div class="empty-icon">📋</div>No checklist items yet. Your tax preparer will set these up for you.</div>';
         return;
       }
       const done = items.filter(i => i.is_checked).length;
