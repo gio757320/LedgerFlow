@@ -1978,6 +1978,22 @@ async function renderClientPortalDashboard(container) {
     const businessPhone = c.phone || '';
     const businessAddress = c.address || '';
 
+    // Fetch logo for the invoice header (same as admin preview)
+    let logoHtml = '';
+    if (c.logo_url) {
+      try {
+        const { data: urlData } = await sb.storage.from('client-logos').createSignedUrl(c.logo_url, 3600);
+        if (urlData?.signedUrl) {
+          logoHtml = \`<img src="\${urlData.signedUrl}" style="max-height:72px;max-width:220px;object-fit:contain;display:block;margin-bottom:8px">\`;
+        }
+      } catch(e) {}
+    }
+    if (!logoHtml) {
+      const initials = businessName.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2) || '?';
+      const hue = Math.abs(businessName.split('').reduce((h,ch)=>((h<<5)-h)+ch.charCodeAt(0),0)) % 360;
+      logoHtml = \`<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" style="margin-bottom:8px"><rect width="56" height="56" rx="8" fill="hsl(\${hue},55%,45%)"/><text x="28" y="37" text-anchor="middle" font-family="Arial,sans-serif" font-size="20" font-weight="800" fill="#fff">\${initials}</text></svg>\`;
+    }
+
     const statusColor = { draft:'#888', sent:'#d97706', paid:'#16a34a', void:'#dc2626' }[inv.status] || '#888';
     const lineItems = Array.isArray(inv.line_items) ? inv.line_items : [];
     const fmtMoney = n => '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -2034,6 +2050,7 @@ async function renderClientPortalDashboard(container) {
 <body>
   <div class="header">
     <div>
+      \${logoHtml}
       <div class="firm-name">\${esc(businessName)}</div>
       <div class="firm-details">
         \${businessEmail ? businessEmail + '<br>' : ''}
