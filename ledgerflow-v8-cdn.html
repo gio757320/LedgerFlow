@@ -4392,7 +4392,11 @@ window.saveCIInvoice = async function(existingId) {
 
   if (savedError) { errEl.textContent = 'Error: ' + savedError.message; return; }
   document.getElementById('ci-modal').hidden = true;
-  renderClientInvoices(document.getElementById('screen-container'));
+  if (STATE.isStaff) {
+    renderAdminInvoices(document.getElementById('screen-container'));
+  } else {
+    renderClientInvoices(document.getElementById('screen-container'));
+  }
 };
 
 // ════════════════════════════════════════════════════════════
@@ -6533,9 +6537,10 @@ async function renderAdminInvoices(container) {
   const clientSelected = !!STATE.selectedClientId;
   const subtitle = clientSelected ? 'Firm charges & client invoices' : 'All Client Invoices';
 
-  container.innerHTML = pageShell('Invoices', subtitle, `
-    <button class="btn btn-primary" onclick="openNewAdminInvoiceModal()">+ New Invoice</button>
-  `, '<div class="loading-block"><span class="spinner"></span> Loading invoices…</div>');
+  container.innerHTML = pageShell('Invoices', subtitle, clientSelected
+    ? `<button class="btn btn-primary" onclick="openNewFirmChargeModal()">+ Add Firm Charge</button>`
+    : `<button class="btn btn-primary" onclick="openNewAdminInvoiceModal()">+ New Invoice</button>`
+  , '<div class="loading-block"><span class="spinner"></span> Loading invoices…</div>');
   const main = container.querySelector('#main');
 
   const fmt = v => v == null ? '—' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -6611,7 +6616,7 @@ async function renderAdminInvoices(container) {
       <div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <div style="font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase">🧾 Client's Customer Invoices</div>
-          <button class="btn btn-primary" onclick="openNewAdminInvoiceModal()" style="font-size:12px;padding:5px 12px">+ New Invoice</button>
+          <button class="btn btn-primary" onclick="openClientNewInvoiceModal()" style="font-size:12px;padding:5px 12px">+ New Invoice</button>
         </div>
         <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">
           <div class="stat-card stat-green" style="flex:1;min-width:120px">
@@ -7312,6 +7317,87 @@ function openNewAdminInvoiceModal() {
       return;
     }
     closeModal('new-adm-inv-backdrop');
+    renderAdminInvoices(document.getElementById('screen-container'));
+  });
+}
+
+// ── Firm Charge Modal (adds to client_billing) ───────────
+function openNewFirmChargeModal() {
+  const bd = document.createElement('div');
+  bd.className = 'modal-backdrop';
+  bd.id = 'new-firm-charge-backdrop';
+  const today = new Date().toISOString().slice(0, 10);
+  const due30 = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  const clientName = (STATE.clientRows || []).find(c => c.id === STATE.selectedClientId)?.full_name || 'this client';
+  bd.innerHTML = `
+    <div class="modal" role="dialog" style="max-width:460px">
+      <div class="modal-header">
+        <h3>New Firm Charge</h3>
+        <button class="modal-close" onclick="closeModal('new-firm-charge-backdrop')" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <div style="font-size:13px;color:var(--muted);margin-bottom:14px">Adding a charge to: <strong>${esc(clientName)}</strong></div>
+        <div class="form-group">
+          <label for="nfc-desc">Description *</label>
+          <input id="nfc-desc" type="text" placeholder="e.g. Tax preparation — 2025 returns" autocomplete="off">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="nfc-amount">Amount ($) *</label>
+            <input id="nfc-amount" type="number" min="0" step="0.01" placeholder="0.00">
+          </div>
+          <div class="form-group">
+            <label for="nfc-due">Due Date</label>
+            <input id="nfc-due" type="date" value="${due30}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="nfc-status">Status</label>
+          <select id="nfc-status">
+            <option value="unpaid">Unpaid</option>
+            <option value="paid">Paid</option>
+          </select>
+        </div>
+        <div class="modal-error" id="nfc-error"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('new-firm-charge-backdrop')">Cancel</button>
+        <button class="btn btn-primary" id="nfc-save">Add Charge</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bd);
+  bd.addEventListener('click', e => { if (e.target === bd) closeModal('new-firm-charge-backdrop'); });
+
+  bd.querySelector('#nfc-save').addEventListener('click', async () => {
+    const amount  = parseFloat(bd.querySelector('#nfc-amount').value) || 0;
+    const desc    = bd.querySelector('#nfc-desc').value.trim();
+    const due     = bd.querySelector('#nfc-due').value.trim();
+    const status  = bd.querySelector('#nfc-status').value;
+    const errEl   = bd.querySelector('#nfc-error');
+
+    if (!desc) { errEl.textContent = 'Description is required.'; return; }
+    if (!amount || amount <= 0) { errEl.textContent = 'Enter a valid amount.'; return; }
+
+    const saveBtn = bd.querySelector('#nfc-save');
+    saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+
+    const payload = {
+      client_id:   STATE.selectedClientId,
+      description: desc,
+      amount,
+      due_date:    due || null,
+      status,
+    };
+    if (status === 'paid') payload.paid_at = new Date().toISOString();
+
+    const { error } = await sb.from('client_billing').insert(payload);
+    if (error) {
+      errEl.textContent = error.message;
+      saveBtn.disabled = false; saveBtn.textContent = 'Add Charge';
+      return;
+    }
+    closeModal('new-firm-charge-backdrop');
     renderAdminInvoices(document.getElementById('screen-container'));
   });
 }
