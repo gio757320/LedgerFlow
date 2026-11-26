@@ -4365,9 +4365,9 @@ window.saveCIInvoice = async function(existingId) {
     amount: parseFloat(row.querySelector('.ci-amt')?.value) || 0
   }));
 
-  const taxRate  = parseFloat(document.getElementById('ci-tax')?.value) || 0;
+  const taxRate  = parseFloat(document.getElementById('ci-tax')?.value ?? '0') || 0;
   const subtotal = items.reduce((s,i) => s + i.amount, 0);
-  const total    = subtotal + subtotal * taxRate / 100;
+  const total    = Math.round((subtotal + subtotal * taxRate / 100) * 100) / 100;
 
   const payload = {
     client_id: clientId,
@@ -4376,7 +4376,8 @@ window.saveCIInvoice = async function(existingId) {
     issue_date:     document.getElementById('ci-date')?.value || null,
     due_date:       document.getElementById('ci-due')?.value  || null,
     status:         document.getElementById('ci-status')?.value || 'draft',
-    tax_rate:       taxRate,
+    tax_rate:       taxRate ?? 0,
+    tax_amount:     Math.round((subtotal * taxRate / 100) * 100) / 100,
     subtotal,
     total,
     notes:          document.getElementById('ci-notes')?.value.trim() || null,
@@ -6623,6 +6624,7 @@ async function renderAdminInvoices(container) {
                   <td style="text-align:right;width:1%;white-space:nowrap">
                     <div style="display:flex;gap:6px;justify-content:flex-end;align-items:center">
                       ${b.status === 'unpaid' ? `<button class="btn btn-secondary" data-bill-id="${esc(b.id)}" data-action="billpaid" style="font-size:11px;padding:3px 8px;background:rgba(34,197,94,.1);color:var(--green);border-color:var(--green)">✓ Paid</button>` : ''}
+                      <button class="btn btn-secondary" data-bill-id="${esc(b.id)}" data-action="billpreview" style="font-size:11px;padding:3px 8px">👁 Preview</button>
                       <button class="btn btn-secondary" data-bill-id="${esc(b.id)}" data-action="billedit" style="font-size:11px;padding:3px 8px">✏️ Edit</button>
                       <button class="btn btn-secondary" data-bill-id="${esc(b.id)}" data-action="billdelete" style="font-size:11px;padding:3px 8px;color:var(--red);border-color:var(--red)">🗑</button>
                     </div>
@@ -6691,6 +6693,14 @@ async function renderAdminInvoices(container) {
         const { error } = await sb.from('client_billing').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', billId);
         if (error) { btn.disabled = false; btn.textContent = '✓ Paid'; alert('Error: ' + error.message); return; }
         renderAdminInvoices(container);
+      });
+    });
+
+    // Wire bill preview buttons
+    main.querySelectorAll('[data-action="billpreview"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const bill = bills.find(b => b.id === btn.dataset.billId);
+        if (bill) previewFirmCharge(bill, (STATE.clientRows || []).find(c => c.id === STATE.selectedClientId));
       });
     });
 
@@ -7443,6 +7453,125 @@ function openNewFirmChargeModal() {
     closeModal('new-firm-charge-backdrop');
     renderAdminInvoices(document.getElementById('screen-container'));
   });
+}
+
+// ── Firm Charge Preview ───────────────────────────────────
+function previewFirmCharge(bill, client) {
+  const fmtDate = d => d ? new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }) : '—';
+  const fmtMoney = n => '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
+  const statusColor = { unpaid:'#d97706', paid:'#16a34a', void:'#9ca3af' }[bill.status] || '#9ca3af';
+  const clientName = client?.full_name || 'Client';
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Statement — ${esc(clientName)}</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Helvetica Neue',Arial,sans-serif; color:#1a1a2e; background:#fff; padding:48px; font-size:14px; line-height:1.6; }
+    .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:40px; }
+    .firm-name { font-size:24px; font-weight:800; color:#1a1a2e; letter-spacing:-0.5px; }
+    .firm-name span { color:#d4a843; }
+    .firm-details { font-size:12px; color:#666; margin-top:6px; }
+    .doc-meta { text-align:right; }
+    .doc-label { font-size:11px; font-weight:700; color:#888; letter-spacing:.08em; text-transform:uppercase; }
+    .doc-title { font-size:26px; font-weight:800; color:#1a1a2e; margin:4px 0 6px; }
+    .status-badge { display:inline-block; padding:3px 14px; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#fff; background:${statusColor}; }
+    hr { border:none; border-top:2px solid #d4a843; margin:0 0 32px; }
+    .bill-row { display:flex; justify-content:space-between; margin-bottom:28px; }
+    .bill-block .label { font-size:11px; font-weight:700; color:#888; letter-spacing:.08em; text-transform:uppercase; margin-bottom:6px; }
+    .bill-block .name { font-size:16px; font-weight:700; }
+    .bill-block .detail { font-size:13px; color:#555; }
+    .dates { display:flex; gap:40px; }
+    .date-item .label { font-size:11px; font-weight:700; color:#888; letter-spacing:.08em; text-transform:uppercase; margin-bottom:4px; }
+    .date-item .val { font-size:14px; font-weight:600; }
+    .charge-box { background:#f8f8fc; border-radius:10px; padding:24px 28px; margin-bottom:28px; }
+    .charge-desc { font-size:17px; font-weight:700; margin-bottom:16px; }
+    .charge-total { display:flex; justify-content:space-between; border-top:2px solid #1a1a2e; padding-top:14px; margin-top:4px; font-size:20px; font-weight:800; }
+    .footer { margin-top:48px; padding-top:16px; border-top:1px solid #eee; display:flex; justify-content:space-between; font-size:11px; color:#aaa; }
+    @media print { body { padding:28px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="firm-name">Manrique <span>&</span> Associates LLC</div>
+      <div class="firm-details">
+        Accounting &amp; Bookkeeping Services<br>
+        contact@manriqueassociates.com
+      </div>
+    </div>
+    <div class="doc-meta">
+      <div class="doc-label">Statement of Charges</div>
+      <div class="doc-title">INVOICE</div>
+      <span class="status-badge">${bill.status}</span>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="bill-row">
+    <div class="bill-block">
+      <div class="label">Bill To</div>
+      <div class="name">${esc(clientName)}</div>
+      ${client?.email ? `<div class="detail">${esc(client.email)}</div>` : ''}
+    </div>
+    <div class="dates">
+      <div class="date-item">
+        <div class="label">Issue Date</div>
+        <div class="val">${fmtDate(bill.created_at?.slice(0,10) || new Date().toISOString().slice(0,10))}</div>
+      </div>
+      ${bill.due_date ? `<div class="date-item">
+        <div class="label">Due Date</div>
+        <div class="val">${fmtDate(bill.due_date)}</div>
+      </div>` : ''}
+    </div>
+  </div>
+
+  <div class="charge-box">
+    <div class="charge-desc">${esc(bill.description || 'Professional Services')}</div>
+    <div style="font-size:13px;color:#555;margin-bottom:12px">Professional accounting &amp; bookkeeping services</div>
+    <div class="charge-total">
+      <span>Amount Due</span>
+      <span>${fmtMoney(bill.amount)}</span>
+    </div>
+  </div>
+
+  <div style="font-size:13px;color:#555;line-height:1.7">
+    Please make payment by the due date shown above.<br>
+    Thank you for trusting Manrique &amp; Associates LLC with your accounting needs.
+  </div>
+
+  <div class="footer">
+    <span>Manrique &amp; Associates LLC — Confidential</span>
+    <span>Generated by LedgerFlow</span>
+  </div>
+</body>
+</html>`;
+
+  const bd = document.createElement('div');
+  bd.id = 'firm-charge-preview-backdrop';
+  bd.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2000;display:flex;align-items:center;justify-content:center;padding:20px';
+  bd.innerHTML = `
+    <div style="background:#fff;border-radius:12px;width:100%;max-width:720px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.35)">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e5e7eb;background:#f9fafb">
+        <div style="font-weight:700;font-size:15px;color:#1a1a2e">📄 Charge Preview</div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button id="fcp-print" style="padding:7px 16px;border-radius:7px;border:1.5px solid #d4a843;background:none;color:#b45309;font-size:13px;font-weight:600;cursor:pointer">🖨 Print / Save PDF</button>
+          <button onclick="document.getElementById('firm-charge-preview-backdrop').remove()" style="font-size:20px;color:#9ca3af;background:none;border:none;cursor:pointer;line-height:1">✕</button>
+        </div>
+      </div>
+      <iframe id="fcp-frame" style="flex:1;border:none;background:#fff"></iframe>
+    </div>`;
+  document.body.appendChild(bd);
+  bd.addEventListener('click', e => { if (e.target === bd) bd.remove(); });
+
+  const frame = bd.querySelector('#fcp-frame');
+  frame.onload = () => {
+    bd.querySelector('#fcp-print').onclick = () => { frame.contentWindow.focus(); frame.contentWindow.print(); };
+  };
+  frame.srcdoc = html;
 }
 
 // ── Edit Firm Charge Modal ────────────────────────────────
