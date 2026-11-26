@@ -6575,10 +6575,16 @@ async function renderAdminInvoices(container) {
 
   if (clientSelected) {
     // ── Two-section view: Firm Charges + Client's Own Invoices ──
-    const [billingRes, invoicesRes] = await Promise.all([
+    const selClient = (STATE.clientRows || []).find(r => r.id === STATE.selectedClientId);
+    const isBusiness = (selClient?.client_type || 'personal') === 'business';
+
+    const fetches = [
       sb.from('client_billing').select('*').eq('client_id', STATE.selectedClientId).order('created_at', { ascending: false }),
-      sb.from('client_invoices').select('*, clients(id, full_name)').eq('client_id', STATE.selectedClientId).order('issue_date', { ascending: false })
-    ]);
+      isBusiness
+        ? sb.from('client_invoices').select('*, clients(id, full_name)').eq('client_id', STATE.selectedClientId).order('issue_date', { ascending: false })
+        : Promise.resolve({ data: [], error: null })
+    ];
+    const [billingRes, invoicesRes] = await Promise.all(fetches);
 
     const bills = billingRes.data || [];
     const invoices = invoicesRes.data || [];
@@ -6639,9 +6645,10 @@ async function renderAdminInvoices(container) {
         </div>`}
       </div>
 
+      ${isBusiness ? `
       <hr style="border:none;border-top:1px solid var(--border);margin:0 0 24px">
 
-      <!-- SECTION 2: Client's own invoices to their customers -->
+      <!-- SECTION 2: Client's own invoices to their customers (business only) -->
       <div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <div style="font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase">🧾 Client's Customer Invoices</div>
@@ -6686,7 +6693,7 @@ async function renderAdminInvoices(container) {
             </tbody>
           </table>
         </div>`}
-      </div>
+      </div>` : ''}
     `;
 
     // Wire bill mark-paid buttons
