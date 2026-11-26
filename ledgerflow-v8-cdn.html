@@ -3800,6 +3800,11 @@ async function openContactPicker(prefix) {
     .select('*').eq('client_id', clientId).order('company_name');
   if (error) { showToast('Could not load contacts', 'red'); return; }
 
+  // Store contacts in a window map so onclick can look them up by id (avoids JSON-in-HTML escaping issues)
+  window._pickerContacts = {};
+  (contacts || []).forEach(c => { window._pickerContacts[c.id] = c; });
+  window._pickerPrefix = prefix;
+
   const overlay = document.createElement('div');
   overlay.id = 'contact-picker-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px';
@@ -3817,7 +3822,7 @@ async function openContactPicker(prefix) {
           ? '<div style="padding:24px;text-align:center;color:var(--muted)">No contacts yet. Add them from the 📒 Contacts page.</div>'
           : contacts.map(c => `
             <div class="picker-item" data-search="${esc((c.company_name+' '+(c.contact_name||'')).toLowerCase())}"
-              onclick="selectContact('${prefix}',${JSON.stringify(JSON.stringify(c))})"
+              onclick="selectContact('${prefix}','${esc(c.id)}')"
               style="padding:10px 20px;cursor:pointer;border-bottom:1px solid var(--border)">
               <div style="font-weight:600;font-size:14px">${esc(c.company_name)}</div>
               ${c.contact_name ? `<div style="font-size:12px;color:var(--muted)">${esc(c.contact_name)}</div>` : ''}
@@ -3834,9 +3839,10 @@ async function openContactPicker(prefix) {
     });
   };
 
-  window.selectContact = function(pfx, jsonStr) {
-    const c = JSON.parse(jsonStr);
+  window.selectContact = function(pfx, contactId) {
+    const c = (window._pickerContacts || {})[contactId];
     document.getElementById('contact-picker-overlay')?.remove();
+    if (!c) return;
     if (pfx === 'ci') {
       const nameEl = document.getElementById('ci-customer');
       if (nameEl) nameEl.value = c.company_name;
