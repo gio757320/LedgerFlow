@@ -2782,15 +2782,112 @@ function openClientDetail(c) {
     }
     el.innerHTML = contacts.map(ct => `
       <div style="padding:9px 0;border-bottom:1px solid var(--border)">
-        <div style="font-size:13px;font-weight:600">${esc(ct.company_name)}</div>
-        ${ct.contact_name ? `<div style="font-size:12px;color:var(--muted)">${esc(ct.contact_name)}</div>` : ''}
-        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:3px">
-          ${ct.email ? `<div style="font-size:12px;color:var(--muted)">✉️ ${esc(ct.email)}</div>` : ''}
-          ${ct.phone ? `<div style="font-size:12px;color:var(--muted)">📞 ${esc(ct.phone)}</div>` : ''}
-          ${ct.city || ct.state ? `<div style="font-size:12px;color:var(--muted)">📍 ${[ct.city, ct.state].filter(Boolean).join(', ')}</div>` : ''}
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+          <div style="min-width:0">
+            <div style="font-size:13px;font-weight:600">${esc(ct.company_name)}</div>
+            ${ct.contact_name ? `<div style="font-size:12px;color:var(--muted)">${esc(ct.contact_name)}</div>` : ''}
+            <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:3px">
+              ${ct.email ? `<div style="font-size:12px;color:var(--muted)">✉️ ${esc(ct.email)}</div>` : ''}
+              ${ct.phone ? `<div style="font-size:12px;color:var(--muted)">📞 ${esc(ct.phone)}</div>` : ''}
+              ${ct.city || ct.state ? `<div style="font-size:12px;color:var(--muted)">📍 ${[ct.city, ct.state].filter(Boolean).join(', ')}</div>` : ''}
+              ${ct.address_line1 ? `<div style="font-size:12px;color:var(--muted)">🏠 ${esc(ct.address_line1)}${ct.address_line2 ? ' ' + esc(ct.address_line2) : ''}</div>` : ''}
+              ${ct.zip ? `<div style="font-size:12px;color:var(--muted)">ZIP: ${esc(ct.zip)}</div>` : ''}
+              ${ct.notes ? `<div style="font-size:12px;color:var(--muted);font-style:italic">${esc(ct.notes)}</div>` : ''}
+            </div>
+          </div>
+          <div style="display:flex;gap:5px;flex-shrink:0;margin-top:2px">
+            <button onclick="editAdminContact('${ct.id}')" style="font-size:11px;padding:3px 9px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer">✏️ Edit</button>
+            <button onclick="deleteAdminContact('${ct.id}','${esc(ct.company_name)}')" style="font-size:11px;padding:3px 9px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface);color:var(--red);cursor:pointer">🗑</button>
+          </div>
         </div>
       </div>`).join('');
   }
+
+  // ── Contact: stored data for editing ──
+  const _contactCache = {};
+
+  window.editAdminContact = async function(contactId) {
+    // Load fresh data
+    const { data: ct, error } = await sb.from('client_contacts').select('*').eq('id', contactId).single();
+    if (error || !ct) { alert('Could not load contact.'); return; }
+    _contactCache[contactId] = ct;
+
+    const el = document.getElementById('cdet-contacts-list');
+    if (!el) return;
+
+    // Build inline edit form
+    const formId = 'cdet-contact-edit-' + contactId;
+    const existing = document.getElementById(formId);
+    if (existing) { existing.remove(); return; } // toggle off
+
+    const form = document.createElement('div');
+    form.id = formId;
+    form.style.cssText = 'background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:14px;margin-top:10px';
+    form.innerHTML = `
+      <div style="font-size:12px;font-weight:600;margin-bottom:10px;color:var(--muted)">EDIT CONTACT</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div><label style="font-size:11px;color:var(--muted)">Company / Customer Name *</label>
+          <input id="ec-company" value="${esc(ct.company_name)}" type="text" style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;margin-top:2px"></div>
+        <div><label style="font-size:11px;color:var(--muted)">Contact Person</label>
+          <input id="ec-name" value="${esc(ct.contact_name||'')}" type="text" style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;margin-top:2px"></div>
+        <div><label style="font-size:11px;color:var(--muted)">Email</label>
+          <input id="ec-email" value="${esc(ct.email||'')}" type="email" style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;margin-top:2px"></div>
+        <div><label style="font-size:11px;color:var(--muted)">Phone</label>
+          <input id="ec-phone" value="${esc(ct.phone||'')}" type="tel" style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;margin-top:2px"></div>
+        <div><label style="font-size:11px;color:var(--muted)">Address</label>
+          <input id="ec-addr1" value="${esc(ct.address_line1||'')}" type="text" placeholder="Street" style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;margin-top:2px;margin-bottom:4px">
+          <input id="ec-addr2" value="${esc(ct.address_line2||'')}" type="text" placeholder="Apt / Suite" style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px"></div>
+        <div style="display:grid;grid-template-columns:1fr 60px 80px;gap:6px;align-items:end">
+          <div><label style="font-size:11px;color:var(--muted)">City</label>
+            <input id="ec-city" value="${esc(ct.city||'')}" type="text" style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;margin-top:2px"></div>
+          <div><label style="font-size:11px;color:var(--muted)">State</label>
+            <input id="ec-state" value="${esc(ct.state||'')}" maxlength="2" style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;margin-top:2px"></div>
+          <div><label style="font-size:11px;color:var(--muted)">ZIP</label>
+            <input id="ec-zip" value="${esc(ct.zip||'')}" type="text" maxlength="10" style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;margin-top:2px"></div>
+        </div>
+      </div>
+      <div><label style="font-size:11px;color:var(--muted)">Notes</label>
+        <textarea id="ec-notes" rows="2" style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;resize:vertical;margin-top:2px">${esc(ct.notes||'')}</textarea></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button id="ec-save-btn" onclick="saveAdminContact('${contactId}')" class="btn btn-primary" style="font-size:12px;padding:6px 14px">Save Changes</button>
+        <button onclick="document.getElementById('${formId}').remove()" class="btn" style="font-size:12px;padding:6px 14px;background:var(--surface);color:var(--text);border:1.5px solid var(--border)">Cancel</button>
+      </div>
+      <div id="ec-err" style="font-size:12px;color:var(--red);margin-top:6px;min-height:14px"></div>`;
+
+    // Insert the form after the contact row that was clicked
+    el.appendChild(form);
+    document.getElementById('ec-company').focus();
+  };
+
+  window.saveAdminContact = async function(contactId) {
+    const btn = document.getElementById('ec-save-btn');
+    const errEl = document.getElementById('ec-err');
+    const company = document.getElementById('ec-company').value.trim();
+    if (!company) { errEl.textContent = 'Company / Customer Name is required.'; return; }
+    btn.textContent = 'Saving…'; btn.disabled = true;
+    const { error } = await sb.from('client_contacts').update({
+      company_name: company,
+      contact_name: document.getElementById('ec-name').value.trim() || null,
+      email: document.getElementById('ec-email').value.trim() || null,
+      phone: document.getElementById('ec-phone').value.trim() || null,
+      address_line1: document.getElementById('ec-addr1').value.trim() || null,
+      address_line2: document.getElementById('ec-addr2').value.trim() || null,
+      city: document.getElementById('ec-city').value.trim() || null,
+      state: document.getElementById('ec-state').value.trim().toUpperCase() || null,
+      zip: document.getElementById('ec-zip').value.trim() || null,
+      notes: document.getElementById('ec-notes').value.trim() || null,
+      updated_at: new Date().toISOString()
+    }).eq('id', contactId);
+    if (error) { errEl.textContent = 'Error: ' + error.message; btn.textContent = 'Save Changes'; btn.disabled = false; return; }
+    loadAdminContacts();
+  };
+
+  window.deleteAdminContact = async function(contactId, companyName) {
+    if (!confirm('Delete contact "' + companyName + '"? This cannot be undone.')) return;
+    const { error } = await sb.from('client_contacts').delete().eq('id', contactId);
+    if (error) { alert('Error deleting: ' + error.message); return; }
+    loadAdminContacts();
+  };
   if ((c.client_type || 'personal') === 'business') {
     const wrapper = document.getElementById('cdet-contacts-wrapper');
     if (wrapper) {
