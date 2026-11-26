@@ -3836,7 +3836,7 @@ async function openContactPicker(prefix) {
 
   window.selectContact = function(pfx, jsonStr) {
     const c = JSON.parse(jsonStr);
-    overlay.remove();
+    document.getElementById('contact-picker-overlay')?.remove();
     if (pfx === 'ci') {
       const nameEl = document.getElementById('ci-customer');
       if (nameEl) nameEl.value = c.company_name;
