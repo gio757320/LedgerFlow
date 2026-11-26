@@ -791,7 +791,7 @@ async function onSignedIn(user) {
   if (STATE.isStaff) {
     const {
       data: clients
-    } = await sb.from('clients').select('id,full_name,entity_type,is_firm,email,phone,address,state,logo_url,services').order('full_name');
+    } = await sb.from('clients').select('id,full_name,entity_type,client_type,is_firm,email,phone,address,state,logo_url,services').order('full_name');
     STATE.clientRows = clients || [];
     populateClientSelect();
   } else {
@@ -900,7 +900,7 @@ window.submitMfaEnroll = async function(factorId) {
 
   // MFA enrolled and verified — proceed into the app
   hideMfaScreen();
-  const clients = (await sb.from('clients').select('id,full_name,entity_type,is_firm,email,phone,address,state,logo_url,services').order('full_name')).data || [];
+  const clients = (await sb.from('clients').select('id,full_name,entity_type,client_type,is_firm,email,phone,address,state,logo_url,services').order('full_name')).data || [];
   STATE.clientRows = clients;
   populateClientSelect();
   showApp();
@@ -946,7 +946,7 @@ window.submitMfaVerify = async function(factorId) {
 
   // Verified — proceed into the app
   hideMfaScreen();
-  const clients = (await sb.from('clients').select('id,full_name,entity_type,is_firm,email,phone,address,state,logo_url,services').order('full_name')).data || [];
+  const clients = (await sb.from('clients').select('id,full_name,entity_type,client_type,is_firm,email,phone,address,state,logo_url,services').order('full_name')).data || [];
   STATE.clientRows = clients;
   populateClientSelect();
   showApp();
