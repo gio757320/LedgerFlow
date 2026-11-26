@@ -6531,7 +6531,7 @@ async function renderAdminInvoices(container) {
   }
 
   const clientSelected = !!STATE.selectedClientId;
-  const subtitle = clientSelected ? 'Firm charges &amp; client invoices' : 'All Client Invoices';
+  const subtitle = clientSelected ? 'Firm charges & client invoices' : 'All Client Invoices';
 
   container.innerHTML = pageShell('Invoices', subtitle, `
     <button class="btn btn-primary" onclick="openNewAdminInvoiceModal()">+ New Invoice</button>
