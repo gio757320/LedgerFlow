@@ -3821,8 +3821,7 @@ async function openContactPicker(prefix) {
         ${contacts.length === 0
           ? '<div style="padding:24px;text-align:center;color:var(--muted)">No contacts yet. Add them from the 📒 Contacts page.</div>'
           : contacts.map(c => `
-            <div class="picker-item" data-search="${esc((c.company_name+' '+(c.contact_name||'')).toLowerCase())}"
-              onclick="selectContact('${prefix}','${esc(c.id)}')"
+            <div class="picker-item" data-id="${esc(c.id)}" data-search="${esc((c.company_name+' '+(c.contact_name||'')).toLowerCase())}"
               style="padding:10px 20px;cursor:pointer;border-bottom:1px solid var(--border)">
               <div style="font-weight:600;font-size:14px">${esc(c.company_name)}</div>
               ${c.contact_name ? `<div style="font-size:12px;color:var(--muted)">${esc(c.contact_name)}</div>` : ''}
@@ -3832,6 +3831,27 @@ async function openContactPicker(prefix) {
     </div>`;
   document.body.appendChild(overlay);
 
+  // Wire up clicks via addEventListener — avoids any inline-onclick escaping issues
+  overlay.querySelectorAll('.picker-item').forEach(el => {
+    el.addEventListener('mouseenter', () => { el.style.background = 'var(--bg)'; });
+    el.addEventListener('mouseleave', () => { el.style.background = ''; });
+    el.addEventListener('click', () => {
+      const contactId = el.dataset.id;
+      const c = (window._pickerContacts || {})[contactId];
+      overlay.remove();
+      if (!c) return;
+      if (prefix === 'ci') {
+        const nameEl = document.getElementById('ci-customer');
+        if (nameEl) nameEl.value = c.company_name;
+      } else if (prefix === 'eai') {
+        const nameEl = document.getElementById('eai-cname');
+        if (nameEl) nameEl.value = c.company_name;
+        const emailEl = document.getElementById('eai-cemail');
+        if (emailEl) emailEl.value = c.email || '';
+      }
+    });
+  });
+
   window.filterPicker = function(q) {
     const lower = q.toLowerCase();
     overlay.querySelectorAll('.picker-item').forEach(el => {
@@ -3839,6 +3859,7 @@ async function openContactPicker(prefix) {
     });
   };
 
+  // Keep window.selectContact for any other callers
   window.selectContact = function(pfx, contactId) {
     const c = (window._pickerContacts || {})[contactId];
     document.getElementById('contact-picker-overlay')?.remove();
