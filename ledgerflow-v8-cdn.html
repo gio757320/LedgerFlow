@@ -6530,111 +6530,246 @@ async function renderAdminInvoices(container) {
     return;
   }
 
-  container.innerHTML = pageShell('Invoices', 'All Client Invoices', `
+  const clientSelected = !!STATE.selectedClientId;
+  const subtitle = clientSelected ? 'Firm charges &amp; client invoices' : 'All Client Invoices';
+
+  container.innerHTML = pageShell('Invoices', subtitle, `
     <button class="btn btn-primary" onclick="openNewAdminInvoiceModal()">+ New Invoice</button>
   `, '<div class="loading-block"><span class="spinner"></span> Loading invoices…</div>');
   const main = container.querySelector('#main');
 
-  // Load invoices joined with client name
-  let query = sb.from('client_invoices')
-    .select('*, clients(id, full_name)')
-    .order('issue_date', { ascending: false });
-
-  if (STATE.selectedClientId) {
-    query = query.eq('client_id', STATE.selectedClientId);
-  }
-
-  const { data: invoices, error } = await query;
-  if (error) {
-    main.innerHTML = `<div class="alert alert-red">Error loading invoices: ${esc(error.message)}</div>`;
-    return;
-  }
-
-  if (!invoices || !invoices.length) {
-    main.innerHTML = `<div class="empty"><div class="empty-icon">🧾</div><div>No invoices yet.</div><div style="font-size:13px;color:var(--muted);margin-top:8px">Create your first invoice with the button above.</div></div>`;
-    return;
-  }
-
-  const statusBadge = s => {
-    const map = { draft: 'badge-grey', sent: 'badge-blue', paid: 'badge-green', void: 'badge-grey', overdue: 'badge-red' };
-    return `<span class="badge ${map[s] || 'badge-grey'}">${esc(s || 'draft')}</span>`;
+  const fmt = v => v == null ? '—' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const statusBadge = (s, map) => {
+    const cls = (map || { draft: 'badge-grey', sent: 'badge-blue', paid: 'badge-green', void: 'badge-grey', overdue: 'badge-red', unpaid: 'badge-red' })[s] || 'badge-grey';
+    return `<span class="badge ${cls}">${esc(s || 'draft')}</span>`;
   };
 
-  const fmt = v => v == null ? '—' : '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (clientSelected) {
+    // ── Two-section view: Firm Charges + Client's Own Invoices ──
+    const [billingRes, invoicesRes] = await Promise.all([
+      sb.from('client_billing').select('*').eq('client_id', STATE.selectedClientId).order('created_at', { ascending: false }),
+      sb.from('client_invoices').select('*, clients(id, full_name)').eq('client_id', STATE.selectedClientId).order('issue_date', { ascending: false })
+    ]);
 
-  // Totals summary
-  const total = invoices.reduce((s, r) => s + (Number(r.total) || 0), 0);
-  const paid  = invoices.filter(r => r.status === 'paid').reduce((s, r) => s + (Number(r.total) || 0), 0);
-  const outstanding = total - paid;
+    const bills = billingRes.data || [];
+    const invoices = invoicesRes.data || [];
 
-  main.innerHTML = `
-    <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
-      <div class="stat-card stat-green" style="flex:1;min-width:140px">
-        <div class="stat-label">Total Invoiced</div>
-        <div class="stat-val">${fmt(total)}</div>
-        <div class="stat-sub">${invoices.length} invoice${invoices.length !== 1 ? 's' : ''}</div>
-      </div>
-      <div class="stat-card stat-gold" style="flex:1;min-width:140px">
-        <div class="stat-label">Outstanding</div>
-        <div class="stat-val">${fmt(outstanding)}</div>
-        <div class="stat-sub">Unpaid / sent</div>
-      </div>
-      <div class="stat-card stat-blue" style="flex:1;min-width:140px">
-        <div class="stat-label">Collected</div>
-        <div class="stat-val">${fmt(paid)}</div>
-        <div class="stat-sub">Paid invoices</div>
-      </div>
-    </div>
-    <div class="card" style="overflow-x:auto">
-      <table style="min-width:600px">
-        <thead><tr>
-          <th>Invoice #</th>
-          <th>Client</th>
-          <th>Date</th>
-          <th>Due</th>
-          <th class="amt">Amount</th>
-          <th>Status</th>
-          <th></th>
-        </tr></thead>
-        <tbody>
-          ${invoices.map(inv => `
-            <tr>
-              <td style="font-weight:600;font-family:monospace">${esc(inv.invoice_number || '—')}</td>
-              <td>${esc(inv.clients?.full_name || '—')}</td>
-              <td>${esc(inv.issue_date || '—')}</td>
-              <td>${esc(inv.due_date || '—')}</td>
-              <td class="amt">${fmt(inv.total)}</td>
-              <td>${statusBadge(inv.status)}</td>
-              <td style="text-align:right;padding-right:8px;white-space:nowrap;width:1%">
-                <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:nowrap">
-                  <button class="btn btn-secondary" data-inv-id="${esc(inv.id)}" data-action="view" style="font-size:11px;padding:3px 10px;font-weight:600">View →</button>
-                  ${inv.status !== 'paid' && inv.status !== 'void' ? `<button class="btn btn-secondary" data-inv-id="${esc(inv.id)}" data-action="markpaid" style="font-size:11px;padding:3px 8px;background:rgba(34,197,94,.1);color:var(--green);border-color:var(--green)">✓ Paid</button>` : ''}
-                </div>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    </div>
-  `;
+    // Firm charges summary
+    const billTotal = bills.reduce((s, b) => s + (Number(b.amount) || 0), 0);
+    const billPaid  = bills.filter(b => b.status === 'paid').reduce((s, b) => s + (Number(b.amount) || 0), 0);
+    const billOwed  = billTotal - billPaid;
 
-  // Wire up buttons
-  main.querySelectorAll('[data-action="markpaid"]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const invId = btn.dataset.invId;
-      btn.disabled = true;
-      btn.textContent = '…';
-      const { error: upErr } = await sb.from('client_invoices').update({ status: 'paid' }).eq('id', invId);
-      if (upErr) { btn.disabled = false; btn.textContent = '✓ Mark Paid'; alert('Error: ' + upErr.message); return; }
-      renderAdminInvoices(container);
+    // Client invoices summary
+    const invTotal = invoices.reduce((s, r) => s + (Number(r.total) || 0), 0);
+    const invPaid  = invoices.filter(r => r.status === 'paid').reduce((s, r) => s + (Number(r.total) || 0), 0);
+    const invOut   = invTotal - invPaid;
+
+    main.innerHTML = `
+      <!-- SECTION 1: Firm charges to this client -->
+      <div style="margin-bottom:28px">
+        <div style="font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.06em;margin-bottom:12px;text-transform:uppercase">💳 Firm Charges to Client</div>
+        <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+          <div class="stat-card stat-green" style="flex:1;min-width:120px">
+            <div class="stat-label">Total Charged</div>
+            <div class="stat-val" style="font-size:20px">${fmt(billTotal)}</div>
+            <div class="stat-sub">${bills.length} charge${bills.length !== 1 ? 's' : ''}</div>
+          </div>
+          <div class="stat-card stat-red" style="flex:1;min-width:120px">
+            <div class="stat-label">Outstanding</div>
+            <div class="stat-val" style="font-size:20px">${fmt(billOwed)}</div>
+            <div class="stat-sub">Unpaid</div>
+          </div>
+          <div class="stat-card stat-blue" style="flex:1;min-width:120px">
+            <div class="stat-label">Collected</div>
+            <div class="stat-val" style="font-size:20px">${fmt(billPaid)}</div>
+            <div class="stat-sub">Paid</div>
+          </div>
+        </div>
+        ${bills.length === 0 ? `<div class="empty" style="padding:14px 0"><div class="empty-icon">💳</div><div>No charges yet.</div></div>` : `
+        <div class="card" style="overflow-x:auto">
+          <table style="min-width:500px">
+            <thead><tr><th>Description</th><th>Amount</th><th>Due</th><th>Status</th><th></th></tr></thead>
+            <tbody id="adm-bills-tbody">
+              ${bills.map(b => `
+                <tr>
+                  <td>${esc(b.description || '—')}</td>
+                  <td class="amt">${fmt(b.amount)}</td>
+                  <td>${esc(b.due_date || '—')}</td>
+                  <td>${statusBadge(b.status, { unpaid: 'badge-red', paid: 'badge-green', void: 'badge-grey' })}</td>
+                  <td style="text-align:right;width:1%;white-space:nowrap">
+                    ${b.status === 'unpaid' ? `<button class="btn btn-secondary" data-bill-id="${esc(b.id)}" data-action="billpaid" style="font-size:11px;padding:3px 8px;background:rgba(34,197,94,.1);color:var(--green);border-color:var(--green)">✓ Paid</button>` : ''}
+                  </td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`}
+      </div>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:0 0 24px">
+
+      <!-- SECTION 2: Client's own invoices to their customers -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase">🧾 Client's Customer Invoices</div>
+          <button class="btn btn-primary" onclick="openNewAdminInvoiceModal()" style="font-size:12px;padding:5px 12px">+ New Invoice</button>
+        </div>
+        <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+          <div class="stat-card stat-green" style="flex:1;min-width:120px">
+            <div class="stat-label">Total Invoiced</div>
+            <div class="stat-val" style="font-size:20px">${fmt(invTotal)}</div>
+            <div class="stat-sub">${invoices.length} invoice${invoices.length !== 1 ? 's' : ''}</div>
+          </div>
+          <div class="stat-card stat-gold" style="flex:1;min-width:120px">
+            <div class="stat-label">Outstanding</div>
+            <div class="stat-val" style="font-size:20px">${fmt(invOut)}</div>
+            <div class="stat-sub">Unpaid / sent</div>
+          </div>
+          <div class="stat-card stat-blue" style="flex:1;min-width:120px">
+            <div class="stat-label">Collected</div>
+            <div class="stat-val" style="font-size:20px">${fmt(invPaid)}</div>
+            <div class="stat-sub">Paid invoices</div>
+          </div>
+        </div>
+        ${invoices.length === 0 ? `<div class="empty" style="padding:14px 0"><div class="empty-icon">🧾</div><div>No invoices yet.</div><div style="font-size:13px;color:var(--muted);margin-top:6px">This client hasn't created any invoices.</div></div>` : `
+        <div class="card" style="overflow-x:auto">
+          <table style="min-width:580px">
+            <thead><tr><th>Invoice #</th><th>Date</th><th>Due</th><th class="amt">Amount</th><th>Status</th><th></th></tr></thead>
+            <tbody id="adm-invs-tbody">
+              ${invoices.map(inv => `
+                <tr>
+                  <td style="font-weight:600;font-family:monospace">${esc(inv.invoice_number || '—')}</td>
+                  <td>${esc(inv.issue_date || '—')}</td>
+                  <td>${esc(inv.due_date || '—')}</td>
+                  <td class="amt">${fmt(inv.total)}</td>
+                  <td>${statusBadge(inv.status)}</td>
+                  <td style="text-align:right;padding-right:8px;white-space:nowrap;width:1%">
+                    <div style="display:flex;gap:6px;justify-content:flex-end">
+                      <button class="btn btn-secondary" data-inv-id="${esc(inv.id)}" data-action="view" style="font-size:11px;padding:3px 10px;font-weight:600">View →</button>
+                      ${inv.status !== 'paid' && inv.status !== 'void' ? `<button class="btn btn-secondary" data-inv-id="${esc(inv.id)}" data-action="markpaid" style="font-size:11px;padding:3px 8px;background:rgba(34,197,94,.1);color:var(--green);border-color:var(--green)">✓ Paid</button>` : ''}
+                    </div>
+                  </td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`}
+      </div>
+    `;
+
+    // Wire bill mark-paid buttons
+    main.querySelectorAll('[data-action="billpaid"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const billId = btn.dataset.billId;
+        btn.disabled = true; btn.textContent = '…';
+        const { error } = await sb.from('client_billing').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', billId);
+        if (error) { btn.disabled = false; btn.textContent = '✓ Paid'; alert('Error: ' + error.message); return; }
+        renderAdminInvoices(container);
+      });
     });
-  });
-  main.querySelectorAll('[data-action="view"]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const inv = invoices.find(i => i.id === btn.dataset.invId);
-      if (inv) openAdminInvoiceDetail(inv, container);
+
+    // Wire invoice buttons
+    main.querySelectorAll('[data-action="markpaid"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const invId = btn.dataset.invId;
+        btn.disabled = true; btn.textContent = '…';
+        const { error } = await sb.from('client_invoices').update({ status: 'paid' }).eq('id', invId);
+        if (error) { btn.disabled = false; btn.textContent = '✓ Paid'; alert('Error: ' + error.message); return; }
+        renderAdminInvoices(container);
+      });
     });
-  });
+    main.querySelectorAll('[data-action="view"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const inv = invoices.find(i => i.id === btn.dataset.invId);
+        if (inv) openAdminInvoiceDetail(inv, container);
+      });
+    });
+
+  } else {
+    // ── No client selected: show firm invoices (client_invoices) across all clients ──
+    const { data: invoices, error } = await sb.from('client_invoices')
+      .select('*, clients(id, full_name)')
+      .order('issue_date', { ascending: false });
+
+    if (error) {
+      main.innerHTML = `<div class="alert alert-red">Error loading invoices: ${esc(error.message)}</div>`;
+      return;
+    }
+
+    if (!invoices || !invoices.length) {
+      main.innerHTML = `<div class="empty"><div class="empty-icon">🧾</div><div>No invoices yet.</div><div style="font-size:13px;color:var(--muted);margin-top:8px">Create your first invoice with the button above.</div></div>`;
+      return;
+    }
+
+    const total = invoices.reduce((s, r) => s + (Number(r.total) || 0), 0);
+    const paid  = invoices.filter(r => r.status === 'paid').reduce((s, r) => s + (Number(r.total) || 0), 0);
+    const outstanding = total - paid;
+
+    main.innerHTML = `
+      <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+        <div class="stat-card stat-green" style="flex:1;min-width:140px">
+          <div class="stat-label">Total Invoiced</div>
+          <div class="stat-val">${fmt(total)}</div>
+          <div class="stat-sub">${invoices.length} invoice${invoices.length !== 1 ? 's' : ''}</div>
+        </div>
+        <div class="stat-card stat-gold" style="flex:1;min-width:140px">
+          <div class="stat-label">Outstanding</div>
+          <div class="stat-val">${fmt(outstanding)}</div>
+          <div class="stat-sub">Unpaid / sent</div>
+        </div>
+        <div class="stat-card stat-blue" style="flex:1;min-width:140px">
+          <div class="stat-label">Collected</div>
+          <div class="stat-val">${fmt(paid)}</div>
+          <div class="stat-sub">Paid invoices</div>
+        </div>
+      </div>
+      <div class="card" style="overflow-x:auto">
+        <table style="min-width:600px">
+          <thead><tr>
+            <th>Invoice #</th>
+            <th>Client</th>
+            <th>Date</th>
+            <th>Due</th>
+            <th class="amt">Amount</th>
+            <th>Status</th>
+            <th></th>
+          </tr></thead>
+          <tbody>
+            ${invoices.map(inv => `
+              <tr>
+                <td style="font-weight:600;font-family:monospace">${esc(inv.invoice_number || '—')}</td>
+                <td>${esc(inv.clients?.full_name || '—')}</td>
+                <td>${esc(inv.issue_date || '—')}</td>
+                <td>${esc(inv.due_date || '—')}</td>
+                <td class="amt">${fmt(inv.total)}</td>
+                <td>${statusBadge(inv.status)}</td>
+                <td style="text-align:right;padding-right:8px;white-space:nowrap;width:1%">
+                  <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:nowrap">
+                    <button class="btn btn-secondary" data-inv-id="${esc(inv.id)}" data-action="view" style="font-size:11px;padding:3px 10px;font-weight:600">View →</button>
+                    ${inv.status !== 'paid' && inv.status !== 'void' ? `<button class="btn btn-secondary" data-inv-id="${esc(inv.id)}" data-action="markpaid" style="font-size:11px;padding:3px 8px;background:rgba(34,197,94,.1);color:var(--green);border-color:var(--green)">✓ Paid</button>` : ''}
+                  </div>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    main.querySelectorAll('[data-action="markpaid"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const invId = btn.dataset.invId;
+        btn.disabled = true; btn.textContent = '…';
+        const { error: upErr } = await sb.from('client_invoices').update({ status: 'paid' }).eq('id', invId);
+        if (upErr) { btn.disabled = false; btn.textContent = '✓ Mark Paid'; alert('Error: ' + upErr.message); return; }
+        renderAdminInvoices(container);
+      });
+    });
+    main.querySelectorAll('[data-action="view"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const inv = invoices.find(i => i.id === btn.dataset.invId);
+        if (inv) openAdminInvoiceDetail(inv, container);
+      });
+    });
+  }
 }
 
 function openAdminInvoiceDetail(inv, container) {
