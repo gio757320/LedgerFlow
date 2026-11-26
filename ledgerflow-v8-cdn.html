@@ -4184,7 +4184,25 @@ async function renderClientInvoices(container) {
   `);
 }
 
+function ensureCIModal() {
+  if (document.getElementById('ci-modal')) return;
+  const el = document.createElement('div');
+  el.id = 'ci-modal';
+  el.hidden = true;
+  el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px';
+  el.innerHTML = `
+    <div style="background:var(--surface);border-radius:12px;width:100%;max-width:620px;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)">
+        <div style="font-weight:700;font-size:16px" id="ci-modal-title">New Invoice</div>
+        <button onclick="document.getElementById('ci-modal').hidden=true" style="font-size:20px;color:var(--muted);background:none;border:none;cursor:pointer">✕</button>
+      </div>
+      <div style="padding:24px" id="ci-modal-body"></div>
+    </div>`;
+  document.body.appendChild(el);
+}
+
 window.openClientNewInvoiceModal = async function() {
+  ensureCIModal();
   const clientId = STATE.isStaff ? STATE.selectedClientId : STATE.clientRow?.id;
   const modal = document.getElementById('ci-modal');
   document.getElementById('ci-modal-title').textContent = 'New Invoice';
@@ -4200,6 +4218,7 @@ window.openClientNewInvoiceModal = async function() {
 };
 
 window.openClientEditInvoiceModal = async function(id) {
+  ensureCIModal();
   const { data: inv } = await sb.from('client_invoices').select('*').eq('id', id).single();
   document.getElementById('ci-modal-title').textContent = 'Edit Invoice';
   document.getElementById('ci-modal-body').innerHTML = clientInvoiceFormHtml(inv);
@@ -6602,7 +6621,11 @@ async function renderAdminInvoices(container) {
                   <td>${esc(b.due_date || '—')}</td>
                   <td>${statusBadge(b.status, { unpaid: 'badge-red', paid: 'badge-green', void: 'badge-grey' })}</td>
                   <td style="text-align:right;width:1%;white-space:nowrap">
-                    ${b.status === 'unpaid' ? `<button class="btn btn-secondary" data-bill-id="${esc(b.id)}" data-action="billpaid" style="font-size:11px;padding:3px 8px;background:rgba(34,197,94,.1);color:var(--green);border-color:var(--green)">✓ Paid</button>` : ''}
+                    <div style="display:flex;gap:6px;justify-content:flex-end;align-items:center">
+                      ${b.status === 'unpaid' ? `<button class="btn btn-secondary" data-bill-id="${esc(b.id)}" data-action="billpaid" style="font-size:11px;padding:3px 8px;background:rgba(34,197,94,.1);color:var(--green);border-color:var(--green)">✓ Paid</button>` : ''}
+                      <button class="btn btn-secondary" data-bill-id="${esc(b.id)}" data-action="billedit" style="font-size:11px;padding:3px 8px">✏️ Edit</button>
+                      <button class="btn btn-secondary" data-bill-id="${esc(b.id)}" data-action="billdelete" style="font-size:11px;padding:3px 8px;color:var(--red);border-color:var(--red)">🗑</button>
+                    </div>
                   </td>
                 </tr>`).join('')}
             </tbody>
@@ -6667,6 +6690,26 @@ async function renderAdminInvoices(container) {
         btn.disabled = true; btn.textContent = '…';
         const { error } = await sb.from('client_billing').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', billId);
         if (error) { btn.disabled = false; btn.textContent = '✓ Paid'; alert('Error: ' + error.message); return; }
+        renderAdminInvoices(container);
+      });
+    });
+
+    // Wire bill edit buttons
+    main.querySelectorAll('[data-action="billedit"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const bill = bills.find(b => b.id === btn.dataset.billId);
+        if (!bill) return;
+        openEditFirmChargeModal(bill, container);
+      });
+    });
+
+    // Wire bill delete buttons
+    main.querySelectorAll('[data-action="billdelete"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Delete this firm charge? This cannot be undone.')) return;
+        const billId = btn.dataset.billId;
+        const { error } = await sb.from('client_billing').delete().eq('id', billId);
+        if (error) { alert('Error: ' + error.message); return; }
         renderAdminInvoices(container);
       });
     });
@@ -7399,6 +7442,79 @@ function openNewFirmChargeModal() {
     }
     closeModal('new-firm-charge-backdrop');
     renderAdminInvoices(document.getElementById('screen-container'));
+  });
+}
+
+// ── Edit Firm Charge Modal ────────────────────────────────
+function openEditFirmChargeModal(bill, container) {
+  const bd = document.createElement('div');
+  bd.className = 'modal-backdrop';
+  bd.id = 'edit-firm-charge-backdrop';
+  bd.innerHTML = `
+    <div class="modal" role="dialog" style="max-width:460px">
+      <div class="modal-header">
+        <h3>Edit Firm Charge</h3>
+        <button class="modal-close" onclick="closeModal('edit-firm-charge-backdrop')" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="efc-desc">Description *</label>
+          <input id="efc-desc" type="text" value="${esc(bill.description || '')}" autocomplete="off">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="efc-amount">Amount ($) *</label>
+            <input id="efc-amount" type="number" min="0" step="0.01" value="${esc(bill.amount || '')}">
+          </div>
+          <div class="form-group">
+            <label for="efc-due">Due Date</label>
+            <input id="efc-due" type="date" value="${esc(bill.due_date || '')}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="efc-status">Status</label>
+          <select id="efc-status">
+            <option value="unpaid" ${bill.status === 'unpaid' ? 'selected' : ''}>Unpaid</option>
+            <option value="paid"   ${bill.status === 'paid'   ? 'selected' : ''}>Paid</option>
+            <option value="void"   ${bill.status === 'void'   ? 'selected' : ''}>Void</option>
+          </select>
+        </div>
+        <div class="modal-error" id="efc-error"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('edit-firm-charge-backdrop')">Cancel</button>
+        <button class="btn btn-primary" id="efc-save">Save Changes</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(bd);
+  bd.addEventListener('click', e => { if (e.target === bd) closeModal('edit-firm-charge-backdrop'); });
+
+  bd.querySelector('#efc-save').addEventListener('click', async () => {
+    const amount = parseFloat(bd.querySelector('#efc-amount').value) || 0;
+    const desc   = bd.querySelector('#efc-desc').value.trim();
+    const due    = bd.querySelector('#efc-due').value.trim();
+    const status = bd.querySelector('#efc-status').value;
+    const errEl  = bd.querySelector('#efc-error');
+
+    if (!desc)   { errEl.textContent = 'Description is required.'; return; }
+    if (!amount) { errEl.textContent = 'Enter a valid amount.'; return; }
+
+    const saveBtn = bd.querySelector('#efc-save');
+    saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+
+    const payload = { description: desc, amount, due_date: due || null, status };
+    if (status === 'paid' && bill.status !== 'paid') payload.paid_at = new Date().toISOString();
+    if (status !== 'paid') payload.paid_at = null;
+
+    const { error } = await sb.from('client_billing').update(payload).eq('id', bill.id);
+    if (error) {
+      errEl.textContent = error.message;
+      saveBtn.disabled = false; saveBtn.textContent = 'Save Changes';
+      return;
+    }
+    closeModal('edit-firm-charge-backdrop');
+    renderAdminInvoices(container);
   });
 }
 
