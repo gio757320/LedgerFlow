@@ -4365,19 +4365,23 @@ window.saveCIInvoice = async function(existingId) {
     amount: parseFloat(row.querySelector('.ci-amt')?.value) || 0
   }));
 
-  const taxRate  = parseFloat(document.getElementById('ci-tax')?.value ?? '0') || 0;
-  const subtotal = items.reduce((s,i) => s + i.amount, 0);
-  const total    = Math.round((subtotal + subtotal * taxRate / 100) * 100) / 100;
+  const taxRateRaw = parseFloat(document.getElementById('ci-tax')?.value);
+  const taxRate    = isNaN(taxRateRaw) ? 0 : taxRateRaw;
+  const subtotal   = Math.round(items.reduce((s,i) => s + i.amount, 0) * 100) / 100;
+  const taxAmount  = Math.round(subtotal * taxRate / 100 * 100) / 100;
+  const total      = Math.round((subtotal + taxAmount) * 100) / 100;
+
+  const invoiceNum = document.getElementById('ci-number')?.value.trim() || `INV-${Date.now()}`;
 
   const payload = {
-    client_id: clientId,
-    invoice_number: document.getElementById('ci-number')?.value.trim(),
+    client_id:      clientId,
+    invoice_number: invoiceNum,
     customer_name:  customer,
-    issue_date:     document.getElementById('ci-date')?.value || null,
+    issue_date:     document.getElementById('ci-date')?.value || new Date().toISOString().slice(0,10),
     due_date:       document.getElementById('ci-due')?.value  || null,
     status:         document.getElementById('ci-status')?.value || 'draft',
-    tax_rate:       taxRate ?? 0,
-    tax_amount:     Math.round((subtotal * taxRate / 100) * 100) / 100,
+    tax_rate:       taxRate,
+    tax_amount:     taxAmount,
     subtotal,
     total,
     notes:          document.getElementById('ci-notes')?.value.trim() || null,
@@ -7087,13 +7091,14 @@ function openEditAdminInvoiceModal(inv, container) {
       unit_price: parseFloat(tr.querySelector('.eai-unit')?.value) || 0,
       amount: (parseFloat(tr.querySelector('.eai-qty')?.value)||1) * (parseFloat(tr.querySelector('.eai-unit')?.value)||0),
     }));
-    const taxRate = parseFloat(bd.querySelector('#eai-taxrate').value) || 0;
-    const subtotal = rows.reduce((s,r) => s + r.amount, 0);
-    const taxAmt = subtotal * taxRate / 100;
-    const total = subtotal + taxAmt;
+    const taxRateRaw2 = parseFloat(bd.querySelector('#eai-taxrate').value);
+    const taxRate = isNaN(taxRateRaw2) ? 0 : taxRateRaw2;
+    const subtotal = Math.round(rows.reduce((s,r) => s + r.amount, 0) * 100) / 100;
+    const taxAmt = Math.round(subtotal * taxRate / 100 * 100) / 100;
+    const total = Math.round((subtotal + taxAmt) * 100) / 100;
 
     const payload = {
-      invoice_number: bd.querySelector('#eai-num').value.trim() || null,
+      invoice_number: bd.querySelector('#eai-num').value.trim() || `INV-${Date.now()}`,
       status: bd.querySelector('#eai-status').value,
       customer_name: bd.querySelector('#eai-cname').value.trim() || null,
       customer_email: bd.querySelector('#eai-cemail').value.trim() || null,
@@ -7101,8 +7106,8 @@ function openEditAdminInvoiceModal(inv, container) {
       due_date: bd.querySelector('#eai-due').value || null,
       line_items: rows,
       subtotal,
-      tax_rate: taxRate || null,
-      tax_amount: taxAmt || null,
+      tax_rate: taxRate,
+      tax_amount: taxAmt,
       total,
       notes: bd.querySelector('#eai-notes').value.trim() || null,
       updated_at: new Date().toISOString(),
